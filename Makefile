@@ -9,7 +9,7 @@ SRC_DIR   := src
 OBJ_DIR   := obj
 DEP_DIR   := $(OBJ_DIR)
 
-SRC_FILES   := main.c parser.c
+SRC_FILES   := main.c ft_parser.c ft_assert.c
 
 SRCS := $(addprefix $(SRC_DIR)/, $(SRC_FILES))
 
@@ -36,6 +36,10 @@ debug: CFLAGS += $(DEBUGFLAG)
 # Build rules
 .PHONY: all
 all: $(NAME)  ## Build release version (default)
+
+.PHONY: tester
+tester:  ## run the tester
+	python3 ./tester/main.py
 
 .PHONY: clean
 clean:  ## Clean object files

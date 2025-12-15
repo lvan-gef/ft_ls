@@ -4,7 +4,7 @@
 
 #include "../include/ft_assert.h"
 
-void log_assert_failure(const char *file, int line, const char *func,
+void log_assert_(const char *file, int line, const char *func,
                         const char *message) {
     time_t now = time(NULL);
     const struct tm *t = localtime(&now);
