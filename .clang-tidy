@@ -1,0 +1,21 @@
+Checks: >
+  -*,
+  bugprone-*,
+  modernize-*,
+  performance-*,
+  misc-*,
+  -modernize-use-nodiscard,
+  -modernize-use-trailing-return-type
+
+CheckOptions:
+  - key:             modernize-loop-convert.MinConfidence
+    value:           reasonable
+  - key:             modernize-use-auto.MinTypeNameLength
+    value:           3
+  - key:             modernize-pass-by-value.IncludeStyle
+    value:           llvm
+  - key:             modernize-use-nullptr.NullMacros
+    value:           'NULL'
+  - key:             'Language'
+    value:           'C11'
+ExtraArgs: ['-std=c11']
