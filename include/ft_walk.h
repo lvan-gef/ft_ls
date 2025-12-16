@@ -5,6 +5,7 @@
 
 #include "./ft_ls.h"
 
-bool walk(t_arguments *args);
+bool walk(t_args *args, t_list *paths);
+void free_path(void *content);
 
 #endif // FT_WALK_H
