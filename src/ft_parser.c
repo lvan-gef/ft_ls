@@ -106,6 +106,9 @@ static bool add_node_(t_arguments *args, const char *path) {
 }
 
 static void print_error_(const char *flag) {
+    CUSTOM_ASSERT_(flag != NULL, "flag can not be NULL");
+    CUSTOM_ASSERT_(*flag != '\0', "flag[0] can not be '\\0'");
+
     ft_fprintf(STDERR_FILENO,
                "ft_ls: invalid option -- %s\nusage: ft_ls "
                "[-Ralrt] [file ...]\n",
@@ -119,5 +122,6 @@ static void free_path_(void *content) {
     if (node->path) {
         free(node->path);
     }
+
     free(node);
 }
