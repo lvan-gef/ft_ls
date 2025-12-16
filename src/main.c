@@ -1,6 +1,6 @@
+#include "../include/ft_assert.h"
 #include "../include/ft_parser.h"
 #include "../include/ft_walk.h"
-#include "../include/ft_assert.h"
 #include "../include/libft.h"
 
 static void clean_program(t_args *args, t_list *paths);
