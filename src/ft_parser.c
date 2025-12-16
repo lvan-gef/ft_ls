@@ -1,7 +1,8 @@
 #include <stddef.h>
+#include <unistd.h>
 
-#include "../include/ft_ls.h"
 #include "../include/ft_assert.h"
+#include "../include/ft_ls.h"
 #include "../include/ft_parser.h"
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
@@ -80,16 +81,23 @@ static bool add_node_(t_arguments *args, const char *path) {
     CUSTOM_ASSERT_(path != NULL, "path can not be NULL");
     CUSTOM_ASSERT_(path[0], "path[0] can not be '\\0'");
 
-    t_node node = {0};
-    node.path = ft_strdup(path);
-    if (!node.path) {
-        ft_fprintf(STDERR, "Failed to calloc path\n");
+    t_node *node = malloc(sizeof(t_node));
+    if (!node) {
+        ft_fprintf(STDERR_FILENO, "Failed to malloc node\n");
         return false;
     }
 
-    t_list *new_node = ft_lstnew((void *)&node);
+    node->path = ft_strdup(path);
+    if (!node->path) {
+        ft_fprintf(STDERR_FILENO, "Failed to strdup path\n");
+        free(node);
+        return false;
+    }
+
+    t_list *new_node = ft_lstnew((void *)node);
     if (!new_node) {
-        free(node.path);
+        free(node->path);
+        free(node);
         return false;
     }
 
@@ -98,19 +106,18 @@ static bool add_node_(t_arguments *args, const char *path) {
 }
 
 static void print_error_(const char *flag) {
-    ft_fprintf(STDERR,
+    ft_fprintf(STDERR_FILENO,
                "ft_ls: invalid option -- %s\nusage: ft_ls "
                "[-Ralrt] [file ...]\n",
                flag);
 }
 
-static void free_path_(void *node) {
-    CUSTOM_ASSERT_(node != NULL, "node can not be NULL");
+static void free_path_(void *content) {
+    CUSTOM_ASSERT_(content != NULL, "content can not be NULL");
 
-    t_list *n = (t_list *)node;
-    if ((char *)n->content) {
-        free(n->content);
+    t_node *node = (t_node *)content;
+    if (node->path) {
+        free(node->path);
     }
-
-    free(n);
+    free(node);
 }
