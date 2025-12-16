@@ -5,14 +5,6 @@
 
 #include "../libft/include/libft.h"
 
-#ifndef STDOUT
-#define STDOUT 1
-#endif // !STDOUT
-       //
-#ifndef STDERR
-#define STDERR 2
-#endif // !STDERR
-
 typedef struct s_arguments {
     bool list;
     bool recursive;
