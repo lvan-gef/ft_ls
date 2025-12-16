@@ -1,7 +1,10 @@
 #ifndef FT_WALK_H
 #define FT_WALK_H
 
-#include "ft_parser.h"
-void walk(t_arguments *args);
+#include <stdbool.h>
+
+#include "./ft_ls.h"
+
+bool walk(t_arguments *args);
 
 #endif // FT_WALK_H
