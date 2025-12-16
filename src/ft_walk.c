@@ -6,8 +6,6 @@
 #include "../include/ft_walk.h"
 #include "../include/ft_assert.h"
 #include "../libft/include/ft_fprintf.h"
-#include "../libft/include/libft.h"
-
 
 static void clean_up_(DIR *dir);
 
