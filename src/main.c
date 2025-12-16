@@ -1,4 +1,5 @@
 #include "../include/ft_parser.h"
+#include "ft_walk.h"
 
 int main(int argc, char **argv) {
     t_arguments args = {0};
@@ -10,6 +11,7 @@ int main(int argc, char **argv) {
     }
 
     // main flow
+    walk(&args);
 
     free_args(&args);
     return 0;
