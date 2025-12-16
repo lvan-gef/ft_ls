@@ -12,25 +12,22 @@
 
 #include "../../include/ft_printf.h"
 
-int	write_str(const char *s)
-{
-	int	count;
-	int	result;
+int write_str(const char *s) {
+    int count;
+    int result;
 
-	count = 0;
-	if (!s)
-		s = "(null)";
-	while (s[count])
-	{
-		result = write_ascii(s[count]);
-		if (result < 0)
-			return (-1);
-		count++;
-	}
-	return (count);
+    count = 0;
+    if (!s)
+        s = "(null)";
+    while (s[count]) {
+        result = write_ascii(s[count]);
+        if (result < 0)
+            return (-1);
+        count++;
+    }
+    return (count);
 }
 
-int	write_ascii(int c)
-{
-	return ((int)write(1, &c, 1));
+int write_ascii(int c) {
+    return ((int)write(1, &c, 1));
 }

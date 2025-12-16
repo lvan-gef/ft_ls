@@ -13,26 +13,22 @@
 #include "../../include/ft_fprintf.h"
 #include <stddef.h>
 
+ssize_t f_write_str(const char *s, int fd) {
+    int count;
+    ssize_t result;
 
-ssize_t f_write_str(const char *s, int fd)
-{
-	int	count;
-	ssize_t result;
-
-	count = 0;
-	if (!s)
-		s = "(null)";
-	while (s[count])
-	{
-		result = f_write_ascii(s[count], fd);
-		if (result < 0)
-			return (-1);
-		count++;
-	}
-	return (count);
+    count = 0;
+    if (!s)
+        s = "(null)";
+    while (s[count]) {
+        result = f_write_ascii(s[count], fd);
+        if (result < 0)
+            return (-1);
+        count++;
+    }
+    return (count);
 }
 
-ssize_t	f_write_ascii(int c, int fd)
-{
-	return (write(fd, &c, 1));
+ssize_t f_write_ascii(int c, int fd) {
+    return (write(fd, &c, 1));
 }

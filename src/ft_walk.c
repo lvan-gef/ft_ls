@@ -3,8 +3,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "../include/ft_walk.h"
 #include "../include/ft_assert.h"
+#include "../include/ft_walk.h"
 #include "../libft/include/ft_fprintf.h"
 
 static void clean_up_(DIR *dir);

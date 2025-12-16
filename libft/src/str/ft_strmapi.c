@@ -12,23 +12,21 @@
 
 #include "../../include/libft.h"
 
-char	*ft_strmapi(char const *s, char (*f)(unsigned int, char))
-{
-	unsigned int	index;
-	size_t			str_len;
-	char			*str;
+char *ft_strmapi(char const *s, char (*f)(unsigned int, char)) {
+    unsigned int index;
+    size_t str_len;
+    char *str;
 
-	if (!s)
-		return (NULL);
-	index = 0;
-	str_len = ft_strlen(s);
-	str = ft_calloc(str_len + 1, sizeof(char));
-	if (!str)
-		return (NULL);
-	while (s[index] != '\0')
-	{
-		str[index] = f(index, s[index]);
-		index++;
-	}
-	return (str);
+    if (!s)
+        return (NULL);
+    index = 0;
+    str_len = ft_strlen(s);
+    str = ft_calloc(str_len + 1, sizeof(char));
+    if (!str)
+        return (NULL);
+    while (s[index] != '\0') {
+        str[index] = f(index, s[index]);
+        index++;
+    }
+    return (str);
 }

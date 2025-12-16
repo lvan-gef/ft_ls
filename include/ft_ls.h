@@ -18,5 +18,4 @@ typedef struct s_node {
     char *path;
 } t_node;
 
-
 #endif // FT_LS_H
