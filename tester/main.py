@@ -21,14 +21,10 @@ def invalid_flags() -> None:
         if lttr in ALLOWED_FLAGS:
             continue
 
-        print(lttr)
-        result = subprocess.run(f'./ft_ls {lttr}', shell=True, capture_output=True)
-        try:
-            assert result.returncode == 1
-            assert result.stdout == ''
-            assert result.stderr != ''
-        except AssertionError as ae:
-            print(f'{ae}\nreturncode: {result.returncode}\nstdout: {result.stdout}\nstderr: {result.stderr}')
+        result = subprocess.run(f'./ft_ls -{lttr}', shell=True, capture_output=True, text=True)
+        assert result.returncode == 1
+        assert result.stdout == ''
+        assert result.stderr != ''
 
 
 if __name__ == '__main__':
