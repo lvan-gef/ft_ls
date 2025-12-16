@@ -1,8 +1,9 @@
 #include <stddef.h>
 
+#include "../include/ft_ls.h"
 #include "../include/ft_assert.h"
 #include "../include/ft_parser.h"
-#include "../libft/include/ft_printf.h"
+#include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
 
 static bool add_node_(t_arguments *args, const char *path);
@@ -44,6 +45,7 @@ bool parse_args(int argc, char **argv, t_arguments *args) {
                             break;
                         case 't':
                             args->time = true;
+                            break;
                         default:
                             print_error_(argv[index]);
                             return false;
@@ -81,7 +83,7 @@ static bool add_node_(t_arguments *args, const char *path) {
     t_node node = {0};
     node.path = ft_strdup(path);
     if (!node.path) {
-        ft_printf("Failed to calloc path\n");
+        ft_fprintf(STDERR, "Failed to calloc path\n");
         return false;
     }
 
@@ -96,9 +98,10 @@ static bool add_node_(t_arguments *args, const char *path) {
 }
 
 static void print_error_(const char *flag) {
-    ft_printf("ft_ls: invalid option -- %s\nusage: ft_ls "
-              "[-Ralrt] [file ...]\n",
-              flag);
+    ft_fprintf(STDERR,
+               "ft_ls: invalid option -- %s\nusage: ft_ls "
+               "[-Ralrt] [file ...]\n",
+               flag);
 }
 
 static void free_path_(void *node) {
@@ -109,5 +112,5 @@ static void free_path_(void *node) {
         free(n->content);
     }
 
-    // free(n);
+    free(n);
 }
