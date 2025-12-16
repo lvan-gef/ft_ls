@@ -5,7 +5,7 @@
 
 #include "../include/ft_ls.h"
 
-bool parse_args(int argc, char **argv, t_arguments *args);
-void free_args(t_arguments *args);
+bool parse_args(int argc, char **argv, t_args *args);
+void free_args(t_args *args);
 
 #endif // FT_PARSER_H

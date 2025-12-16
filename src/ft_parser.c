@@ -7,14 +7,14 @@
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
 
-static bool add_node_(t_arguments *args, const char *path);
+static bool add_node_(t_args *args, const char *path);
 static void print_error_(const char *flag);
 static void free_path_(void *node);
 
-bool parse_args(int argc, char **argv, t_arguments *args) {
+bool parse_args(int argc, char **argv, t_args *args) {
     CUSTOM_ASSERT_(argc > 0, "argc must be more then 0");
-    CUSTOM_ASSERT_(argv != NULL, "argv can not be NULL");
-    CUSTOM_ASSERT_(argv[0] != NULL, "argv[0] can not be NULL");
+    CUSTOM_ASSERT_(argv, "argv can not be NULL");
+    CUSTOM_ASSERT_(argv[0], "argv[0] can not be '\\0'");
 
     size_t index = 1;
     bool is_flag = true;
@@ -70,33 +70,27 @@ bool parse_args(int argc, char **argv, t_arguments *args) {
     return true;
 }
 
-void free_args(t_arguments *args) {
+void free_args(t_args *args) {
     CUSTOM_ASSERT_(args != NULL, "args can not be NULL");
 
     ft_lstclear(&args->paths, free_path_);
 }
 
-static bool add_node_(t_arguments *args, const char *path) {
+static bool add_node_(t_args *args, const char *path) {
     CUSTOM_ASSERT_(args != NULL, "args can not be NULL");
     CUSTOM_ASSERT_(path != NULL, "path can not be NULL");
     CUSTOM_ASSERT_(path[0], "path[0] can not be '\\0'");
 
-    t_node *node = malloc(sizeof(t_node));
+    t_node *node = ft_calloc(1, sizeof(*node));
     if (!node) {
         ft_fprintf(STDERR_FILENO, "Failed to malloc node\n");
         return false;
     }
 
-    node->path = ft_strdup(path);
-    if (!node->path) {
-        ft_fprintf(STDERR_FILENO, "Failed to strdup path\n");
-        free(node);
-        return false;
-    }
+    ft_strlcpy(node->path, path, PATH_MAX - 1);
 
     t_list *new_node = ft_lstnew((void *)node);
     if (!new_node) {
-        free(node->path);
         free(node);
         return false;
     }
@@ -119,9 +113,5 @@ static void free_path_(void *content) {
     CUSTOM_ASSERT_(content != NULL, "content can not be NULL");
 
     t_node *node = (t_node *)content;
-    if (node->path) {
-        free(node->path);
-    }
-
     free(node);
 }
