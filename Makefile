@@ -1,7 +1,7 @@
 NAME := ft_ls
 
 CC        := cc
-CFLAGS    := -std=c11 -Wall -Wextra -Werror -Wshadow -Wpedantic -Wconversion -Wdouble-promotion
+CFLAGS    := -Wall -Wextra -Werror -Wshadow -Wpedantic -Wconversion -Wdouble-promotion
 DEBUGFLAG := -g3 -fno-omit-frame-pointer -fsanitize=address,null
 DEPSFLAGS := -MMD -MP
 
@@ -9,7 +9,7 @@ SRC_DIR   := src
 OBJ_DIR   := obj
 DEP_DIR   := $(OBJ_DIR)
 
-SRC_FILES   := main.c ft_parser.c ft_assert.c ft_walk.c
+SRC_FILES   := main.c ft_parser.c ft_assert.c ft_walk.c ft_print.c
 
 SRCS := $(addprefix $(SRC_DIR)/, $(SRC_FILES))
 
