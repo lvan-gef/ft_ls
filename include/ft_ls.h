@@ -18,6 +18,10 @@
 #define DT_LEN 13
 #endif // !DT_LEN
 
+#ifndef TERM_SIZE
+#define TERM_SIZE 80
+#endif // !TERM_SIZE
+
 typedef struct s_args {
     bool list;
     bool recursive;
@@ -30,6 +34,7 @@ typedef struct s_args {
 typedef struct s_path {
     char path[MAX_PATH];
     size_t max_len;
+    size_t file_count;
     t_list *files;
 } t_path;
 
@@ -41,6 +46,7 @@ typedef struct s_file {
     char user[MAX_PATH];
     long long size;
     char date[DT_LEN];
+    size_t len;
 } t_file;
 
 typedef struct s_node {
