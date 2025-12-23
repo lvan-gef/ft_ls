@@ -114,9 +114,10 @@ static char *walk_files(t_args *args, DIR *dir, t_path *path) {
         }
 
         char *parse_error = parse_file(dirent, &sb, path);
-        if (parse_error) {
+        if (*parse_error) {
             return parse_error;
         }
+        ++path->file_count;
 
         dirent = readdir(dir);
     }
@@ -149,11 +150,12 @@ static char *parse_file(struct dirent *dirent, struct stat *sb, t_path *path) {
     }
 
     ft_strlcpy(file->date, dt + 4, DT_LEN);
-    file->size = sb->st_size;
     ft_strlcpy(file->filename, dirent->d_name, MAX_PATH);
-    file->hardlink = sb->st_nlink;
     get_permission_(file, sb);
     get_user_group_(file, sb->st_gid, sb->st_uid);
+    file->size = sb->st_size;
+    file->hardlink = sb->st_nlink;
+    file->len = len;
 
     t_list *node = ft_lstnew((void *)file);
     if (!node) {
