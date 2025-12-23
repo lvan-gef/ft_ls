@@ -44,7 +44,8 @@ static void printer_(t_args *args, t_list *files, size_t len,
             file_printed = 0;
         }
 
-        char padding[len + 1];;
+        char padding[len + 1];
+        ;
         set_padding_(padding, len, file->len);
         ft_fprintf(STDOUT_FILENO, "%s %s", file->filename, padding);
 
@@ -71,13 +72,13 @@ static size_t get_rows_(size_t file_count, size_t len) {
 }
 
 static void set_padding_(char *padding, size_t len, size_t file_len) {
-        size_t index = 0;
-        const size_t differ = len - file_len;
+    size_t index = 0;
+    const size_t differ = len - file_len;
 
-        while (index < differ) {
-            padding[index] = ' ';
-            ++index;
-        }
+    while (index < differ) {
+        padding[index] = ' ';
+        ++index;
+    }
 
-        padding[index] = '\0';
+    padding[index] = '\0';
 }

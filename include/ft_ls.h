@@ -5,7 +5,6 @@
 
 #include "../libft/include/libft.h"
 
-
 #ifndef MAX_PATH
 #define MAX_PATH 255
 #endif // !MAX_PATH
