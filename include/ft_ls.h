@@ -39,7 +39,7 @@ typedef struct s_file {
     unsigned long hardlink;
     char group[MAX_PATH];
     char user[MAX_PATH];
-    size_t size;
+    long long size;
     char date[DT_LEN];
 } t_file;
 
