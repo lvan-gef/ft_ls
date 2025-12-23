@@ -1,11 +1,13 @@
 #include <dirent.h>
 #include <errno.h>
+#include <grp.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
-#include <grp.h>
+#include <pwd.h>
 
 #include "../include/ft_assert.h"
 #include "../include/ft_ls.h"
@@ -14,6 +16,7 @@
 #include "../libft/include/libft.h"
 
 static char *parse_files(t_args *args, DIR *dir, t_path *path);
+static bool create_path_node_(t_args *args, const t_path *path, const char *pathname);
 static void get_permission_(t_file *file, struct stat *sb);
 static void clean_up_(DIR *dir, t_list **paths);
 static void free_file_(void *content);
@@ -31,6 +34,7 @@ bool walk(t_args *args, t_list **paths) {
     while (ll) {
         t_node *node = ll->content;
         dir = opendir(node->path);
+        ft_fprintf(STDOUT_FILENO, "--> %s\n", node->path);
         if (!dir) {
             err_msg = "Failed to open the dir";
             goto failed;
@@ -86,12 +90,20 @@ static char *parse_files(t_args *args, DIR *dir, t_path *path) {
     while (dirent && !errno) {
         struct stat sb;
 
-        if (lstat(dirent->d_name, &sb) == -1) {
+        char fullpath[MAX_PATH] = {0};
+
+        ft_strlcpy(fullpath, path->path, MAX_PATH);
+        ft_strlcat(fullpath, "/", MAX_PATH);
+        ft_strlcat(fullpath, dirent->d_name, MAX_PATH);
+        if (lstat(fullpath, &sb) == -1) {
             return strerror(errno);
         }
 
         if (S_ISDIR(sb.st_mode) && args->recursive) {
-            // TODO: add to paths of args
+            if (!create_path_node_(args, path, dirent->d_name)) {
+                return strerror(errno);
+            }
+
             dirent = readdir(dir);
             continue;
         }
@@ -112,19 +124,25 @@ static char *parse_files(t_args *args, DIR *dir, t_path *path) {
         }
 
         struct group *grp = getgrgid(sb.st_gid);
-        if (grp != NULL) {
+        if (grp) {
             ft_strlcpy(file->group, grp->gr_name, MAX_PATH);
         } else {
             // TODO: handle error like ls
         }
 
+        struct passwd *pwd = getpwuid(sb.st_uid);
+        if (pwd) {
+            ft_strlcpy(file->user, pwd->pw_name, MAX_PATH);
+        } else {
+            // TODO: handle error like ls
+        }
+
+        file->size = sb.st_size;
         ft_strlcpy(file->filename, dirent->d_name, MAX_PATH);
         get_permission_(file, &sb);
         file->hardlink = sb.st_nlink;
-        ft_fprintf(STDOUT_FILENO, "%s %d %s %s\n", file->permission,
-                   file->hardlink, file->group, file->filename);
-        // get file info
-        // add to struct
+        ft_fprintf(STDOUT_FILENO, "%s %d %s %s %d %s\n", file->permission,
+                   file->hardlink, file->user, file->group, file->size, file->filename);
 
         node = ft_lstnew((void *)file);
         if (!node) {
@@ -141,6 +159,34 @@ static char *parse_files(t_args *args, DIR *dir, t_path *path) {
     }
 
     return "\0";
+}
+
+static bool create_path_node_(t_args *args, const t_path *path, const char *pathname) {
+    if (*pathname == '.' && !args->all) {
+        return true;
+    }
+
+    if (*pathname == '.' ||
+        ft_strncmp(pathname, "..", ft_strlen(pathname)) == 0) {
+        return true;
+    }
+
+    t_path *sub_path = ft_calloc(1, sizeof(*path));
+    if (!path) {
+        return false;
+    }
+
+    ft_strlcpy(sub_path->path, path->path, MAX_PATH);
+    ft_strlcat(sub_path->path, "/", MAX_PATH);
+    ft_strlcat(sub_path->path, pathname, MAX_PATH);
+    t_list *node = ft_lstnew((void *)sub_path);
+    if (!node) {
+        free(sub_path);
+        return false;
+    }
+    ft_lstadd_back(&args->paths, node);
+
+    return true;
 }
 
 static void get_permission_(t_file *file, struct stat *sb) {
