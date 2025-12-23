@@ -5,9 +5,18 @@
 
 #include "../libft/include/libft.h"
 
+
 #ifndef MAX_PATH
-#define MAX_PATH 256
+#define MAX_PATH 255
 #endif // !MAX_PATH
+
+#ifndef PERMISSION_SIZE
+#define PERMISSION_SIZE 12
+#endif // !PERMISSION_SIZE
+
+#ifndef DT_LEN
+#define DT_LEN 13
+#endif // !DT_LEN
 
 typedef struct s_args {
     bool list;
@@ -23,6 +32,16 @@ typedef struct s_path {
     size_t max_len;
     t_list *files;
 } t_path;
+
+typedef struct s_file {
+    char filename[MAX_PATH];
+    char permission[PERMISSION_SIZE];
+    unsigned long hardlink;
+    char group[MAX_PATH];
+    char user[MAX_PATH];
+    size_t size;
+    char date[DT_LEN];
+} t_file;
 
 typedef struct s_node {
     char path[MAX_PATH];
