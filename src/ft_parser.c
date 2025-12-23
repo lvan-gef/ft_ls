@@ -71,7 +71,7 @@ bool parse_args(int argc, char **argv, t_args *args) {
 }
 
 void free_args(t_args *args) {
-    CUSTOM_ASSERT_(args != NULL, "args can not be NULL");
+    CUSTOM_ASSERT_(args, "args can not be NULL");
 
     ft_lstclear(&args->paths, free_path_);
 }
@@ -86,8 +86,7 @@ static bool add_node_(t_args *args, const char *path) {
         ft_fprintf(STDERR_FILENO, "Failed to malloc node\n");
         return false;
     }
-
-    ft_strlcpy(node->path, path, PATH_MAX - 1);
+    ft_strlcpy(node->path, path, MAX_PATH);
 
     t_list *new_node = ft_lstnew((void *)node);
     if (!new_node) {
