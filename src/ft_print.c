@@ -45,7 +45,6 @@ static void printer_(t_args *args, t_list *files, size_t len,
         }
 
         char padding[len + 1];
-        ;
         set_padding_(padding, len, file->len);
         ft_fprintf(STDOUT_FILENO, "%s %s", file->filename, padding);
 
