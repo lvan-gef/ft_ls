@@ -22,7 +22,7 @@ int main(int argc, char **argv) {
     }
 
     // print it
-    print_ls(paths);
+    print_ls(&args, paths);
 
     clean_program(&args, paths);
     return 0;
