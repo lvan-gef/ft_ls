@@ -1,8 +1,11 @@
 #include <dirent.h>
 #include <errno.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <grp.h>
 
 #include "../include/ft_assert.h"
 #include "../include/ft_ls.h"
@@ -11,12 +14,15 @@
 #include "../libft/include/libft.h"
 
 static char *parse_files(t_args *args, DIR *dir, t_path *path);
-static void clean_up_(DIR *dir, t_list *paths);
+static void get_permission_(t_file *file, struct stat *sb);
+static void clean_up_(DIR *dir, t_list **paths);
 static void free_file_(void *content);
 
-bool walk(t_args *args, t_list *paths) {
+bool walk(t_args *args, t_list **paths) {
     CUSTOM_ASSERT_(args, "args can not be NULL");
     CUSTOM_ASSERT_(args->paths, "args->paths can not be NULL");
+    CUSTOM_ASSERT_(paths, "paths can not be NULL");
+    // CUSTOM_ASSERT_(*paths, "*paths can not be NULL");
 
     DIR *dir = NULL;
     char *err_msg = {0};
@@ -42,6 +48,13 @@ bool walk(t_args *args, t_list *paths) {
             goto failed;
         }
 
+        t_list *p_node = ft_lstnew((void *)path);
+        if (!p_node) {
+            err_msg = "Failed to create a node for t_path";
+            goto failed;
+        }
+        ft_lstadd_back(paths, p_node);
+
         closedir(dir);
         ll = ll->next;
     }
@@ -53,11 +66,12 @@ failed:
     return false;
 }
 
-void free_path(void *content) {
+void free_walk(void *content) {
     CUSTOM_ASSERT_(content, "content can not be NULL");
 
     t_path *path = (t_path *)content;
     ft_lstclear(&path->files, free_file_);
+    free(path);
 }
 
 static char *parse_files(t_args *args, DIR *dir, t_path *path) {
@@ -67,11 +81,20 @@ static char *parse_files(t_args *args, DIR *dir, t_path *path) {
 
     errno = 0;
     struct dirent *dirent = readdir(dir);
+    t_list *node = NULL;
 
     while (dirent && !errno) {
-        // if -R create a node and add it to ll
-        // if file create a node add stuff and apppend
-        ft_fprintf(STDOUT_FILENO, "%s\n", dirent->d_name);
+        struct stat sb;
+
+        if (lstat(dirent->d_name, &sb) == -1) {
+            return strerror(errno);
+        }
+
+        if (S_ISDIR(sb.st_mode) && args->recursive) {
+            // TODO: add to paths of args
+            dirent = readdir(dir);
+            continue;
+        }
 
         const size_t len = ft_strlen(dirent->d_name);
         if (*dirent->d_name == '.' && !args->all) {
@@ -83,10 +106,32 @@ static char *parse_files(t_args *args, DIR *dir, t_path *path) {
             path->max_len = len;
         }
 
+        t_file *file = ft_calloc(1, sizeof(*file));
+        if (!file) {
+            return strerror(errno);
+        }
+
+        struct group *grp = getgrgid(sb.st_gid);
+        if (grp != NULL) {
+            ft_strlcpy(file->group, grp->gr_name, MAX_PATH);
+        } else {
+            // TODO: handle error like ls
+        }
+
+        ft_strlcpy(file->filename, dirent->d_name, MAX_PATH);
+        get_permission_(file, &sb);
+        file->hardlink = sb.st_nlink;
+        ft_fprintf(STDOUT_FILENO, "%s %d %s %s\n", file->permission,
+                   file->hardlink, file->group, file->filename);
         // get file info
         // add to struct
-        // create node
-        //
+
+        node = ft_lstnew((void *)file);
+        if (!node) {
+            free(file);
+            return strerror(errno);
+        }
+        ft_lstadd_back(&path->files, node);
 
         dirent = readdir(dir);
     }
@@ -95,23 +140,58 @@ static char *parse_files(t_args *args, DIR *dir, t_path *path) {
         return strerror(errno);
     }
 
-    // append it to paths
-
     return "\0";
 }
 
-static void free_file_(void *content) {
-    (void)content;
+static void get_permission_(t_file *file, struct stat *sb) {
+    switch (sb->st_mode & S_IFMT) {
+        case S_IFLNK:
+            ft_fprintf(STDOUT_FILENO, "symbolic link\n");
+            break;
+        case S_IFREG:
+            ft_strlcat(file->permission, "-", PERMISSION_SIZE);
+            break;
+        case S_IFDIR:
+            ft_strlcat(file->permission, (sb->st_mode & S_IRUSR) ? "d" : "-",
+                       PERMISSION_SIZE);
+            break;
+        default:
+            ft_fprintf(STDOUT_FILENO, "others have to check it");
+    }
+
+    ft_strlcat(file->permission, (sb->st_mode & S_IRUSR) ? "r" : "-",
+               PERMISSION_SIZE);
+    ft_strlcat(file->permission, (sb->st_mode & S_IWUSR) ? "w" : "-",
+               PERMISSION_SIZE);
+    ft_strlcat(file->permission, (sb->st_mode & S_IXUSR) ? "x" : "-",
+               PERMISSION_SIZE);
+    ft_strlcat(file->permission, (sb->st_mode & S_IRGRP) ? "r" : "-",
+               PERMISSION_SIZE);
+    ft_strlcat(file->permission, (sb->st_mode & S_IWGRP) ? "w" : "-",
+               PERMISSION_SIZE);
+    ft_strlcat(file->permission, (sb->st_mode & S_IXGRP) ? "x" : "-",
+               PERMISSION_SIZE);
+    ft_strlcat(file->permission, (sb->st_mode & S_IROTH) ? "r" : "-",
+               PERMISSION_SIZE);
+    ft_strlcat(file->permission, (sb->st_mode & S_IWOTH) ? "w" : "-",
+               PERMISSION_SIZE);
+    ft_strlcat(file->permission, (sb->st_mode & S_IXOTH) ? "x" : "-",
+               PERMISSION_SIZE);
 }
 
-static void clean_up_(DIR *dir, t_list *paths) {
+static void free_file_(void *content) {
+    CUSTOM_ASSERT_(content, "content can not be NULL");
+
+    t_file *file = content;
+    free(file);
+}
+
+static void clean_up_(DIR *dir, t_list **paths) {
     CUSTOM_ASSERT_(paths, "paths can not be NULL");
 
     if (dir) {
         closedir(dir);
     }
 
-    if (paths) {
-        ft_lstclear(&paths, free_path);
-    }
+    ft_lstclear(paths, free_walk);
 }
