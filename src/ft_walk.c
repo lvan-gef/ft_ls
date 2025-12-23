@@ -133,11 +133,14 @@ static char *parse_file(struct dirent *dirent, struct stat *sb, t_path *path) {
     CUSTOM_ASSERT_(sb, "sb can not be NULL");
     CUSTOM_ASSERT_(path, "path can not be NULL");
 
-    t_list *node = NULL;
-
     const size_t len = ft_strlen(dirent->d_name);
     if (len > path->max_len) {
         path->max_len = len;
+    }
+
+    const char *dt = ctime(&sb->st_atim.tv_sec);
+    if (!dt) {
+        return strerror(errno);
     }
 
     t_file *file = ft_calloc(1, sizeof(*file));
@@ -145,14 +148,14 @@ static char *parse_file(struct dirent *dirent, struct stat *sb, t_path *path) {
         return strerror(errno);
     }
 
-    ft_strlcpy(file->date, ctime(&sb->st_atim.tv_sec) + 4, DT_LEN);
+    ft_strlcpy(file->date, dt + 4, DT_LEN);
     file->size = sb->st_size;
     ft_strlcpy(file->filename, dirent->d_name, MAX_PATH);
     file->hardlink = sb->st_nlink;
     get_permission_(file, sb);
     get_user_group_(file, sb->st_gid, sb->st_uid);
 
-    node = ft_lstnew((void *)file);
+    t_list *node = ft_lstnew((void *)file);
     if (!node) {
         free(file);
         return strerror(errno);
