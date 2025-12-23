@@ -1,7 +1,7 @@
 NAME := libft.a
 
 CC        ?= cc
-CFLAGS    := -std=c11 -Wall -Wextra -Werror -Wshadow -Wpedantic -Wconversion -Wdouble-promotion
+CFLAGS    := -Wall -Wextra -Werror -Wshadow -Wpedantic -Wconversion -Wdouble-promotion
 DEBUGFLAG := -g3 -fno-omit-frame-pointer -fsanitize=address,null
 DEPSFLAGS := -MMD -MP
 
