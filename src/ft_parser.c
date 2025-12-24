@@ -3,9 +3,9 @@
 
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
+#include "../include/ft_free.h"
 #include "../include/ft_ls.h"
 #include "../include/ft_parser.h"
-#include "../include/ft_free.h"
 
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"

@@ -1,9 +1,9 @@
 #ifndef FT_LS_H
 #define FT_LS_H
 
+#include <limits.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include <limits.h>
 
 #include "./ft_array.h"
 

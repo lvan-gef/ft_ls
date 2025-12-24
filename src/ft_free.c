@@ -1,6 +1,6 @@
-#include "../include/ft_ls.h"
-#include "../include/ft_assert.h"
 #include "../include/ft_free.h"
+#include "../include/ft_assert.h"
+#include "../include/ft_ls.h"
 
 void free_args(t_args *args) {
     CUSTOM_ASSERT_(args, "args can not be NULL");

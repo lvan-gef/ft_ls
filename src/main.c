@@ -1,9 +1,9 @@
-#include "../include/ft_assert.h"
-#include "../include/ft_parser.h"
-#include "../include/ft_walk.h"
 #include "../include/ft_array.h"
-#include "../include/ft_print.h"
+#include "../include/ft_assert.h"
 #include "../include/ft_free.h"
+#include "../include/ft_parser.h"
+#include "../include/ft_print.h"
+#include "../include/ft_walk.h"
 #include "ft_fprintf.h"
 
 static void clean_program(t_args *args);
@@ -21,10 +21,10 @@ int main(int argc, char **argv) {
             return 1;
         }
     } else {
-       if (!default_arg(&args)) {
-           free_args(&args);
+        if (!default_arg(&args)) {
+            free_args(&args);
             return 1;
-       }
+        }
     }
 
     if (!walk(&args)) {

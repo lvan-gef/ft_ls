@@ -7,13 +7,13 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "../include/ft_array.h"
 #include "../include/ft_assert.h"
+#include "../include/ft_free.h"
 #include "../include/ft_ls.h"
 #include "../include/ft_walk.h"
-#include "../include/ft_array.h"
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
-#include "ft_free.h"
 
 static char *walk_files(t_args *args, DIR *dir, t_path *path);
 static char *parse_file(struct dirent *dirent, struct stat *sb, t_path *path);
@@ -45,7 +45,8 @@ bool walk(t_args *args) {
         dir = opendir(path->path);
         if (!dir) {
             if (errno == EACCES) {
-                // ls: kan map '/var/lib/AccountsService/users' niet openen: Toegang geweigerd
+                // ls: kan map '/var/lib/AccountsService/users' niet openen:
+                // Toegang geweigerd
                 ft_fprintf(STDERR_FILENO,
                            "ls: can map: '%s' not open: Permission denied",
                            path->path);
@@ -216,23 +217,23 @@ static void set_fullpath_(char *fullpath, const char *filename,
 }
 
 static void get_user_group_(t_file *file, gid_t group_id, uid_t user_id) {
-  if (user_id != cached_uid) {
-      struct passwd *pwd = getpwuid(user_id);
-      if (pwd) {
-          ft_strlcpy(cached_user, pwd->pw_name, sizeof(cached_user));
-          cached_uid = user_id;
-      }
-  }
-  ft_strlcpy(file->user, cached_user, USER_SIZE);
+    if (user_id != cached_uid) {
+        struct passwd *pwd = getpwuid(user_id);
+        if (pwd) {
+            ft_strlcpy(cached_user, pwd->pw_name, sizeof(cached_user));
+            cached_uid = user_id;
+        }
+    }
+    ft_strlcpy(file->user, cached_user, USER_SIZE);
 
-  if (group_id != cached_gid) {
-      struct group *grp = getgrgid(group_id);
-      if (grp) {
-          ft_strlcpy(cached_group, grp->gr_name, sizeof(cached_group));
-          cached_gid = group_id;
-      }
-  }
-  ft_strlcpy(file->group, cached_group, USER_SIZE);
+    if (group_id != cached_gid) {
+        struct group *grp = getgrgid(group_id);
+        if (grp) {
+            ft_strlcpy(cached_group, grp->gr_name, sizeof(cached_group));
+            cached_gid = group_id;
+        }
+    }
+    ft_strlcpy(file->group, cached_group, USER_SIZE);
 }
 
 static void get_permission_(t_file *file, struct stat *sb) {

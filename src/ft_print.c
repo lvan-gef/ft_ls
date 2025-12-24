@@ -1,8 +1,8 @@
 #include "../include/ft_print.h"
+#include "../include/ft_array.h"
 #include "../include/ft_assert.h"
 #include "../include/ft_ls.h"
 #include "../include/ft_sort.h"
-#include "../include/ft_array.h"
 
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
@@ -36,7 +36,8 @@ void print_ls(t_args *args) {
 }
 
 // TODO: sort ll by default on alpa, otherwise sort on argument
-// TODO: looks like on one row we have 3 spaces except for when we have a name with '' then we have 2 spaces before it
+// TODO: looks like on one row we have 3 spaces except for when we have a name
+// with '' then we have 2 spaces before it
 static void printer_(t_args *args, t_array *files, size_t len) {
     CUSTOM_ASSERT_(args, "args can not be NULL");
     CUSTOM_ASSERT_(files, "files can not be NULL");
