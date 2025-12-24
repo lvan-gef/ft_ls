@@ -13,6 +13,10 @@ int main(int argc, char **argv) {
             free_args(&args);
             return 1;
         }
+    } else {
+       if (!default_arg(&args)) {
+            return 1;
+       }
     }
 
     t_list *paths = NULL;
@@ -21,7 +25,6 @@ int main(int argc, char **argv) {
         return 2;
     }
 
-    // print it
     print_ls(&args, paths);
 
     clean_program(&args, paths);

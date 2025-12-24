@@ -67,7 +67,15 @@ bool parse_args(int argc, char **argv, t_args *args) {
         ++index;
     }
 
+    if (!args->paths) {
+        return default_arg(args);
+    }
+
     return true;
+}
+
+bool default_arg(t_args *args) {
+    return add_node_(args, ".");
 }
 
 void free_args(t_args *args) {

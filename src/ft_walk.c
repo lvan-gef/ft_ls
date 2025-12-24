@@ -5,6 +5,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "../include/ft_assert.h"
 #include "../include/ft_ls.h"
@@ -21,8 +22,9 @@ static void set_fullpath_(char *fullpath, const char *filename,
 static void get_user_group_(t_file *file, unsigned int group_id,
                             unsigned int user_id);
 static void get_permission_(t_file *file, struct stat *sb);
-static void clean_up_(DIR *dir, t_list **paths);
 static void free_file_(void *content);
+
+// TODO: paths get messed up with / when it starts or ands with it as argument
 
 bool walk(t_args *args, t_list **paths) {
     CUSTOM_ASSERT_(args, "args can not be NULL");
@@ -38,7 +40,18 @@ bool walk(t_args *args, t_list **paths) {
         t_node *node = ll->content;
         dir = opendir(node->path);
         if (!dir) {
-            err_msg = "Failed to open the dir";
+            if (errno == 13) {
+                // ls: kan map '/var/lib/AccountsService/users' niet openen: Toegang geweigerd
+                ft_fprintf(STDERR_FILENO,
+                           "ls: can map: '%s' not open: Permission denied",
+                           node->path);
+                errno = 0;
+                ll = ll->next;
+                continue;
+            }
+
+            ft_fprintf(STDOUT_FILENO, "%s ,", node->path);
+            err_msg = strerror(errno);
             goto failed;
         }
 
@@ -68,7 +81,9 @@ bool walk(t_args *args, t_list **paths) {
     return true;
 failed:
     ft_fprintf(STDERR_FILENO, "errno: %d, %s\n", errno, err_msg);
-    clean_up_(dir, paths);
+    if (dir) {
+        closedir(dir);
+    }
     return false;
 }
 
@@ -218,8 +233,6 @@ static void set_fullpath_(char *fullpath, const char *filename,
 static void get_user_group_(t_file *file, unsigned int group_id,
                             unsigned int user_id) {
     CUSTOM_ASSERT_(file, "file can no be NULL");
-    CUSTOM_ASSERT_(group_id > 0, "group_id must be more then 0");
-    CUSTOM_ASSERT_(user_id > 0, "user_id must be more then 0");
 
     struct group *grp = getgrgid(group_id);
     if (grp) {
@@ -243,6 +256,7 @@ static void get_permission_(t_file *file, struct stat *sb) {
     switch (sb->st_mode & S_IFMT) {
         case S_IFLNK:
             ft_fprintf(STDOUT_FILENO, "symbolic link\n");
+            ft_strlcat(file->permission, "l", PERMISSION_SIZE);
             break;
         case S_IFREG:
             ft_strlcat(file->permission, "-", PERMISSION_SIZE);
@@ -252,7 +266,7 @@ static void get_permission_(t_file *file, struct stat *sb) {
                        PERMISSION_SIZE);
             break;
         default:
-            ft_fprintf(STDOUT_FILENO, "others have to check it");
+            ft_fprintf(STDOUT_FILENO, "others have to check it\n");
     }
 
     ft_strlcat(file->permission, (sb->st_mode & S_IRUSR) ? "r" : "-",
@@ -280,14 +294,4 @@ static void free_file_(void *content) {
 
     t_file *file = content;
     free(file);
-}
-
-static void clean_up_(DIR *dir, t_list **paths) {
-    CUSTOM_ASSERT_(paths, "paths can not be NULL");
-
-    if (dir) {
-        closedir(dir);
-    }
-
-    ft_lstclear(paths, free_walk);
 }

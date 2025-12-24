@@ -2,7 +2,7 @@ NAME := libft.a
 
 CC        ?= cc
 CFLAGS    := -Wall -Wextra -Werror -Wshadow -Wpedantic -Wconversion -Wdouble-promotion
-DEBUGFLAG := -g3 -fno-omit-frame-pointer -fsanitize=address,null
+DEBUGFLAG := -g3 -fno-omit-frame-pointer
 DEPSFLAGS := -MMD -MP
 
 SRC_DIR   := src

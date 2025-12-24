@@ -18,7 +18,7 @@
 #endif // !DT_LEN
 
 #ifndef TERM_SIZE
-#define TERM_SIZE 80
+#define TERM_SIZE 160
 #endif // !TERM_SIZE
 
 typedef struct s_args {
@@ -31,21 +31,21 @@ typedef struct s_args {
 } t_args;
 
 typedef struct s_path {
-    char path[MAX_PATH];
     size_t max_len;
     size_t file_count;
-    t_list *files;
+    char path[MAX_PATH];
+    char **files;
 } t_path;
 
 typedef struct s_file {
-    char filename[MAX_PATH];
-    char permission[PERMISSION_SIZE];
     unsigned long hardlink;
+    char filename[MAX_PATH];
+    long long size;
+    size_t len;
+    char permission[PERMISSION_SIZE];
     char group[MAX_PATH];
     char user[MAX_PATH];
-    long long size;
     char date[DT_LEN];
-    size_t len;
 } t_file;
 
 typedef struct s_node {
