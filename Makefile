@@ -9,7 +9,7 @@ SRC_DIR   := src
 OBJ_DIR   := obj
 DEP_DIR   := $(OBJ_DIR)
 
-SRC_FILES   := main.c ft_parser.c ft_assert.c ft_walk.c ft_print.c ft_sort.c
+SRC_FILES   := main.c ft_parser.c ft_assert.c ft_walk.c ft_print.c ft_sort.c ft_array.c ft_free.c
 
 SRCS := $(addprefix $(SRC_DIR)/, $(SRC_FILES))
 

@@ -2,12 +2,10 @@
 #define FT_LS_H
 
 #include <stdbool.h>
+#include <stddef.h>
+#include <limits.h>
 
-#include "../libft/include/libft.h"
-
-#ifndef MAX_PATH
-#define MAX_PATH 255
-#endif // !MAX_PATH
+#include "./ft_array.h"
 
 #ifndef PERMISSION_SIZE
 #define PERMISSION_SIZE 12
@@ -21,35 +19,35 @@
 #define TERM_SIZE 160
 #endif // !TERM_SIZE
 
+#ifndef USER_SIZE
+#define USER_SIZE 256
+#endif // !USER_SIZE
+
 typedef struct s_args {
     bool list;
     bool recursive;
     bool all;
     bool reverse;
     bool time;
-    t_list *paths;
+    t_array *paths;
 } t_args;
 
 typedef struct s_path {
     size_t max_len;
-    size_t file_count;
-    char path[MAX_PATH];
-    char **files;
+    char path[PATH_MAX];
+    t_array *files;
 } t_path;
 
 typedef struct s_file {
     unsigned long hardlink;
-    char filename[MAX_PATH];
     long long size;
     size_t len;
+    char filename[NAME_MAX];
     char permission[PERMISSION_SIZE];
-    char group[MAX_PATH];
-    char user[MAX_PATH];
-    char date[DT_LEN];
+    char group[USER_SIZE];
+    char user[USER_SIZE];
+    char date_fmt[DT_LEN];
+    // add time as number
 } t_file;
 
-typedef struct s_node {
-    char path[MAX_PATH];
-} t_node;
-
-#endif // FT_LS_H
+#endif // !FT_LS_H

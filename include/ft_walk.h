@@ -3,10 +3,8 @@
 
 #include <stdbool.h>
 
-#include "../libft/include/libft.h"
 #include "./ft_ls.h"
 
-bool walk(t_args *args, t_list **paths);
-void free_walk(void *content);
+bool walk(t_args *args);
 
-#endif // FT_WALK_H
+#endif // !FT_WALK_H

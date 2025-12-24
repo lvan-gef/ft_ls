@@ -3,9 +3,9 @@
 
 #include <stdbool.h>
 
-#include "../libft/include/libft.h"
+#include "./ft_array.h"
 
-void sort_alpha(t_list *files, bool reverse);
-void sort_time(t_list *files, bool reverse);
+void sort_alpha(t_array *files, bool reverse);
+void sort_time(t_array *files, bool reverse);
 
-#endif // FT_SORT_H
+#endif // !FT_SORT_H
