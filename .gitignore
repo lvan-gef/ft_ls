@@ -56,4 +56,4 @@ dkms.conf
 
 compile_commands.json
 .cache/
-ft_ls
+ft_ls*
