@@ -30,8 +30,6 @@ static gid_t cached_gid = (gid_t)-1;
 static char cached_user[32];
 static char cached_group[32];
 
-// TODO: paths get messed up with / when it starts or ands with it as argument
-
 bool walk(t_args *args) {
     CUSTOM_ASSERT_(args, "args can not be NULL");
     CUSTOM_ASSERT_(args->paths, "args->paths can not be NULL");
@@ -41,21 +39,25 @@ bool walk(t_args *args) {
     size_t index = 0;
 
     while (index < args->paths->len) {
+        errno = 0;
         t_path *path = args->paths->data[index];
         dir = opendir(path->path);
         if (!dir) {
             if (errno == EACCES) {
-                // ls: kan map '/var/lib/AccountsService/users' niet openen:
-                // Toegang geweigerd
-                ft_fprintf(STDERR_FILENO,
-                           "ls: can map: '%s' not open: Permission denied",
-                           path->path);
+                ft_fprintf(STDERR_FILENO, "ft_ls: cannot access: '%s': %s\n",
+                           path->path, strerror(errno));
                 errno = 0;
                 ++index;
                 continue;
             }
 
-            ft_fprintf(STDERR_FILENO, "%s ,", path->path);
+            if (errno == ENOENT) {
+                errno = 0;
+                ++index;
+                continue;
+            }
+
+            ft_fprintf(STDOUT_FILENO, "%s\n", path->path);
             err_msg = strerror(errno);
             goto failed;
         }
@@ -87,7 +89,8 @@ static char *walk_files(t_args *args, DIR *dir, t_path *path) {
     errno = 0;
     struct dirent *dirent = readdir(dir);
 
-    while (dirent && !errno) {
+    while (dirent) {
+        errno = 0;
         struct stat sb;
 
         if (*dirent->d_name == '.' && !args->all) {
@@ -99,7 +102,11 @@ static char *walk_files(t_args *args, DIR *dir, t_path *path) {
         set_fullpath_(fullpath, path->path, dirent->d_name);
 
         if (lstat(fullpath, &sb) == -1) {
-            return strerror(errno);
+            ft_fprintf(STDERR_FILENO, "ft_ls: cannot access: '%s': %s\n",
+                       fullpath, strerror(errno));
+            errno = 0;
+            dirent = readdir(dir);
+            continue;
         }
 
         if (S_ISDIR(sb.st_mode) && args->recursive) {
@@ -112,17 +119,14 @@ static char *walk_files(t_args *args, DIR *dir, t_path *path) {
         }
 
         char *parse_error = parse_file(dirent, &sb, path);
-        if (parse_error || errno) {
+        if (parse_error) {
             return parse_error;
         }
 
         dirent = readdir(dir);
     }
 
-    if (errno) {
-        return strerror(errno);
-    }
-
+    errno = 0;
     return NULL;
 }
 
@@ -242,7 +246,7 @@ static void get_permission_(t_file *file, struct stat *sb) {
 
     switch (sb->st_mode & S_IFMT) {
         case S_IFLNK:
-            ft_fprintf(STDOUT_FILENO, "symbolic link\n");
+            // ft_fprintf(STDOUT_FILENO, "symbolic link\n");
             ft_strlcat(file->permission, "l", PERMISSION_SIZE);
             break;
         case S_IFREG:
@@ -252,7 +256,8 @@ static void get_permission_(t_file *file, struct stat *sb) {
             ft_strlcat(file->permission, "d", PERMISSION_SIZE);
             break;
         default:
-            ft_fprintf(STDOUT_FILENO, "others have to check it\n");
+            // ft_fprintf(STDOUT_FILENO, "others have to check it\n");
+            break;
     }
 
     ft_strlcat(file->permission, (sb->st_mode & S_IRUSR) ? "r" : "-",
