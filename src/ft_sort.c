@@ -7,11 +7,13 @@
 void sort_alpha(t_array *files, bool reverse) {
     CUSTOM_ASSERT_(files, "files can not be NULL");
 
+    (void)files;
     (void)reverse;
 }
 
 void sort_time(t_array *files, bool reverse) {
     CUSTOM_ASSERT_(files, "files can not be NULL");
 
+    (void)files;
     (void)reverse;
 }
