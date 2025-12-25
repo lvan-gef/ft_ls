@@ -1,18 +1,20 @@
-NAME := libft.a
+NAME   := libft.a
+NAME_D := libft_d.a
 
 CC        ?= cc
 CFLAGS    := -Wall -Wextra -Werror -Wshadow -Wpedantic -Wconversion -Wdouble-promotion
-DEBUGFLAG := -g3 -fno-omit-frame-pointer
 DEPSFLAGS := -MMD -MP
 
+# Release flags
+R_CFLAGS  := -DNDEBUG -O3 -march=native -fomit-frame-pointer
+
+# Debug flags
+D_CFLAGS  := -g3 -fno-omit-frame-pointer -fsanitize=address,undefined,null,leak,integer-divide-by-zero,signed-integer-overflow
+
 SRC_DIR   := src
-OBJ_DIR   := obj
 INC_DIR   := include
 
 MODULES := ll mem printer str gnl ft_printf ft_fprintf
-
-SRC_DIRS := $(addprefix $(SRC_DIR)/, $(MODULES))
-OBJ_DIRS := $(addprefix $(OBJ_DIR)/, $(MODULES))
 
 ll_SRC      := ft_lstnew_bonus.c ft_lstadd_front_bonus.c ft_lstsize_bonus.c \
                ft_lstlast_bonus.c ft_lstadd_back_bonus.c ft_lstdelone_bonus.c \
@@ -35,16 +37,29 @@ gnl_SRC     := get_next_line.c get_next_line_utils.c
 ft_printf_SRC  := ft_formatter.c ft_printf.c ft_writers.c
 ft_fprintf_SRC := ft_fformatter.c ft_fprintf.c ft_fwriters.c
 
-ll_OBJ         := $(ll_SRC:%.c=$(OBJ_DIR)/ll/%.o)
-mem_OBJ        := $(mem_SRC:%.c=$(OBJ_DIR)/mem/%.o)
-printer_OBJ    := $(printer_SRC:%.c=$(OBJ_DIR)/printer/%.o)
-str_OBJ        := $(str_SRC:%.c=$(OBJ_DIR)/str/%.o)
-gnl_OBJ        := $(gnl_SRC:%.c=$(OBJ_DIR)/gnl/%.o)
-ft_printf_OBJ  := $(ft_printf_SRC:%.c=$(OBJ_DIR)/ft_printf/%.o)
-ft_fprintf_OBJ := $(ft_fprintf_SRC:%.c=$(OBJ_DIR)/ft_fprintf/%.o)
+# Release objects
+R_OBJ_DIR := obj
+R_OBJ_DIRS := $(addprefix $(R_OBJ_DIR)/, $(MODULES))
+R_OBJECTS := $(ll_SRC:%.c=$(R_OBJ_DIR)/ll/%.o) \
+             $(mem_SRC:%.c=$(R_OBJ_DIR)/mem/%.o) \
+             $(printer_SRC:%.c=$(R_OBJ_DIR)/printer/%.o) \
+             $(str_SRC:%.c=$(R_OBJ_DIR)/str/%.o) \
+             $(gnl_SRC:%.c=$(R_OBJ_DIR)/gnl/%.o) \
+             $(ft_printf_SRC:%.c=$(R_OBJ_DIR)/ft_printf/%.o) \
+             $(ft_fprintf_SRC:%.c=$(R_OBJ_DIR)/ft_fprintf/%.o)
+R_DEPS := $(R_OBJECTS:.o=.d)
 
-OBJECTS := $(ll_OBJ) $(mem_OBJ) $(printer_OBJ) $(str_OBJ) $(gnl_OBJ) $(ft_printf_OBJ) $(ft_fprintf_OBJ)
-DEPS    := $(OBJECTS:.o=.d)
+# Debug objects
+D_OBJ_DIR := obj_debug
+D_OBJ_DIRS := $(addprefix $(D_OBJ_DIR)/, $(MODULES))
+D_OBJECTS := $(ll_SRC:%.c=$(D_OBJ_DIR)/ll/%.o) \
+             $(mem_SRC:%.c=$(D_OBJ_DIR)/mem/%.o) \
+             $(printer_SRC:%.c=$(D_OBJ_DIR)/printer/%.o) \
+             $(str_SRC:%.c=$(D_OBJ_DIR)/str/%.o) \
+             $(gnl_SRC:%.c=$(D_OBJ_DIR)/gnl/%.o) \
+             $(ft_printf_SRC:%.c=$(D_OBJ_DIR)/ft_printf/%.o) \
+             $(ft_fprintf_SRC:%.c=$(D_OBJ_DIR)/ft_fprintf/%.o)
+D_DEPS := $(D_OBJECTS:.o=.d)
 
 HEADERS := -I $(INC_DIR)
 
@@ -53,43 +68,62 @@ LIB := ar rcs
 BLUE     := \033[36m
 NC       := \033[0m
 
-.PHONY all:
-all: $(NAME)  ## Build the library (default)
+.PHONY: all
+all: $(NAME)  ## Build release version (default)
 
-.PHONY debug:
-debug: CFLAGS += $(DEBUGFLAG)  ## Build with debug flags
-debug: $(NAME)
+.PHONY: debug
+debug: $(NAME_D)  ## Build debug version
 
-.PHONY clean:
+.PHONY: clean
 clean:  ## Clean object files
-	@rm -rf $(OBJ_DIR)
+	@rm -rf $(R_OBJ_DIR) $(D_OBJ_DIR)
 	@echo "Cleaned object files"
 
-.PHONY fclean:
+.PHONY: fclean
 fclean: clean  ## Clean object files and library
-	@rm -f $(NAME)
+	@rm -f $(NAME) $(NAME_D)
 	@echo "Cleaned everything"
 
-.PHONY re:
+.PHONY: re
 re: fclean all  ## Clean all and rebuild
 
-.PHONY help:
+.PHONY: re-debug
+re-debug: fclean debug  ## Clean all and rebuild debug
+
+.PHONY: help
 help:  ## Display this help message
 	@echo 'Usage: make $(BLUE)<target>$(NC)'
 	@echo 'Available targets:'
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  $(BLUE)%-15s$(NC) %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-$(NAME): $(OBJECTS)
-	$(LIB) $@ $(OBJECTS)
-	@echo "Library: '$(NAME)' built successfully"
+# Release build
+$(NAME): $(R_OBJECTS)
+	$(LIB) $@ $(R_OBJECTS)
+	@echo "Library: '$(NAME)' built successfully (release)"
 
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIRS)
-	$(CC) $(CFLAGS) $(DEPSFLAGS) $(HEADERS) -c $< -o $@
+# Debug build
+$(NAME_D): $(D_OBJECTS)
+	$(LIB) $@ $(D_OBJECTS)
+	@echo "Library: '$(NAME_D)' built successfully (debug)"
 
-$(OBJ_DIRS): | $(OBJ_DIR)
+# Release pattern rule
+$(R_OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(R_OBJ_DIRS)
+	$(CC) $(CFLAGS) $(R_CFLAGS) $(DEPSFLAGS) $(HEADERS) -c $< -o $@
+
+# Debug pattern rule
+$(D_OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(D_OBJ_DIRS)
+	$(CC) $(CFLAGS) $(D_CFLAGS) $(DEPSFLAGS) $(HEADERS) -c $< -o $@
+
+$(R_OBJ_DIRS): | $(R_OBJ_DIR)
 	@mkdir -p $@
 
-$(OBJ_DIR):
+$(D_OBJ_DIRS): | $(D_OBJ_DIR)
 	@mkdir -p $@
 
--include $(DEPS)
+$(R_OBJ_DIR):
+	@mkdir -p $@
+
+$(D_OBJ_DIR):
+	@mkdir -p $@
+
+-include $(R_DEPS) $(D_DEPS)

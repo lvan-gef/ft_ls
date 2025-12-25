@@ -3,8 +3,6 @@
 
 #include "./ft_ls.h"
 
-#include "../libft/include/libft.h"
+void print_ls(t_args *args);
 
-void print_ls(t_args *args, t_list *paths);
-
-#endif // FT_PRINT_H
+#endif // !FT_PRINT_H

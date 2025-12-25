@@ -7,7 +7,9 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "../include/ft_array.h"
 #include "../include/ft_assert.h"
+#include "../include/ft_free.h"
 #include "../include/ft_ls.h"
 #include "../include/ft_walk.h"
 #include "../libft/include/ft_fprintf.h"
@@ -22,60 +24,51 @@ static void set_fullpath_(char *fullpath, const char *filename,
 static void get_user_group_(t_file *file, unsigned int group_id,
                             unsigned int user_id);
 static void get_permission_(t_file *file, struct stat *sb);
-static void free_file_(void *content);
 
-// TODO: paths get messed up with / when it starts or ands with it as argument
+static uid_t cached_uid = (uid_t)-1;
+static gid_t cached_gid = (gid_t)-1;
+static char cached_user[32];
+static char cached_group[32];
 
-bool walk(t_args *args, t_list **paths) {
+bool walk(t_args *args) {
     CUSTOM_ASSERT_(args, "args can not be NULL");
     CUSTOM_ASSERT_(args->paths, "args->paths can not be NULL");
-    CUSTOM_ASSERT_(paths, "paths can not be NULL");
-    CUSTOM_ASSERT_(!*paths, "*paths must be NULL");
 
     DIR *dir = NULL;
-    char *err_msg = {0};
-    t_list *ll = args->paths;
+    char *err_msg = NULL;
+    size_t index = 0;
 
-    while (ll) {
-        t_node *node = ll->content;
-        dir = opendir(node->path);
+    while (index < args->paths->len) {
+        errno = 0;
+        t_path *path = args->paths->data[index];
+        dir = opendir(path->path);
         if (!dir) {
-            if (errno == 13) {
-                // ls: kan map '/var/lib/AccountsService/users' niet openen: Toegang geweigerd
-                ft_fprintf(STDERR_FILENO,
-                           "ls: can map: '%s' not open: Permission denied",
-                           node->path);
+            if (errno == EACCES) {
+                ft_fprintf(STDERR_FILENO, "ft_ls: cannot access: '%s': %s\n",
+                           path->path, strerror(errno));
                 errno = 0;
-                ll = ll->next;
+                ++index;
                 continue;
             }
 
-            ft_fprintf(STDOUT_FILENO, "%s ,", node->path);
+            if (errno == ENOENT) {
+                errno = 0;
+                ++index;
+                continue;
+            }
+
+            ft_fprintf(STDOUT_FILENO, "%s\n", path->path);
             err_msg = strerror(errno);
             goto failed;
         }
 
-        t_path *path = ft_calloc(1, sizeof(*path));
-        if (!path) {
-            err_msg = "Failed to calloc path struct";
-            goto failed;
-        }
-        ft_strlcpy(path->path, node->path, MAX_PATH);
-
         err_msg = walk_files(args, dir, path);
-        if (*err_msg) {
+        if (err_msg || errno) {
             goto failed;
         }
-
-        t_list *p_node = ft_lstnew((void *)path);
-        if (!p_node) {
-            err_msg = "Failed to create a node for t_path";
-            goto failed;
-        }
-        ft_lstadd_back(paths, p_node);
 
         closedir(dir);
-        ll = ll->next;
+        ++index;
     }
 
     return true;
@@ -87,14 +80,6 @@ failed:
     return false;
 }
 
-void free_walk(void *content) {
-    CUSTOM_ASSERT_(content, "content can not be NULL");
-
-    t_path *path = (t_path *)content;
-    ft_lstclear(&path->files, free_file_);
-    free(path);
-}
-
 // TODO: . and .. we need that for ls even if not in recursive mode
 static char *walk_files(t_args *args, DIR *dir, t_path *path) {
     CUSTOM_ASSERT_(args, "args can not be NULL");
@@ -104,7 +89,8 @@ static char *walk_files(t_args *args, DIR *dir, t_path *path) {
     errno = 0;
     struct dirent *dirent = readdir(dir);
 
-    while (dirent && !errno) {
+    while (dirent) {
+        errno = 0;
         struct stat sb;
 
         if (*dirent->d_name == '.' && !args->all) {
@@ -112,11 +98,15 @@ static char *walk_files(t_args *args, DIR *dir, t_path *path) {
             continue;
         }
 
-        char fullpath[MAX_PATH] = {0};
+        char fullpath[PATH_MAX] = {0};
         set_fullpath_(fullpath, path->path, dirent->d_name);
 
         if (lstat(fullpath, &sb) == -1) {
-            return strerror(errno);
+            ft_fprintf(STDERR_FILENO, "ft_ls: cannot access: '%s': %s\n",
+                       fullpath, strerror(errno));
+            errno = 0;
+            dirent = readdir(dir);
+            continue;
         }
 
         if (S_ISDIR(sb.st_mode) && args->recursive) {
@@ -129,19 +119,15 @@ static char *walk_files(t_args *args, DIR *dir, t_path *path) {
         }
 
         char *parse_error = parse_file(dirent, &sb, path);
-        if (*parse_error) {
+        if (parse_error) {
             return parse_error;
         }
-        ++path->file_count;
 
         dirent = readdir(dir);
     }
 
-    if (errno) {
-        return strerror(errno);
-    }
-
-    return "\0";
+    errno = 0;
+    return NULL;
 }
 
 static char *parse_file(struct dirent *dirent, struct stat *sb, t_path *path) {
@@ -164,22 +150,20 @@ static char *parse_file(struct dirent *dirent, struct stat *sb, t_path *path) {
         return strerror(errno);
     }
 
-    ft_strlcpy(file->date, dt + 4, DT_LEN);
-    ft_strlcpy(file->filename, dirent->d_name, MAX_PATH);
+    ft_strlcpy(file->date_fmt, dt + 4, DT_LEN);
+    ft_strlcpy(file->filename, dirent->d_name, NAME_MAX);
     get_permission_(file, sb);
     get_user_group_(file, sb->st_gid, sb->st_uid);
     file->size = sb->st_size;
     file->hardlink = sb->st_nlink;
     file->len = len;
 
-    t_list *node = ft_lstnew((void *)file);
-    if (!node) {
+    if (!append_array(path->files, (void *)file)) {
         free(file);
         return strerror(errno);
     }
-    ft_lstadd_back(&path->files, node);
 
-    return "\0";
+    return NULL;
 }
 
 static bool create_path_node_(t_args *args, const t_path *path,
@@ -189,29 +173,31 @@ static bool create_path_node_(t_args *args, const t_path *path,
     CUSTOM_ASSERT_(pathname, "pathname can not be NULL");
     CUSTOM_ASSERT_(*pathname != '\0', "*pathname can not be '\\0'");
 
-    if (*pathname == '.' && !args->all) {
+    if (*pathname == '.') {
         return true;
     }
 
-    if (*pathname == '.' ||
-        ft_strncmp(pathname, "..", ft_strlen(pathname)) == 0) {
+    if (ft_strncmp(pathname, "..", ft_strlen(pathname)) == 0) {
         return true;
     }
 
     t_path *sub_path = ft_calloc(1, sizeof(*path));
-    if (!path) {
+    if (!sub_path) {
         return false;
     }
 
-    ft_strlcpy(sub_path->path, path->path, MAX_PATH);
-    ft_strlcat(sub_path->path, "/", MAX_PATH);
-    ft_strlcat(sub_path->path, pathname, MAX_PATH);
-    t_list *node = ft_lstnew((void *)sub_path);
-    if (!node) {
+    sub_path->files = init_array(10);
+    if (!sub_path->files) {
         free(sub_path);
         return false;
     }
-    ft_lstadd_back(&args->paths, node);
+
+    set_fullpath_(sub_path->path, path->path, pathname);
+    if (!append_array(args->paths, (void *)sub_path)) {
+        free_array(sub_path->files, free_file);
+        free(sub_path);
+        return false;
+    }
 
     return true;
 }
@@ -225,28 +211,33 @@ static void set_fullpath_(char *fullpath, const char *filename,
     CUSTOM_ASSERT_(dir_name, "dir_name can not be NULL");
     CUSTOM_ASSERT_(*dir_name != '\0', "*dir_name can not be '\\0'");
 
-    ft_strlcpy(fullpath, filename, MAX_PATH);
-    ft_strlcat(fullpath, "/", MAX_PATH);
-    ft_strlcat(fullpath, dir_name, MAX_PATH);
+    const size_t len = ft_strlen(filename);
+
+    ft_strlcpy(fullpath, filename, PATH_MAX);
+    if (filename[len - 1] != '/') {
+        ft_strlcat(fullpath, "/", PATH_MAX);
+    }
+    ft_strlcat(fullpath, dir_name, PATH_MAX);
 }
 
-static void get_user_group_(t_file *file, unsigned int group_id,
-                            unsigned int user_id) {
-    CUSTOM_ASSERT_(file, "file can no be NULL");
-
-    struct group *grp = getgrgid(group_id);
-    if (grp) {
-        ft_strlcpy(file->group, grp->gr_name, MAX_PATH);
-    } else {
-        // TODO: handle error like ls
+static void get_user_group_(t_file *file, gid_t group_id, uid_t user_id) {
+    if (user_id != cached_uid) {
+        struct passwd *pwd = getpwuid(user_id);
+        if (pwd) {
+            ft_strlcpy(cached_user, pwd->pw_name, sizeof(cached_user));
+            cached_uid = user_id;
+        }
     }
+    ft_strlcpy(file->user, cached_user, USER_SIZE);
 
-    struct passwd *pwd = getpwuid(user_id);
-    if (pwd) {
-        ft_strlcpy(file->user, pwd->pw_name, MAX_PATH);
-    } else {
-        // TODO: handle error like ls
+    if (group_id != cached_gid) {
+        struct group *grp = getgrgid(group_id);
+        if (grp) {
+            ft_strlcpy(cached_group, grp->gr_name, sizeof(cached_group));
+            cached_gid = group_id;
+        }
     }
+    ft_strlcpy(file->group, cached_group, USER_SIZE);
 }
 
 static void get_permission_(t_file *file, struct stat *sb) {
@@ -255,18 +246,18 @@ static void get_permission_(t_file *file, struct stat *sb) {
 
     switch (sb->st_mode & S_IFMT) {
         case S_IFLNK:
-            ft_fprintf(STDOUT_FILENO, "symbolic link\n");
+            // ft_fprintf(STDOUT_FILENO, "symbolic link\n");
             ft_strlcat(file->permission, "l", PERMISSION_SIZE);
             break;
         case S_IFREG:
             ft_strlcat(file->permission, "-", PERMISSION_SIZE);
             break;
         case S_IFDIR:
-            ft_strlcat(file->permission, (sb->st_mode & S_IRUSR) ? "d" : "-",
-                       PERMISSION_SIZE);
+            ft_strlcat(file->permission, "d", PERMISSION_SIZE);
             break;
         default:
-            ft_fprintf(STDOUT_FILENO, "others have to check it\n");
+            // ft_fprintf(STDOUT_FILENO, "others have to check it\n");
+            break;
     }
 
     ft_strlcat(file->permission, (sb->st_mode & S_IRUSR) ? "r" : "-",
@@ -287,11 +278,4 @@ static void get_permission_(t_file *file, struct stat *sb) {
                PERMISSION_SIZE);
     ft_strlcat(file->permission, (sb->st_mode & S_IXOTH) ? "x" : "-",
                PERMISSION_SIZE);
-}
-
-static void free_file_(void *content) {
-    CUSTOM_ASSERT_(content, "content can not be NULL");
-
-    t_file *file = content;
-    free(file);
 }
