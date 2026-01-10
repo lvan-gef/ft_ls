@@ -14,7 +14,7 @@ static bool add_path_(t_args *args, const char *pathname);
 static void print_error_(const char *flag);
 
 bool parse_args(int argc, char **argv, t_args *args) {
-    CUSTOM_ASSERT_(argc > 0, "argc must be more then 0");
+    CUSTOM_ASSERT_(argc >= 1, "argc must be more then 0");
     CUSTOM_ASSERT_(argv, "argv can not be NULL");
     CUSTOM_ASSERT_(argv[0], "argv[0] can not be '\\0'");
 
@@ -77,10 +77,15 @@ bool parse_args(int argc, char **argv, t_args *args) {
 }
 
 bool default_arg(t_args *args) {
+    CUSTOM_ASSERT_(args, "args can not be NULL");
     return add_path_(args, ".");
 }
 
 static bool add_path_(t_args *args, const char *pathname) {
+    CUSTOM_ASSERT_(args, "args can not be NULL");
+    CUSTOM_ASSERT_(pathname, "pathname can not be NULL");
+    CUSTOM_ASSERT_(*pathname, "*pathname can not be '\\0'");
+
     t_path *path = ft_calloc(1, sizeof(*path));
     if (!path) {
         return false;
@@ -103,8 +108,8 @@ static bool add_path_(t_args *args, const char *pathname) {
 }
 
 static void print_error_(const char *flag) {
-    CUSTOM_ASSERT_(flag != NULL, "flag can not be NULL");
-    CUSTOM_ASSERT_(*flag != '\0', "flag[0] can not be '\\0'");
+    CUSTOM_ASSERT_(flag, "flag can not be NULL");
+    CUSTOM_ASSERT_(*flag, "*flag can not be '\\0'");
 
     ft_fprintf(STDERR_FILENO,
                "ft_ls: invalid option -- %s\nusage: ft_ls "

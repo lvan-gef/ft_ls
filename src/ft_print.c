@@ -86,9 +86,12 @@ static size_t get_rows_(size_t file_count, size_t len) {
 
     const size_t new_len = len + 1;
     size_t tmp_count = file_count / 2;
-    size_t tmp_width = new_len * tmp_count;
+    CUSTOM_ASSERT_(tmp_count < file_count, "tmp_count did underflow");
+
+    size_t tmp_width = new_len * tmp_count;  // make a assert for it??
     size_t rows = 1;
 
+    // make asserts in the while loop??
     while (tmp_width > TERM_SIZE) {
         ++rows;
         tmp_count = tmp_count / 2;
@@ -100,9 +103,9 @@ static size_t get_rows_(size_t file_count, size_t len) {
 
 static void set_padding_(char *padding, size_t len, size_t file_len,
                          size_t rows) {
-    CUSTOM_ASSERT_(len >= file_len, "len should be >= then file_len");
     CUSTOM_ASSERT_(file_len, "file_len should be more then 0");
     CUSTOM_ASSERT_(len, "len should be more then 0");
+    CUSTOM_ASSERT_(len >= file_len, "len should be >= then file_len");
     CUSTOM_ASSERT_(rows, "rows should be more then 0");
 
     size_t index = 0;

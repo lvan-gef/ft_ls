@@ -4,7 +4,7 @@
 #include "../include/ft_parser.h"
 #include "../include/ft_print.h"
 #include "../include/ft_walk.h"
-#include "ft_fprintf.h"
+#include "../include/ft_fprintf.h"
 
 static void clean_program(t_args *args);
 

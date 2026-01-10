@@ -140,7 +140,8 @@ static char *parse_file(struct dirent *dirent, struct stat *sb, t_path *path) {
         path->max_len = len;
     }
 
-    const char *dt = ctime(&sb->st_atim.tv_sec);
+    const char *dt = ctime(&sb->st_atimespec.tv_nsec);
+    // const char *dt = ctime(&sb->st_atim.tv_sec);
     if (!dt) {
         return strerror(errno);
     }
@@ -171,7 +172,7 @@ static bool create_path_node_(t_args *args, const t_path *path,
     CUSTOM_ASSERT_(args, "args can not be NULL");
     CUSTOM_ASSERT_(path, "path can not be NULL");
     CUSTOM_ASSERT_(pathname, "pathname can not be NULL");
-    CUSTOM_ASSERT_(*pathname != '\0', "*pathname can not be '\\0'");
+    CUSTOM_ASSERT_(*pathname, "*pathname can not be '\\0'");
 
     if (*pathname == '.') {
         return true;
@@ -205,11 +206,11 @@ static bool create_path_node_(t_args *args, const t_path *path,
 static void set_fullpath_(char *fullpath, const char *filename,
                           const char *dir_name) {
     CUSTOM_ASSERT_(fullpath, "fullpath can not be NULL");
-    CUSTOM_ASSERT_(*fullpath == '\0', "*fullpath must be '\\0'");
+    CUSTOM_ASSERT_(*fullpath, "*fullpath must be '\\0'");
     CUSTOM_ASSERT_(filename, "filename can not be NULL");
-    CUSTOM_ASSERT_(*filename != '\0', "*filename can not be '\\0'");
+    CUSTOM_ASSERT_(*filename, "*filename can not be '\\0'");
     CUSTOM_ASSERT_(dir_name, "dir_name can not be NULL");
-    CUSTOM_ASSERT_(*dir_name != '\0', "*dir_name can not be '\\0'");
+    CUSTOM_ASSERT_(*dir_name, "*dir_name can not be '\\0'");
 
     const size_t len = ft_strlen(filename);
 
@@ -221,6 +222,8 @@ static void set_fullpath_(char *fullpath, const char *filename,
 }
 
 static void get_user_group_(t_file *file, gid_t group_id, uid_t user_id) {
+    CUSTOM_ASSERT_(file, "file can not be NULL");
+
     if (user_id != cached_uid) {
         struct passwd *pwd = getpwuid(user_id);
         if (pwd) {

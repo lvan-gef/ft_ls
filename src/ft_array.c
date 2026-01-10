@@ -27,6 +27,9 @@ t_array *init_array(size_t size) {
 }
 
 bool append_array(t_array *array, void *content) {
+    CUSTOM_ASSERT_(array, "array can not be NULL");
+    CUSTOM_ASSERT_(content, "content can not be NULL");
+
     errno = 0;
     if (array->len == array->cap) {
         if (!realloc_arr_(array)) {
@@ -47,11 +50,15 @@ void free_array(t_array *array, void (*free_fn)(void *)) {
             free_fn(array->data[i]);
         }
     }
+
     free((void *)array->data);
     free(array);
 }
 
 static bool realloc_arr_(t_array *array) {
+    CUSTOM_ASSERT_(array, "array can not be NULL");
+
+    errno = 0;
     size_t new_cap = array->cap * 2;
     if (new_cap < array->cap) {
         errno = ERANGE;

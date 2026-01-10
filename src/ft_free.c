@@ -17,9 +17,11 @@ void free_args(t_args *args) {
 }
 
 void free_file(void *content) {
+    CUSTOM_ASSERT_(content, "content can not be NULL");
     free(content);
 }
 
 void free_path(void *content) {
+    CUSTOM_ASSERT_(content, "content can not be NULL");
     free(content);
 }
