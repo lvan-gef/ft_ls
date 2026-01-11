@@ -22,11 +22,8 @@ void print_ls(t_args *args) {
         size_t index = 0;
         while (index < paths->len) {
             t_path *path = paths->data[index];
-            ft_fprintf(STDOUT_FILENO, "%s:\n", path->path);
-            // TODO: dont add stuff with max_len 0
-            if (path->max_len > 0) {
-                printer_(args, path->files, path->max_len);
-            }
+            CUSTOM_ASSERT_(path->max_len, "path->max_len must be more then 0");
+            printer_(args, path->files, path->max_len);
             ++index;
         }
     } else {
@@ -53,7 +50,7 @@ static void printer_(t_args *args, t_array *files, size_t len) {
     }
 
     size_t file_printed = 0;
-    ft_fprintf(STDOUT_FILENO, " ");
+    // ft_fprintf(STDOUT_FILENO, " ");
     size_t index = 0;
     while (index < files->len) {
         t_file *file = files->data[index];
