@@ -12,6 +12,7 @@ typedef struct s_array {
 
 t_array *init_array(size_t size);
 bool append_array(t_array *array, void *content);
+void remove_elem_array(t_array *array, void *content, void (*free_fn)(void *));
 void free_array(t_array *array, void (*free_fn)(void *));
 
 #endif // !FT_ARRAY_H

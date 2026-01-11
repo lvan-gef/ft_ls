@@ -42,6 +42,29 @@ bool append_array(t_array *array, void *content) {
     return true;
 }
 
+void remove_elem_array(t_array *array, void *content, void (*free_fn)(void *)) {
+    CUSTOM_ASSERT_(array, "array can not be NULL");
+    CUSTOM_ASSERT_(content, "content can not be NULL");
+
+    size_t index = 0;
+    while (index < array->len) {
+        if (array->data[index] == content) {
+            free_fn(array->data[index]);
+            size_t next_index = index + 1;
+            while (next_index < array->len) {
+                array->data[index] = array->data[next_index];
+                ++index;
+                ++next_index;
+            }
+
+            array->data[array->len - 1] = NULL;
+            --array->len;
+            return;
+        }
+        ++index;
+    }
+}
+
 void free_array(t_array *array, void (*free_fn)(void *)) {
     CUSTOM_ASSERT_(array, "array can not be NULL");
 
