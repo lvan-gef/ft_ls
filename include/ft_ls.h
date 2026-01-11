@@ -16,7 +16,7 @@
 #endif // !DT_LEN
 
 #ifndef TERM_SIZE
-#define TERM_SIZE 160
+#define TERM_SIZE 256
 #endif // !TERM_SIZE
 
 #ifndef USER_SIZE

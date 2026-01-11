@@ -10,8 +10,10 @@ R_CFLAGS  := -DNDEBUG -O3 -march=native -fomit-frame-pointer
 R_LDFLAGS :=
 
 # Debug flags
-D_CFLAGS  := -g3 -fno-omit-frame-pointer -fsanitize=address,undefined,null,leak,integer-divide-by-zero,signed-integer-overflow
-D_LDFLAGS := -fsanitize=address,undefined
+SANITIZERS := -fsanitize=address,undefined,null,leak,integer-divide-by-zero,signed-integer-overflow
+# SANITIZERS :=
+D_CFLAGS   := -g3 -fno-omit-frame-pointer $(SANITIZERS)
+D_LDFLAGS  := $(SANITIZERS)
 
 SRC_DIR := src
 

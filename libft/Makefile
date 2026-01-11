@@ -30,8 +30,7 @@ str_SRC     := ft_strjoin.c ft_strlcat.c ft_itoa.c ft_atoi.c ft_isdigit.c \
                ft_strchr.c ft_striteri.c ft_isascii.c ft_isalnum.c ft_split.c \
                ft_isalpha.c ft_strrchr.c ft_strlen.c ft_isprint.c ft_strtrim.c \
                ft_substr.c ft_strmapi.c ft_toupper.c ft_atoli.c ft_iswhitespace.c \
-               ft_split_ws.c ft_atof.c ft_uitoa.c
-
+               ft_split_ws.c ft_atof.c ft_uitoa.c ft_strncasecmp.c
 gnl_SRC     := get_next_line.c get_next_line_utils.c
 
 ft_printf_SRC  := ft_formatter.c ft_printf.c ft_writers.c

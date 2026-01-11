@@ -4,7 +4,6 @@
 #include "../include/ft_parser.h"
 #include "../include/ft_print.h"
 #include "../include/ft_walk.h"
-#include "../include/ft_fprintf.h"
 
 static void clean_program(t_args *args);
 
@@ -35,7 +34,6 @@ int main(int argc, char **argv) {
     print_ls(&args);
 
     clean_program(&args);
-    ft_fprintf(STDOUT_FILENO, "%d\n", sysconf(_SC_LOGIN_NAME_MAX));
     return 0;
 }
 

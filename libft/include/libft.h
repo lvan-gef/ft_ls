@@ -441,6 +441,17 @@ char *ft_strmapi(char const *s, char (*f)(unsigned int, char));
 int ft_strncmp(const char *s1, const char *s2, size_t n);
 
 /**
+ * @brief Compare 2 strings case-insensitive to see if they are the same
+ *
+ * @param s1 String 1 to compare         (char*)
+ * @param s2 String 2 to compare         (char*)
+ * @param n  Size to compare the strings (size_t)
+ *
+ * @return int <0 | 0 | >0
+ */
+int ft_strncasecmp(const char *s1, const char *s2, size_t n);
+
+/**
  * @brief Find needle in a haystack
  *
  * @param haystack String to search in    (char*)

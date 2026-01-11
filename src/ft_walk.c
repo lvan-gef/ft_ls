@@ -142,8 +142,12 @@ static char *parse_file(struct dirent *dirent, struct stat *sb, t_path *path) {
     CUSTOM_ASSERT_(path, "path can not be NULL");
 
     const size_t len = ft_strlen(dirent->d_name);
-    if (len > path->max_len) {
-        path->max_len = len;
+    size_t display_len = len;
+    if (ft_memchr(dirent->d_name, ' ', len)) {
+        display_len = len + 2;
+    }
+    if (display_len > path->max_len) {
+        path->max_len = display_len;
     }
 
     const char *dt = get_dt(sb);

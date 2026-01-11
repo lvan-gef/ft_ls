@@ -11,6 +11,7 @@ static void printer_(t_args *args, t_array *files, size_t len);
 static void set_padding_(char *padding, size_t len, size_t file_len,
                          size_t rows);
 static size_t get_rows_(size_t file_count, size_t len);
+static char *need_quote_(const char *str);
 
 void print_ls(t_args *args) {
     CUSTOM_ASSERT_(args, "args can not be NULL");
@@ -32,9 +33,7 @@ void print_ls(t_args *args) {
     }
 }
 
-// TODO: sort ll by default on alpa, otherwise sort on argument
-// TODO: looks like on one row we have 3 spaces except for when we have a name
-// with '' then we have 2 spaces before it
+// TODO: when multi row then print up -> down left -> rigth
 static void printer_(t_args *args, t_array *files, size_t len) {
     CUSTOM_ASSERT_(args, "args can not be NULL");
     CUSTOM_ASSERT_(files, "files can not be NULL");
@@ -46,7 +45,7 @@ static void printer_(t_args *args, t_array *files, size_t len) {
     if (args->time) {
         sort_time(files, args->reverse);
     } else {
-        sort_alpha(files, args->reverse);
+        sort_alpha(files);
     }
 
     size_t file_printed = 0;
@@ -61,13 +60,33 @@ static void printer_(t_args *args, t_array *files, size_t len) {
         }
 
         char padding[len + 1];
-        char *c = ft_memchr(file->filename, ' ', file->len);
+        char *c = need_quote_(file->filename);
+
+        char *next_is_quoted = false;
+        if (index + 1 < files->len) {
+            t_file *next = files->data[index + 1];
+            next_is_quoted = need_quote_(next->filename);
+        }
+
         if (!c) {
             set_padding_(padding, len, file->len, rows);
-            ft_fprintf(STDOUT_FILENO, "%s %s", file->filename, padding);
+            if (next_is_quoted) {
+                ft_fprintf(STDOUT_FILENO, "%s%s", file->filename, padding);
+            } else {
+                ft_fprintf(STDOUT_FILENO, "%s %s", file->filename, padding);
+            }
         } else {
             set_padding_(padding, len - 2, file->len, rows);
-            ft_fprintf(STDOUT_FILENO, "'%s '%s", file->filename, padding);
+            char *quote = "'";
+            if (*c == '\'') {
+                quote = "\"";
+            }
+
+            if (next_is_quoted) {
+                ft_fprintf(STDOUT_FILENO, "%s%s%s%s", quote, file->filename, quote, padding);
+            } else {
+                ft_fprintf(STDOUT_FILENO, "%s%s%s %s", quote, file->filename, quote, padding);
+            }
         }
 
         ++file_printed;
@@ -117,4 +136,19 @@ static void set_padding_(char *padding, size_t len, size_t file_len,
     }
 
     padding[index] = '\0';
+}
+
+static char *need_quote_(const char *str) {
+    size_t index = 0;
+
+    while (str[index]) {
+        char *c = ft_strchr(" '", str[index]);
+        if (c) {
+            return c;
+        }
+
+        ++index;
+    }
+
+    return NULL;
 }
