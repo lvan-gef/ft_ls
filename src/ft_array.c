@@ -67,11 +67,10 @@ void remove_elem_array(t_array *array, void *content, void (*free_fn)(void *)) {
 
 void free_array(t_array *array, void (*free_fn)(void *)) {
     CUSTOM_ASSERT_(array, "array can not be NULL");
+    CUSTOM_ASSERT_(free_fn, "free_fn can not be NULL");
 
-    if (free_fn) {
-        for (size_t i = 0; i < array->len; i++) {
-            free_fn(array->data[i]);
-        }
+    for (size_t i = 0; i < array->len; i++) {
+        free_fn(array->data[i]);
     }
 
     free((void *)array->data);
