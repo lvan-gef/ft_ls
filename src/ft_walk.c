@@ -71,6 +71,7 @@ bool walk(t_args *args) {
         closedir(dir);
 
         if (!path->max_len) {
+            free_array(path->files, free_file);
             remove_elem_array(args->paths, (void *)path, free_path);
         } else {
             ++index;
