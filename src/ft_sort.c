@@ -6,7 +6,7 @@
 #include "../include/ft_ls.h"
 #include "../include/ft_sort.h"
 
-#include "../include/libft.h"
+#include "../libft/include/libft.h"
 
 static int sort_it_(const char *a, const char *b);
 
