@@ -101,7 +101,7 @@ static bool add_path_(t_args *args, const char *pathname) {
     ft_strlcpy(path->path, pathname, PATH_MAX);
     if (!append_array(args->paths, (void *)path)) {
         free_array(path->files, free_file);
-        free_array(path->files, free_path);
+        free(path);
         return false;
     }
 
