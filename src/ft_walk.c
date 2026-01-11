@@ -16,15 +16,15 @@
 #include "../libft/include/libft.h"
 
 static char *walk_files(t_args *args, DIR *dir, t_path *path);
-static char *parse_file(struct dirent *dirent, struct stat *sb, t_path *path);
+static char *parse_file(const struct dirent *dirent, struct stat *sb, t_path *path);
 static bool create_path_node_(t_args *args, const t_path *path,
                               const char *pathname);
 static void set_fullpath_(char *fullpath, const char *filename,
                           const char *dir_name);
 static void get_user_group_(t_file *file, unsigned int group_id,
                             unsigned int user_id);
-static void get_permission_(t_file *file, struct stat *sb);
-static char *get_dt(struct stat *sb);
+static void get_permission_(t_file *file, const struct stat *sb);
+static char *get_dt(const struct stat *sb);
 
 static uid_t cached_uid = (uid_t)-1;
 static gid_t cached_gid = (gid_t)-1;
@@ -137,7 +137,7 @@ static char *walk_files(t_args *args, DIR *dir, t_path *path) {
     return NULL;
 }
 
-static char *parse_file(struct dirent *dirent, struct stat *sb, t_path *path) {
+static char *parse_file(const struct dirent *dirent, struct stat *sb, t_path *path) {
     CUSTOM_ASSERT_(dirent, "dirent can not be NULL");
     CUSTOM_ASSERT_(sb, "sb can not be NULL");
     CUSTOM_ASSERT_(path, "path can not be NULL");
@@ -271,7 +271,7 @@ static void get_user_group_(t_file *file, gid_t group_id, uid_t user_id) {
     ft_strlcpy(file->group, cached_group, USER_SIZE);
 }
 
-static void get_permission_(t_file *file, struct stat *sb) {
+static void get_permission_(t_file *file, const struct stat *sb) {
     CUSTOM_ASSERT_(file, "file can not be NULL");
     CUSTOM_ASSERT_(sb, "sb can not be NULL");
 
@@ -311,7 +311,7 @@ static void get_permission_(t_file *file, struct stat *sb) {
                PERMISSION_SIZE);
 }
 
-static char *get_dt(struct stat *sb) {
+static char *get_dt(const struct stat *sb) {
     CUSTOM_ASSERT_(sb, "sb cannot be NULL");
 
 #if defined(__linux__)

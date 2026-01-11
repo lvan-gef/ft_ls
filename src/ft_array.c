@@ -42,7 +42,7 @@ bool append_array(t_array *array, void *content) {
     return true;
 }
 
-void remove_elem_array(t_array *array, void *content, void (*free_fn)(void *)) {
+void remove_elem_array(t_array *array, const void *content, void (*free_fn)(void *)) {
     CUSTOM_ASSERT_(array, "array can not be NULL");
     CUSTOM_ASSERT_(content, "content can not be NULL");
 

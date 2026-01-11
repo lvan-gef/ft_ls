@@ -7,7 +7,7 @@
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
 
-static void printer_(t_args *args, t_array *files, size_t len);
+static void printer_(const t_args *args, t_array *files, size_t len);
 static void set_padding_(char *padding, size_t len, size_t file_len,
                          size_t rows);
 static size_t get_rows_(size_t file_count, size_t len);
@@ -34,7 +34,7 @@ void print_ls(t_args *args) {
 }
 
 // TODO: when multi row then print up -> down left -> rigth
-static void printer_(t_args *args, t_array *files, size_t len) {
+static void printer_(const t_args *args, t_array *files, size_t len) {
     CUSTOM_ASSERT_(args, "args can not be NULL");
     CUSTOM_ASSERT_(files, "files can not be NULL");
     CUSTOM_ASSERT_(len, "len must be more then 0");
