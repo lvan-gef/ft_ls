@@ -321,6 +321,15 @@ int ft_iswhitespace(int c);
 char *ft_itoa(int n);
 
 /**
+ * @brief Convert unsigned interger to string
+ *
+ * @param n Unsigned interger to convert (int)
+ *
+ * @return char* | NULL
+ */
+char *ft_uitoa(unsigned int n);
+
+/**
  * @brief Split string given a delim
  *
  * @param s String to split   (char*)
