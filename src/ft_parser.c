@@ -14,9 +14,10 @@ static bool add_path_(t_args *args, const char *pathname);
 static void print_error_(const char *flag);
 
 bool parse_args(int argc, char **argv, t_args *args) {
-    CUSTOM_ASSERT_(argc >= 1, "argc must be more then 0");
+    CUSTOM_ASSERT_(argc, "argc must be more then 0");
     CUSTOM_ASSERT_(argv, "argv can not be NULL");
-    CUSTOM_ASSERT_(argv[0], "argv[0] can not be '\\0'");
+    CUSTOM_ASSERT_(argv[0], "argv[0] can not be NULL");
+    CUSTOM_ASSERT_(*argv[0], "*argv[0] can not be '\\0'");
 
     size_t index = 1;
     bool is_flag = true;
