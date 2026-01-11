@@ -24,11 +24,12 @@ static void set_fullpath_(char *fullpath, const char *filename,
 static void get_user_group_(t_file *file, unsigned int group_id,
                             unsigned int user_id);
 static void get_permission_(t_file *file, struct stat *sb);
+static char *get_dt(struct stat *sb);
 
 static uid_t cached_uid = (uid_t)-1;
 static gid_t cached_gid = (gid_t)-1;
-static char cached_user[32];
-static char cached_group[32];
+static char cached_user[32] = "";
+static char cached_group[32] = "";
 
 bool walk(t_args *args) {
     CUSTOM_ASSERT_(args, "args can not be NULL");
@@ -145,8 +146,7 @@ static char *parse_file(struct dirent *dirent, struct stat *sb, t_path *path) {
         path->max_len = len;
     }
 
-    const char *dt = ctime(&sb->st_atimespec.tv_nsec);
-    // const char *dt = ctime(&sb->st_atim.tv_sec);
+    const char *dt = get_dt(sb);
     if (!dt) {
         return strerror(errno);
     }
@@ -233,8 +233,17 @@ static void get_user_group_(t_file *file, gid_t group_id, uid_t user_id) {
         struct passwd *pwd = getpwuid(user_id);
         if (pwd) {
             ft_strlcpy(cached_user, pwd->pw_name, sizeof(cached_user));
-            cached_uid = user_id;
+        } else {
+            char *id = ft_uitoa(user_id);
+            if (!id) {
+                // TODO: close program we can not get mem for a small name
+                exit(99);
+            }
+
+            ft_strlcpy(cached_user, id, sizeof(cached_user));
+            free(id);
         }
+        cached_uid = user_id;
     }
     ft_strlcpy(file->user, cached_user, USER_SIZE);
 
@@ -242,8 +251,17 @@ static void get_user_group_(t_file *file, gid_t group_id, uid_t user_id) {
         struct group *grp = getgrgid(group_id);
         if (grp) {
             ft_strlcpy(cached_group, grp->gr_name, sizeof(cached_group));
-            cached_gid = group_id;
+        } else {
+            char *id = ft_uitoa(group_id);
+            if (!id) {
+                // TODO: close program we can not get mem for a small name
+                exit(99);
+            }
+
+            ft_strlcpy(cached_group, id, sizeof(cached_group));
+            free(id);
         }
+        cached_gid = group_id;
     }
     ft_strlcpy(file->group, cached_group, USER_SIZE);
 }
@@ -286,4 +304,17 @@ static void get_permission_(t_file *file, struct stat *sb) {
                PERMISSION_SIZE);
     ft_strlcat(file->permission, (sb->st_mode & S_IXOTH) ? "x" : "-",
                PERMISSION_SIZE);
+}
+
+static char *get_dt(struct stat *sb) {
+    CUSTOM_ASSERT_(sb, "sb cannot be NULL");
+
+#if defined(__linux__)
+    return ctime(&sb->st_atim.tv_sec);
+#elif defined(__APPLE__) && defined(__MACH__)
+    return ctime(&sb->st_atimespec.tv_nsec);
+#else
+    ft_fprintf(STDERR_FILENO, "OS is not supported\n");
+    return NULL;
+#endif
 }
