@@ -62,7 +62,7 @@ static void printer_(const t_args *args, t_array *files, size_t len) {
         char padding[len + 1];
         const char *c = need_quote_(file->filename);
 
-        const char *next_is_quoted = false;
+        const char *next_is_quoted = NULL;
         if (index + 1 < files->len) {
             const t_file *next = files->data[index + 1];
             next_is_quoted = need_quote_(next->filename);
