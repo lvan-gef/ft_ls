@@ -94,7 +94,7 @@ static char *walk_files(t_args *args, DIR *dir, t_path *path) {
     CUSTOM_ASSERT_(path, "path can not be NULL");
 
     errno = 0;
-    struct dirent *dirent = readdir(dir);
+    const struct dirent *dirent = readdir(dir);
 
     while (dirent) {
         errno = 0;
@@ -235,7 +235,7 @@ static void get_user_group_(t_file *file, gid_t group_id, uid_t user_id) {
     CUSTOM_ASSERT_(file, "file can not be NULL");
 
     if (user_id != cached_uid) {
-        struct passwd *pwd = getpwuid(user_id);
+        const struct passwd *pwd = getpwuid(user_id);
         if (pwd) {
             ft_strlcpy(cached_user, pwd->pw_name, sizeof(cached_user));
         } else {
@@ -253,7 +253,7 @@ static void get_user_group_(t_file *file, gid_t group_id, uid_t user_id) {
     ft_strlcpy(file->user, cached_user, USER_SIZE);
 
     if (group_id != cached_gid) {
-        struct group *grp = getgrgid(group_id);
+        const struct group *grp = getgrgid(group_id);
         if (grp) {
             ft_strlcpy(cached_group, grp->gr_name, sizeof(cached_group));
         } else {
