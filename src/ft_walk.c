@@ -68,7 +68,12 @@ bool walk(t_args *args) {
         }
 
         closedir(dir);
-        ++index;
+
+        if (!path->max_len) {
+            remove_elem_array(args->paths, (void *)path, free_path);
+        } else {
+            ++index;
+        }
     }
 
     return true;
@@ -206,7 +211,7 @@ static bool create_path_node_(t_args *args, const t_path *path,
 static void set_fullpath_(char *fullpath, const char *filename,
                           const char *dir_name) {
     CUSTOM_ASSERT_(fullpath, "fullpath can not be NULL");
-    CUSTOM_ASSERT_(*fullpath, "*fullpath must be '\\0'");
+    CUSTOM_ASSERT_(!*fullpath, "*fullpath must be '\\0'");
     CUSTOM_ASSERT_(filename, "filename can not be NULL");
     CUSTOM_ASSERT_(*filename, "*filename can not be '\\0'");
     CUSTOM_ASSERT_(dir_name, "dir_name can not be NULL");
