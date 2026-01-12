@@ -1,8 +1,10 @@
 NAME   := ft_ls
 NAME_D := ft_ls_d
 
+TERM_SIZE ?= 256
+
 CC        := cc
-CFLAGS    := -Wall -Wextra -Werror -Wshadow -Wpedantic -Wconversion -Wdouble-promotion
+CFLAGS    := -Wall -Wextra -Werror -Wshadow -Wpedantic -Wconversion -Wdouble-promotion -DTERM_SIZE=$(TERM_SIZE)
 DEPSFLAGS := -MMD -MP
 
 # Release flags
