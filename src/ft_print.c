@@ -49,13 +49,12 @@ static void printer_(const t_args *args, t_array *files, size_t len) {
     }
 
     size_t file_printed = 0;
-    // ft_fprintf(STDOUT_FILENO, " ");
     size_t index = 0;
     while (index < files->len) {
         t_file *file = files->data[index];
 
         if (file_printed >= files_per_row) {
-            ft_fprintf(STDOUT_FILENO, "\n ");
+            ft_fprintf(STDOUT_FILENO, "\n");
             file_printed = 0;
         }
 
@@ -76,6 +75,7 @@ static void printer_(const t_args *args, t_array *files, size_t len) {
                 ft_fprintf(STDOUT_FILENO, "%s %s", file->filename, padding);
             }
         } else {
+            CUSTOM_ASSERT_(len - 2 < len, "new_len did underflow");
             set_padding_(padding, len - 2, file->len, rows);
             char *quote = "'";
             if (*c == '\'') {
@@ -102,7 +102,6 @@ static size_t get_rows_(size_t file_count, size_t len) {
 
     const size_t new_len = len + 1;
     size_t tmp_count = file_count / 2;
-    CUSTOM_ASSERT_(tmp_count < file_count, "tmp_count did underflow");
 
     size_t tmp_width = new_len * tmp_count;  // make a assert for it??
     size_t rows = 1;
