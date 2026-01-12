@@ -10,6 +10,7 @@ R_CFLAGS  := -DNDEBUG -O3 -march=native -fomit-frame-pointer
 
 # Debug flags
 D_CFLAGS  := -g3 -fno-omit-frame-pointer -fsanitize=address,undefined,null,leak,integer-divide-by-zero,signed-integer-overflow
+# D_CFLAGS  := -g3 -fno-omit-frame-pointer
 
 SRC_DIR   := src
 INC_DIR   := include
