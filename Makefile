@@ -1,5 +1,6 @@
 NAME   := ft_ls
 NAME_D := ft_ls_d
+MAKEFLAGS += -j
 
 TERM_SIZE ?= 80
 
@@ -60,15 +61,20 @@ clean:  ## Clean object files
 	@rm -rf $(R_OBJ_DIR) $(D_OBJ_DIR)
 
 .PHONY: fclean
-fclean: clean  ## Clean object, bin
+fclean:  ## Clean object, bin
+	@$(MAKE) clean
 	@$(MAKE) -C $(LIBFT_DIR) fclean
 	@rm -f $(NAME) $(NAME_D)
 
 .PHONY: re
-re: fclean all  ## Clean all and recompile
+re:  ## Clean all and recompile
+	@$(MAKE) fclean
+	@$(MAKE) all
 
 .PHONY: re-debug
-re-debug: fclean debug  ## Clean all and recompile debug
+re-debug:  ## Clean all and rebuild debug
+	@$(MAKE) fclean
+	@$(MAKE) debug
 
 .PHONY: fmt
 fmt:  ## Format code via clang-format

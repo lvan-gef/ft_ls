@@ -1,5 +1,6 @@
 NAME   := libft.a
 NAME_D := libft_d.a
+MAKEFLAGS += -j
 
 CC        ?= cc
 CFLAGS    := -Wall -Wextra -Werror -Wshadow -Wpedantic -Wconversion -Wdouble-promotion
@@ -9,7 +10,7 @@ DEPSFLAGS := -MMD -MP
 R_CFLAGS  := -DNDEBUG -O3 -march=native -fomit-frame-pointer
 
 # Debug flags
-D_CFLAGS  := -g3 -fno-omit-frame-pointer -fsanitize=address,undefined,null,leak,integer-divide-by-zero,signed-integer-overflow
+D_CFLAGS  := -g3 -fno-omit-frame-pointer -fsanitize=address,undefined,leak,null,integer-divide-by-zero,signed-integer-overflow
 # D_CFLAGS  := -g3 -fno-omit-frame-pointer
 
 SRC_DIR   := src
@@ -80,15 +81,20 @@ clean:  ## Clean object files
 	@echo "Cleaned object files"
 
 .PHONY: fclean
-fclean: clean  ## Clean object files and library
+fclean:  ## Clean object files and library
+	@$(MAKE) clean
 	@rm -f $(NAME) $(NAME_D)
 	@echo "Cleaned everything"
 
 .PHONY: re
-re: fclean all  ## Clean all and rebuild
+re:  ## Clean all and recompile
+	@$(MAKE) fclean
+	@$(MAKE) all
 
 .PHONY: re-debug
-re-debug: fclean debug  ## Clean all and rebuild debug
+re-debug:  ## Clean all and rebuild debug
+	@$(MAKE) fclean
+	@$(MAKE) debug
 
 .PHONY: help
 help:  ## Display this help message
