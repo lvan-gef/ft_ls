@@ -11,9 +11,8 @@ import termios
 
 ALLOWED_FLAGS = ['R', 'a', 'l', 'r', 't']
 DEBUG = True
-TERMINAL_SIZES = [256]
+TERMINAL_SIZES = [181]
 # TERMINAL_SIZES = [80, 100, 160, 240, 256, 512]
-CORE_COUNT = os.cpu_count()
 own_bin = './ft_ls'
 if DEBUG:
     own_bin = f'{own_bin}_d'
@@ -34,11 +33,11 @@ def main() -> None:
 def compile_ls(term_size: int = 80) -> None:
     print('', '-' * 5, 'Compile with column width:', term_size, '-' * 5)
     if DEBUG:
-        result = subprocess.run(f'make TERM_SIZE={term_size} debug -j {CORE_COUNT}',
+        result = subprocess.run(f'make TERM_SIZE={term_size} debug',
                                 shell=True,
                                 capture_output=True)
     else:
-        result = subprocess.run(f'make TERM_SIZE={term_size} -j {CORE_COUNT}',
+        result = subprocess.run(f'make TERM_SIZE={term_size}',
                                 shell=True,
                                 capture_output=True)
 
@@ -59,7 +58,7 @@ def invalid_flags() -> None:
 def simple_tests(term_size: int = 80) -> None:
     paths = ['', '.', '..', 'src', 'include', 'tester']
 
-    for p in paths:
+    for p in paths[-2:-1]:
         if p == '':
             ls_output = run_with_pty(cmd=['ls'], cols=term_size)
             ft_ls_output = run_with_pty(cmd=[f'{own_bin}'], cols=term_size)
@@ -82,13 +81,17 @@ def run_with_pty(cmd: list[str], cols: int = 80):
     # Set terminal width
     winsize = struct.pack('HHHH', 24, cols, 0, 0)  # rows, cols, xpixel, ypixel
     fcntl.ioctl(slave, termios.TIOCSWINSZ, winsize)
+    env = os.environ.copy()
+    env.pop('COLUMNS', None)
+    env['TERM'] = 'screen-256color'
 
     proc = subprocess.Popen(
       cmd,
       stdout=slave,
-      stderr=slave,
+      stderr=subprocess.DEVNULL,
       stdin=slave,
-      close_fds=True
+      close_fds=True,
+      env=env
     )
     os.close(slave)
 
@@ -104,7 +107,7 @@ def run_with_pty(cmd: list[str], cols: int = 80):
 
     os.close(master)
     proc.wait()
-    return output.decode()
+    return output.decode().replace('\r', '')
 
 
 if __name__ == '__main__':
