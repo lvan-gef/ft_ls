@@ -1,7 +1,7 @@
 NAME   := ft_ls
 NAME_D := ft_ls_d
 
-TERM_SIZE ?= 256
+TERM_SIZE ?= 80
 
 CC        := cc
 CFLAGS    := -Wall -Wextra -Werror -Wshadow -Wpedantic -Wconversion -Wdouble-promotion -DTERM_SIZE=$(TERM_SIZE)

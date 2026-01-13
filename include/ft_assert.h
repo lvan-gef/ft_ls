@@ -9,9 +9,9 @@ void log_assert_(const char *file, int line, const char *func,
 #endif // !NDEBUG
 
 #ifdef NDEBUG
-#define CUSTOM_ASSERT_(condition, message) ((void)0)
+#define ASSERT_(condition, message) ((void)0)
 #else
-#define CUSTOM_ASSERT_(condition, message)                                     \
+#define ASSERT_(condition, message)                                     \
     do {                                                                       \
         if (!(condition)) {                                                    \
             log_assert_(__FILE__, __LINE__, __func__, message);                \

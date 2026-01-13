@@ -9,7 +9,7 @@
 static bool realloc_arr_(t_array *array);
 
 t_array *init_array(size_t size) {
-    CUSTOM_ASSERT_(size, "size must be more then 0");
+    ASSERT_(size, "size must be more then 0");
 
     t_array *array = ft_calloc(1, sizeof(*array));
     if (!array) {
@@ -27,8 +27,8 @@ t_array *init_array(size_t size) {
 }
 
 bool append_array(t_array *array, void *content) {
-    CUSTOM_ASSERT_(array, "array can not be NULL");
-    CUSTOM_ASSERT_(content, "content can not be NULL");
+    ASSERT_(array, "array can not be NULL");
+    ASSERT_(content, "content can not be NULL");
 
     errno = 0;
     if (array->len == array->cap) {
@@ -43,8 +43,8 @@ bool append_array(t_array *array, void *content) {
 }
 
 void remove_elem_array(t_array *array, const void *content, void (*free_fn)(void *)) {
-    CUSTOM_ASSERT_(array, "array can not be NULL");
-    CUSTOM_ASSERT_(content, "content can not be NULL");
+    ASSERT_(array, "array can not be NULL");
+    ASSERT_(content, "content can not be NULL");
 
     size_t index = 0;
     while (index < array->len) {
@@ -66,8 +66,8 @@ void remove_elem_array(t_array *array, const void *content, void (*free_fn)(void
 }
 
 void free_array(t_array *array, void (*free_fn)(void *)) {
-    CUSTOM_ASSERT_(array, "array can not be NULL");
-    CUSTOM_ASSERT_(free_fn, "free_fn can not be NULL");
+    ASSERT_(array, "array can not be NULL");
+    ASSERT_(free_fn, "free_fn can not be NULL");
 
     for (size_t i = 0; i < array->len; i++) {
         free_fn(array->data[i]);
@@ -78,7 +78,7 @@ void free_array(t_array *array, void (*free_fn)(void *)) {
 }
 
 static bool realloc_arr_(t_array *array) {
-    CUSTOM_ASSERT_(array, "array can not be NULL");
+    ASSERT_(array, "array can not be NULL");
 
     errno = 0;
     size_t new_cap = array->cap * 2;

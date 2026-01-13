@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
 }
 
 static void clean_program(t_args *args) {
-    CUSTOM_ASSERT_(args != NULL, "args can not be NULL");
+    ASSERT_(args != NULL, "args can not be NULL");
 
     free_args(args);
 }

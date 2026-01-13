@@ -15,8 +15,8 @@
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
 
-static char *walk_files(t_args *args, DIR *dir, t_path *path);
-static char *parse_file(const struct dirent *dirent, struct stat *sb, t_path *path);
+static char *walk_files_(t_args *args, DIR *dir, t_path *path);
+static char *parse_file_(const struct dirent *dirent, struct stat *sb, t_path *path);
 static bool create_path_node_(t_args *args, const t_path *path,
                               const char *pathname);
 static void set_fullpath_(char *fullpath, const char *filename,
@@ -24,7 +24,7 @@ static void set_fullpath_(char *fullpath, const char *filename,
 static void get_user_group_(t_file *file, unsigned int group_id,
                             unsigned int user_id);
 static void get_permission_(t_file *file, const struct stat *sb);
-static char *get_dt(const struct stat *sb);
+static char *get_dt_(const struct stat *sb);
 
 static uid_t cached_uid = (uid_t)-1;
 static gid_t cached_gid = (gid_t)-1;
@@ -32,8 +32,8 @@ static char cached_user[32] = "";
 static char cached_group[32] = "";
 
 bool walk(t_args *args) {
-    CUSTOM_ASSERT_(args, "args can not be NULL");
-    CUSTOM_ASSERT_(args->paths, "args->paths can not be NULL");
+    ASSERT_(args, "args can not be NULL");
+    ASSERT_(args->paths, "args->paths can not be NULL");
 
     DIR *dir = NULL;
     char *err_msg = NULL;
@@ -63,7 +63,7 @@ bool walk(t_args *args) {
             goto failed;
         }
 
-        err_msg = walk_files(args, dir, path);
+        err_msg = walk_files_(args, dir, path);
         if (err_msg || errno) {
             goto failed;
         }
@@ -88,10 +88,10 @@ failed:
 }
 
 // TODO: . and .. we need that for ls even if not in recursive mode
-static char *walk_files(t_args *args, DIR *dir, t_path *path) {
-    CUSTOM_ASSERT_(args, "args can not be NULL");
-    CUSTOM_ASSERT_(dir, "dir can not be NULL");
-    CUSTOM_ASSERT_(path, "path can not be NULL");
+static char *walk_files_(t_args *args, DIR *dir, t_path *path) {
+    ASSERT_(args, "args can not be NULL");
+    ASSERT_(dir, "dir can not be NULL");
+    ASSERT_(path, "path can not be NULL");
 
     errno = 0;
     const struct dirent *dirent = readdir(dir);
@@ -125,7 +125,7 @@ static char *walk_files(t_args *args, DIR *dir, t_path *path) {
             continue;
         }
 
-        char *parse_error = parse_file(dirent, &sb, path);
+        char *parse_error = parse_file_(dirent, &sb, path);
         if (parse_error) {
             return parse_error;
         }
@@ -137,21 +137,21 @@ static char *walk_files(t_args *args, DIR *dir, t_path *path) {
     return NULL;
 }
 
-static char *parse_file(const struct dirent *dirent, struct stat *sb, t_path *path) {
-    CUSTOM_ASSERT_(dirent, "dirent can not be NULL");
-    CUSTOM_ASSERT_(sb, "sb can not be NULL");
-    CUSTOM_ASSERT_(path, "path can not be NULL");
+static char *parse_file_(const struct dirent *dirent, struct stat *sb, t_path *path) {
+    ASSERT_(dirent, "dirent can not be NULL");
+    ASSERT_(sb, "sb can not be NULL");
+    ASSERT_(path, "path can not be NULL");
 
     const size_t len = ft_strlen(dirent->d_name);
-    size_t display_len = len;
-    if (ft_memchr(dirent->d_name, ' ', len)) {
-        display_len = len + 2;
-    }
-    if (display_len > path->max_len) {
-        path->max_len = display_len;
+    // size_t display_len = len;
+    // if (ft_memchr(dirent->d_name, ' ', len)) {
+    //     display_len = len + 2;
+    // }
+    if (len > path->max_len) {
+        path->max_len = len;
     }
 
-    const char *dt = get_dt(sb);
+    const char *dt = get_dt_(sb);
     if (!dt) {
         return strerror(errno);
     }
@@ -179,10 +179,10 @@ static char *parse_file(const struct dirent *dirent, struct stat *sb, t_path *pa
 
 static bool create_path_node_(t_args *args, const t_path *path,
                               const char *pathname) {
-    CUSTOM_ASSERT_(args, "args can not be NULL");
-    CUSTOM_ASSERT_(path, "path can not be NULL");
-    CUSTOM_ASSERT_(pathname, "pathname can not be NULL");
-    CUSTOM_ASSERT_(*pathname, "*pathname can not be '\\0'");
+    ASSERT_(args, "args can not be NULL");
+    ASSERT_(path, "path can not be NULL");
+    ASSERT_(pathname, "pathname can not be NULL");
+    ASSERT_(*pathname, "*pathname can not be '\\0'");
 
     if (*pathname == '.') {
         return true;
@@ -215,12 +215,12 @@ static bool create_path_node_(t_args *args, const t_path *path,
 
 static void set_fullpath_(char *fullpath, const char *filename,
                           const char *dir_name) {
-    CUSTOM_ASSERT_(fullpath, "fullpath can not be NULL");
-    CUSTOM_ASSERT_(!*fullpath, "*fullpath must be '\\0'");
-    CUSTOM_ASSERT_(filename, "filename can not be NULL");
-    CUSTOM_ASSERT_(*filename, "*filename can not be '\\0'");
-    CUSTOM_ASSERT_(dir_name, "dir_name can not be NULL");
-    CUSTOM_ASSERT_(*dir_name, "*dir_name can not be '\\0'");
+    ASSERT_(fullpath, "fullpath can not be NULL");
+    ASSERT_(!*fullpath, "*fullpath must be '\\0'");
+    ASSERT_(filename, "filename can not be NULL");
+    ASSERT_(*filename, "*filename can not be '\\0'");
+    ASSERT_(dir_name, "dir_name can not be NULL");
+    ASSERT_(*dir_name, "*dir_name can not be '\\0'");
 
     const size_t len = ft_strlen(filename);
 
@@ -232,7 +232,7 @@ static void set_fullpath_(char *fullpath, const char *filename,
 }
 
 static void get_user_group_(t_file *file, gid_t group_id, uid_t user_id) {
-    CUSTOM_ASSERT_(file, "file can not be NULL");
+    ASSERT_(file, "file can not be NULL");
 
     if (user_id != cached_uid) {
         const struct passwd *pwd = getpwuid(user_id);
@@ -272,8 +272,8 @@ static void get_user_group_(t_file *file, gid_t group_id, uid_t user_id) {
 }
 
 static void get_permission_(t_file *file, const struct stat *sb) {
-    CUSTOM_ASSERT_(file, "file can not be NULL");
-    CUSTOM_ASSERT_(sb, "sb can not be NULL");
+    ASSERT_(file, "file can not be NULL");
+    ASSERT_(sb, "sb can not be NULL");
 
     switch (sb->st_mode & S_IFMT) {
         case S_IFLNK:
@@ -311,8 +311,8 @@ static void get_permission_(t_file *file, const struct stat *sb) {
                PERMISSION_SIZE);
 }
 
-static char *get_dt(const struct stat *sb) {
-    CUSTOM_ASSERT_(sb, "sb cannot be NULL");
+static char *get_dt_(const struct stat *sb) {
+    ASSERT_(sb, "sb cannot be NULL");
 
 #if defined(__linux__)
     return ctime(&sb->st_atim.tv_sec);

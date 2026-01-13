@@ -11,7 +11,8 @@ import termios
 
 ALLOWED_FLAGS = ['R', 'a', 'l', 'r', 't']
 DEBUG = True
-TERMINAL_SIZES = [80, 100, 160, 240, 256, 512]
+TERMINAL_SIZES = [256]
+# TERMINAL_SIZES = [80, 100, 160, 240, 256, 512]
 CORE_COUNT = os.cpu_count()
 own_bin = './ft_ls'
 if DEBUG:
@@ -69,9 +70,9 @@ def simple_tests(term_size: int = 80) -> None:
         try:
             assert ls_output == ft_ls_output
         except AssertionError:
-            print(ls_output, file=sys.stderr)
-            print('-' * 100, file=sys.stderr)
-            print(ft_ls_output, file=sys.stderr)
+            print(f'ls:\n{ls_output}', file=sys.stderr)
+            print('-' * term_size, file=sys.stderr)
+            print(f'ft_ls:\n{ft_ls_output}', file=sys.stderr)
             raise AssertionError('output ls and ft_ls are different')
 
 

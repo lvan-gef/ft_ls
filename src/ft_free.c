@@ -3,7 +3,7 @@
 #include "../include/ft_ls.h"
 
 void free_args(t_args *args) {
-    CUSTOM_ASSERT_(args, "args can not be NULL");
+    ASSERT_(args, "args can not be NULL");
 
     size_t index = 0;
     while (index < args->paths->len) {
@@ -17,11 +17,11 @@ void free_args(t_args *args) {
 }
 
 void free_file(void *content) {
-    CUSTOM_ASSERT_(content, "content can not be NULL");
+    ASSERT_(content, "content can not be NULL");
     free(content);
 }
 
 void free_path(void *content) {
-    CUSTOM_ASSERT_(content, "content can not be NULL");
+    ASSERT_(content, "content can not be NULL");
     free(content);
 }
