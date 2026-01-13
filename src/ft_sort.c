@@ -8,7 +8,7 @@
 
 #include "../libft/include/libft.h"
 
-static int sort_it_(const char *a, const char *b);
+static int comapre(const char *a, const char *b);
 
 void sort_alpha(t_array *files) {
     CUSTOM_ASSERT_(files, "files can not be NULL");
@@ -19,7 +19,7 @@ void sort_alpha(t_array *files) {
         while (sub_index < files->len) {
             t_file *file_a = (t_file *)files->data[index];
             t_file *file_b = (t_file *)files->data[sub_index];
-            int result = sort_it_(file_a->filename, file_b->filename);
+            int result = comapre(file_a->filename, file_b->filename);
             if (result > 0) {
                 files->data[sub_index] = file_a;
                 files->data[index] = file_b;
@@ -37,7 +37,7 @@ void sort_time(t_array *files, bool reverse) {
     (void)reverse;
 }
 
-static int sort_it_(const char *a, const char *b) {
+static int comapre(const char *a, const char *b) {
     while (*a && *b) {
         while (*a && !ft_isalnum(*a))
             a++;
