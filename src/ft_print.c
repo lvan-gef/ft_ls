@@ -5,12 +5,11 @@
 #include "../include/ft_assert.h"
 #include "../include/ft_ls.h"
 #include "../include/ft_sort.h"
-#include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
 
 
 static void printer_(const t_args *args, t_array *files, size_t len);
-static void print_single_row(t_array *files);
+static void print_single_row(t_array *files, size_t max_len);
 // static void set_padding_(char *padding, size_t len, size_t file_len,
 //                          size_t rows);
 static size_t get_rows_(size_t file_count, size_t len);
@@ -51,7 +50,7 @@ static void printer_(const t_args *args, t_array *files, size_t max_len) {
     }
     size_t rows = get_rows_(files->len, max_len);
     if (rows == 1) {
-        print_single_row(files);
+        print_single_row(files, max_len);
     } else {
         exit(88);
     }
@@ -107,36 +106,32 @@ static void printer_(const t_args *args, t_array *files, size_t max_len) {
     // ft_fprintf(STDOUT_FILENO, "\n");
 }
 
-static void print_single_row(t_array *files) {
-    size_t total_len = 0;
-    size_t index = 0;
+static void print_single_row(t_array *files, size_t max_len) {
+    size_t col_width = ((max_len / 8) + 1) * 8;
+    size_t buf_size = files->len * (max_len + 8);
+    char buf[buf_size];
+    size_t len = 0;
 
-    ft_fprintf(STDOUT_FILENO, "%d\n", files->len);
+    size_t index = 0;
     while (index < files->len - 1) {
         t_file *f = files->data[index];
-        ft_fprintf(STDERR_FILENO, "%s\n", f->filename);
-        total_len += ft_strlen(f->filename) + 2;
+        len += ft_strlcpy(buf + len, f->filename, buf_size - len);
+
+        size_t tabs_needed = (col_width - f->len + 7) / 8;
+        while (tabs_needed > 0) {
+            buf[len] = '\t';
+            ++len;
+            --tabs_needed;
+        }
         ++index;
     }
-    total_len += ft_strlen(files->data[index]);
-    total_len += 2;
 
-    char buf[total_len];
-    index = 0;
     t_file *f = files->data[index];
-    ft_strlcpy(buf, f->filename, total_len);
-    ft_strlcat(buf, "  ", total_len);
-    ++index;
-    while (index < files->len) {
-        f = files->data[index];
-        ft_strlcat(buf, f->filename, total_len);
-        ft_strlcat(buf, "  ", total_len);
-        ++index;
-    }
-    ft_strlcat(buf, "\n", total_len);
+    len += ft_strlcpy(buf + len, f->filename, buf_size - len);
+    buf[len] = '\n';
+    ++len;
 
-    // ft_fprintf(STDOUT_FILENO, "%s\n", buf);
-    write(STDOUT_FILENO, buf, total_len);
+    write(STDOUT_FILENO, buf, len);
 }
 
 static size_t get_rows_(size_t file_count, size_t max_len) {
