@@ -1,7 +1,12 @@
 #ifndef FT_LS_H
 #define FT_LS_H
 
-#include <limits.h>
+#ifdef __linux__
+    #include <linux/limits.h>
+#elif defined(__APPLE__)
+    #include <sys/syslimits.h>
+#endif
+
 #include <stdbool.h>
 #include <stddef.h>
 
