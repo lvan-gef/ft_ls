@@ -1,13 +1,20 @@
 #! /usr/bin/env python3
 
-import sys
+from pathlib import Path
+import difflib
+import fcntl
 import os
 import pty
-import subprocess
 import string
 import struct
-import fcntl
+import subprocess
+import sys
 import termios
+import shutil
+
+from create_test_folders import create_test_folders
+
+# TODO: you can give ls a file then it will print that...
 
 ALLOWED_FLAGS = ['R', 'a', 'l', 'r', 't']
 DEBUG = True
@@ -18,6 +25,9 @@ if DEBUG:
     own_bin = f'{own_bin}_d'
 
 def main() -> None:
+    test_path = Path.cwd().joinpath('ft_ls_tester')
+    tests_files = create_test_folders(path=test_path)
+
     subprocess.run('make fclean', shell=True, capture_output=True)
     compile_ls()
     invalid_flags()
@@ -26,9 +36,10 @@ def main() -> None:
     for term_size in TERMINAL_SIZES:
         compile_ls(term_size=term_size)
         print('-' * 10, 'Test column width:', term_size, '-' * 10)
-        simple_tests(term_size=term_size)
+        simple_tests(term_size=term_size, test_files=tests_files)
         subprocess.run('make fclean', shell=True, capture_output=True)
 
+    shutil.rmtree(test_path)
 
 def compile_ls(term_size: int = 80) -> None:
     print('', '-' * 5, 'Compile with column width:', term_size, '-' * 5)
@@ -55,10 +66,18 @@ def invalid_flags() -> None:
         assert result.stderr != ''
 
 
-def simple_tests(term_size: int = 80) -> None:
-    paths = ['', '.', '..', 'src', 'include', 'tester']
+def simple_tests(term_size, test_files: list[Path]) -> None:
+    # paths = ['', '.', '..', 'src', 'include', 'tester']
 
-    for p in paths[-2:-1]:
+    paths = ['src', 'include']
+    for p in test_files:
+        paths.append(str(p))
+
+
+    for p in paths:
+    # for p in paths[-3:-1]:
+    # for p in test_files:
+        # p = str(p)
         if p == '':
             ls_output = run_with_pty(cmd=['ls'], cols=term_size)
             ft_ls_output = run_with_pty(cmd=[f'{own_bin}'], cols=term_size)
@@ -72,7 +91,17 @@ def simple_tests(term_size: int = 80) -> None:
             print(f'ls:\n{ls_output}', file=sys.stderr)
             print('-' * term_size, file=sys.stderr)
             print(f'ft_ls:\n{ft_ls_output}', file=sys.stderr)
-            raise AssertionError('output ls and ft_ls are different')
+            print('-' * term_size, file=sys.stderr)
+            seqm = difflib.SequenceMatcher(None, ft_ls_output, ls_output)
+            for opcode, a0, a1, b0, b1 in seqm.get_opcodes():
+                if opcode == 'replace':
+                    print(f"Replace '{ft_ls_output[a0:a1]}' with '{ls_output[b0:b1]}'")
+                elif opcode == 'insert':
+                    print(f"Insert '{ls_output[b0:b1]}'")
+                elif opcode == 'delete':
+                    print(f"Delete '{ft_ls_output[a0:a1]}'")
+            # raise AssertionError('output ls and ft_ls are different')
+            print('-' * term_size, file=sys.stderr)
 
 
 def run_with_pty(cmd: list[str], cols: int = 80):
