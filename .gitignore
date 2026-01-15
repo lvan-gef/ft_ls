@@ -58,3 +58,4 @@ compile_commands.json
 .cache/
 ft_ls
 ft_ls_d
+__pycache__
