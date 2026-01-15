@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <time.h>
-#include <unistd.h>
 
 #include "../include/ft_assert.h"
 
+#ifndef NDEBUG
 void log_assert_(const char *file, int line, const char *func,
                  const char *message) {
     time_t now = time(NULL);
@@ -19,3 +19,4 @@ void log_assert_(const char *file, int line, const char *func,
 
     fflush(stderr);
 }
+#endif

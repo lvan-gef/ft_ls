@@ -1,10 +1,17 @@
 #ifndef FT_LS_H
 #define FT_LS_H
 
+typedef enum e_os {
+    OS_LINUX,
+    OS_MAC
+} t_os;
+
 #ifdef __linux__
     #include <linux/limits.h>
+    #define CURRENT_OS ((t_os)OS_LINUX)
 #elif defined(__APPLE__)
     #include <sys/syslimits.h>
+    #define CURRENT_OS ((t_os)OS_MAC)
 #endif
 
 #include <stdbool.h>
@@ -40,6 +47,7 @@ typedef struct s_args {
 typedef struct s_path {
     size_t max_len;
     char path[PATH_MAX];
+    bool quoted;
     t_array *files;
 } t_path;
 

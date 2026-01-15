@@ -38,36 +38,19 @@ void sort_time(t_array *files, bool reverse) {
 }
 
 static int comapre_(const char *a, const char *b) {
-    while (*a && *b) {
-        while (*a && !ft_isalnum(*a)) {
-            ++a;
-        }
+    // Skip leading quote if filename is quoted
+    if (*a == '\'' || *a == '"') {
+        ++a;
+    }
+    if (*b == '\'' || *b == '"') {
+        ++b;
+    }
 
-        while (*b && !ft_isalnum(*b)) {
-            ++b;
-        }
-
-        if (!*a || !*b) {
-            break;
-        }
-
-        char ca = (char)ft_tolower(*a);
-        char cb = (char)ft_tolower(*b);
-        if (ca != cb) {
-            return ca - cb;
-        }
-
+    // Simple byte-by-byte comparison (like strcmp)
+    while (*a && *b && *a == *b) {
         ++a;
         ++b;
     }
 
-    while (*a && !ft_isalnum(*a)) {
-        ++a;
-    }
-
-    while (*b && !ft_isalnum(*b)) {
-        ++b;
-    }
-
-    return *a - *b;
+    return (unsigned char)*a - (unsigned char)*b;
 }

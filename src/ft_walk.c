@@ -1,6 +1,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <grp.h>
+#include <linux/limits.h>
 #include <pwd.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -25,6 +26,7 @@ static void get_user_group_(t_file *file, unsigned int group_id,
                             unsigned int user_id);
 static void get_permission_(t_file *file, const struct stat *sb);
 static char *get_dt_(const struct stat *sb);
+static void set_filename(t_file *file, const char *filename, t_path *path);
 
 static uid_t cached_uid = (uid_t)-1;
 static gid_t cached_gid = (gid_t)-1;
@@ -58,7 +60,6 @@ bool walk(t_args *args) {
                 continue;
             }
 
-            ft_fprintf(STDOUT_FILENO, "%s\n", path->path);
             err_msg = strerror(errno);
             goto failed;
         }
@@ -143,10 +144,6 @@ static char *parse_file_(const struct dirent *dirent, struct stat *sb, t_path *p
     ASSERT_(path, "path can not be NULL");
 
     const size_t len = ft_strlen(dirent->d_name);
-    // size_t display_len = len;
-    // if (ft_memchr(dirent->d_name, ' ', len)) {
-    //     display_len = len + 2;
-    // }
     if (len > path->max_len) {
         path->max_len = len;
     }
@@ -162,12 +159,12 @@ static char *parse_file_(const struct dirent *dirent, struct stat *sb, t_path *p
     }
 
     ft_strlcpy(file->date_fmt, dt + 4, DT_LEN);
-    ft_strlcpy(file->filename, dirent->d_name, NAME_MAX);
     get_permission_(file, sb);
     get_user_group_(file, sb->st_gid, sb->st_uid);
     file->size = sb->st_size;
     file->hardlink = sb->st_nlink;
     file->len = len;
+    set_filename(file, dirent->d_name, path);
 
     if (!append_array(path->files, (void *)file)) {
         free(file);
@@ -322,4 +319,42 @@ static char *get_dt_(const struct stat *sb) {
     ft_fprintf(STDERR_FILENO, "OS is not supported\n");
     return NULL;
 #endif
+}
+
+static void set_filename(t_file *file, const char *filename, t_path *path) {
+    ASSERT_(file, "file can not be NULL");
+    ASSERT_(file->len, "file->len must be more then 0");
+    ASSERT_(filename, "filename can not be NULL");
+    ASSERT_(*filename, "*filename can not be '\\0'");
+    ASSERT_(path, "path can not be NULL");
+
+    char targets[4] = " '\"";
+    char *c = NULL;
+    char quote[2] = "'";
+    size_t len = 0;
+    size_t index = 0;
+
+    while (targets[index]) {
+        c = ft_memchr(filename, targets[index], file->len);
+        if (c) {
+            if (*c == '\'') {
+                *quote = '"';
+            }
+            break;
+        }
+
+        ++index;
+    }
+
+    if (c) {
+        len += ft_strlcpy(file->filename, quote, NAME_MAX);
+        len += ft_strlcpy(file->filename + len, filename, NAME_MAX);
+        len += ft_strlcpy(file->filename + len, quote, NAME_MAX);
+
+        ASSERT_(len == ft_strlen(file->filename), "len is not == to strlen()");
+        file->len = len;
+        path->quoted = true;
+        return;
+    }
+    (void)ft_strlcpy(file->filename, filename, NAME_MAX);
 }
