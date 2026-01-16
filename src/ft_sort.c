@@ -6,12 +6,11 @@
 #include "../include/ft_ls.h"
 #include "../include/ft_sort.h"
 
-#include "../libft/include/libft.h"
-
 static int comapre_(const char *a, const char *b);
 
 void sort_alpha(t_array *files) {
     ASSERT_(files, "files can not be NULL");
+    ASSERT_(files->len, "files->len must be more then 0");
 
     size_t index = 0;
     while (index < files->len) {
@@ -38,15 +37,19 @@ void sort_time(t_array *files, bool reverse) {
 }
 
 static int comapre_(const char *a, const char *b) {
-    // Skip leading quote if filename is quoted
+    ASSERT_(a, "a can not be NULL");
+    ASSERT_(*a, "*a can not be '\\0'");
+    ASSERT_(b, "b can not be NULL");
+    ASSERT_(*b, "*b can not be '\\0'");
+
     if (*a == '\'' || *a == '"') {
         ++a;
     }
+
     if (*b == '\'' || *b == '"') {
         ++b;
     }
 
-    // Simple byte-by-byte comparison (like strcmp)
     while (*a && *b && *a == *b) {
         ++a;
         ++b;
