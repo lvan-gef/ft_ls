@@ -39,6 +39,7 @@ void sort_time(t_array *files, bool reverse) {
 }
 
 static int get_priority(char c) {
+    ASSERT_(c, "c can not be '\\0'");
     if (ft_isalpha(c)) {
         return 0;
     }
@@ -51,6 +52,11 @@ static int get_priority(char c) {
 }
 
 static int compare_(const char *a, const char *b) {
+    ASSERT_(a, "a can not be NULL");
+    ASSERT_(*a, "*a can not be '\\0'");
+    ASSERT_(b, "b can not be NULL");
+    ASSERT_(*b, "*b can not be '\\0'");
+
     if (*a == '\'' || *a == '"') {
         ++a;
     }
