@@ -14,6 +14,7 @@ typedef enum e_os {
     #define CURRENT_OS ((t_os)OS_MAC)
 #endif
 
+#include <time.h>
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -60,7 +61,7 @@ typedef struct s_file {
     char group[USER_SIZE];
     char user[USER_SIZE];
     char date_fmt[DT_LEN];
-    // add time as number
+    struct timespec mtime;
 } t_file;
 
 #endif // !FT_LS_H
