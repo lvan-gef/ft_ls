@@ -159,6 +159,7 @@ static char *parse_file_(const struct dirent *dirent, struct stat *sb, t_path *p
     }
 
     ft_strlcpy(file->date_fmt, dt + 4, DT_LEN);
+    file->mtime = sb->st_mtim;
     get_permission_(file, sb);
     get_user_group_(file, sb->st_gid, sb->st_uid);
     file->size = sb->st_size;
