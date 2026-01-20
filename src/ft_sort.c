@@ -9,8 +9,10 @@
 #include "../libft/include/libft.h"
 
 static int compare_(const char *a, const char *b);
+static int compare_time(struct timespec *a, struct timespec *b);
+static void reverse_(t_array *files);
 
-void sort_alpha(t_array *files) {
+void sort_alpha(t_array *files, bool reverse) {
     ASSERT_(files, "files can not be NULL");
     ASSERT_(files->len, "files->len must be more then 0");
 
@@ -29,13 +31,54 @@ void sort_alpha(t_array *files) {
         }
         ++index;
     }
+
+    if (reverse) {
+        reverse_(files);
+    }
 }
 
 void sort_time(t_array *files, bool reverse) {
     ASSERT_(files, "files can not be NULL");
+    ASSERT_(files->len, "files->len must be more then 0");
 
-    (void)files;
-    (void)reverse;
+    size_t size = files->len - 1;
+    ASSERT_(size < files->len, "size should be less then files->len");
+
+    while (true) {
+        bool changed = false;
+        size_t index = 0;
+
+        while (index < size) {
+            t_file *file_a = files->data[index];
+            t_file *file_b = files->data[index + 1];
+
+            int cmp = compare_time(&file_a->mtime, &file_b->mtime);
+            bool should_swap = false;
+            if (cmp == 0) {
+                should_swap = compare_(file_a->filename, file_b->filename) > 0;
+            } else {
+                should_swap = cmp < 0;
+            }
+
+            if (should_swap) {
+                files->data[index] = file_b;
+                files->data[index + 1] = file_a;
+                changed = true;
+            }
+
+            ++index;
+        }
+
+        if (!changed) {
+            break;
+        }
+
+        --size;
+    }
+
+    if (reverse) {
+        reverse_(files);
+    }
 }
 
 static int get_priority(char c) {
@@ -119,4 +162,32 @@ static int compare_(const char *a, const char *b) {
     }
 
     return *a - *b;
+}
+
+static int compare_time(struct timespec *a, struct timespec *b) {
+    ASSERT_(a, "a can not be NULL");
+    ASSERT_(b, "b can not be NULL");
+
+    if (a->tv_sec != b->tv_sec) {
+        return (a->tv_sec > b->tv_sec) - (a->tv_sec < b->tv_sec);
+    }
+
+    return (a->tv_nsec > b->tv_nsec) - (a->tv_nsec < b->tv_nsec);
+}
+
+static void reverse_(t_array *files) {
+    ASSERT_(files, "files can not be NULL");
+    ASSERT_(files->len, "files->len must be more then 0");
+
+    size_t index = 0;
+    size_t end = files->len - 1;
+    ASSERT_(index <= end, "index <= end");
+
+    while (index < end) {
+        t_file *tmp = files->data[index];
+        files->data[index] = files->data[end];
+        files->data[end] = tmp;
+        ++index;
+        --end;
+    }
 }
