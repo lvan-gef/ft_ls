@@ -17,7 +17,8 @@
 #include "../libft/include/libft.h"
 
 static char *walk_files_(t_args *args, DIR *dir, t_path *path);
-static char *parse_file_(const struct dirent *dirent, struct stat *sb, t_path *path);
+static char *parse_file_(const struct dirent *dirent, struct stat *sb,
+                         t_path *path);
 static bool create_path_node_(t_args *args, const t_path *path,
                               const char *pathname);
 static void set_fullpath_(char *fullpath, const char *filename,
@@ -138,7 +139,8 @@ static char *walk_files_(t_args *args, DIR *dir, t_path *path) {
     return NULL;
 }
 
-static char *parse_file_(const struct dirent *dirent, struct stat *sb, t_path *path) {
+static char *parse_file_(const struct dirent *dirent, struct stat *sb,
+                         t_path *path) {
     ASSERT_(dirent, "dirent can not be NULL");
     ASSERT_(sb, "sb can not be NULL");
     ASSERT_(path, "path can not be NULL");

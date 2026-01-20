@@ -2,14 +2,14 @@
 #define FT_LS_H
 
 #ifdef __linux__
-    #include <linux/limits.h>
+#include <linux/limits.h>
 #elif defined(__APPLE__)
-    #include <sys/syslimits.h>
+#include <sys/syslimits.h>
 #endif
 
-#include <time.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <time.h>
 
 #include "./ft_array.h"
 

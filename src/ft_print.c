@@ -3,18 +3,20 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "../include/ft_print.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
 #include "../include/ft_ls.h"
+#include "../include/ft_print.h"
 #include "../include/ft_sort.h"
+#include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
-#include "ft_fprintf.h"
 
-static void printer_(const t_args *args, t_array *files, size_t len, bool quoted);
+static void printer_(const t_args *args, t_array *files, size_t len,
+                     bool quoted);
 static void single_row_(t_array *files, size_t max_len, bool quoted);
-static void multi_row_(t_array *files, size_t max_len, bool quoted, size_t rows);
-static size_t get_rows_(size_t file_count, size_t max_len, size_t gap);
+static void multi_row_(t_array *files, size_t max_len, bool quoted);
+static size_t get_rows_(size_t file_count, size_t max_len);
+static size_t ft_min_(t_array *arr);
 
 void print_ls(t_args *args) {
     ASSERT_(args, "args can not be NULL");
@@ -32,11 +34,13 @@ void print_ls(t_args *args) {
         }
     } else {
         t_path *path = paths->data[0];
+        ASSERT_(path->max_len, "path->max_len must be more then 0");
         printer_(args, path->files, path->max_len, path->quoted);
     }
 }
 
-static void printer_(const t_args *args, t_array *files, size_t max_len, bool quoted) {
+static void printer_(const t_args *args, t_array *files, size_t max_len,
+                     bool quoted) {
     ASSERT_(args, "args can not be NULL");
     ASSERT_(files, "files can not be NULL");
     ASSERT_(max_len, "len must be more then 0");
@@ -44,15 +48,13 @@ static void printer_(const t_args *args, t_array *files, size_t max_len, bool qu
     if (args->time) {
         sort_time(files, args->reverse);
     } else {
-        sort_alpha(files);
+        sort_alpha(files, args->reverse);
     }
 
-    size_t gap = quoted ? 3 : 2;
-    size_t rows = get_rows_(files->len, max_len, gap);
-    if (rows == 1) {
+    if (get_rows_(files->len, max_len) == 1) {
         single_row_(files, max_len, quoted);
     } else {
-        multi_row_(files, max_len, quoted, rows);
+        multi_row_(files, max_len, quoted);
     }
 }
 
@@ -121,24 +123,55 @@ static void single_row_(t_array *files, size_t max_len, bool quoted) {
     free(buf);
 }
 
-static void multi_row_(t_array *files, size_t max_len, bool quoted, size_t rows) {
+static void multi_row_(t_array *files, size_t max_len, bool quoted) {
     ASSERT_(files, "file can not be NULL");
     ASSERT_(max_len, "max_len can not be NULL");
-    ASSERT_(rows, "rows can not be NULL");
+
+    size_t min_col_width = ft_min_(files) + 3;
+    size_t max_possible_cols = TERM_SIZE / min_col_width;
+    max_possible_cols =
+        max_possible_cols < files->len
+            ? max_possible_cols
+            : files->len; //  min(max_possible_cols, file_count);
+    ft_fprintf(STDOUT_FILENO, "%d\n", max_possible_cols);
     (void)quoted;
-    ft_fprintf(STDOUT_FILENO, "rows: %d, cols: %d, files: %d\n", rows, files->len / rows, files->len);
 }
 
-static size_t get_rows_(size_t file_count, size_t max_len, size_t gap) {
+static size_t get_rows_(size_t file_count, size_t max_len) {
     ASSERT_(file_count, "file_count should be more then 0");
-    ASSERT_(max_len, "len should be more then 0");
-    ASSERT_(gap >= 2, "gap should be at least 2");
+    ASSERT_(max_len, "max_len should be more then 0");
 
-    size_t col_width = max_len + gap;
-    size_t cols = TERM_SIZE / col_width;
-    if (cols == 0) {
-        cols = 1;
+    const size_t new_len = max_len;
+    size_t tmp_count = file_count / 2;
+
+    size_t tmp_width = new_len * tmp_count;
+    ASSERT_(tmp_count == 0 || new_len <= SIZE_MAX / tmp_count,
+            "overflow in tmp_width");
+    tmp_width = new_len * tmp_count;
+    size_t rows = 1;
+
+    while (tmp_width > TERM_SIZE) {
+        ++rows;
+        tmp_count = tmp_count / 2;
+        ASSERT_(tmp_count == 0 || new_len <= SIZE_MAX / tmp_count,
+                "overflow in tmp_width");
+        tmp_width = new_len * tmp_count;
     }
 
-    return (file_count + cols - 1) / cols;
+    return rows;
+}
+
+static size_t ft_min_(t_array *arr) {
+    size_t index = 0;
+    size_t min_val = SIZE_MAX;
+
+    while (index < arr->len) {
+        t_file *file = arr->data[index];
+        if (file->len < min_val) {
+            min_val = file->len;
+        }
+        ++index;
+    }
+
+    return min_val;
 }
