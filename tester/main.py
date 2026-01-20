@@ -18,8 +18,7 @@ from create_test_folders import create_test_folders
 
 ALLOWED_FLAGS = ['R', 'a', 'l', 'r', 't']
 DEBUG = True
-TERMINAL_SIZES = [181]
-# TERMINAL_SIZES = [80, 100, 160, 240, 256, 512]
+TERMINAL_SIZES = [80, 100, 160, 240, 256, 512]
 own_bin = './ft_ls'
 if DEBUG:
     own_bin = f'{own_bin}_d'
@@ -69,7 +68,7 @@ def invalid_flags() -> None:
 def simple_tests(term_size, test_files: list[Path]) -> None:
     # paths = ['', '.', '..', 'src', 'include', 'tester']
 
-    paths = ['src', 'include']
+    paths = ['', 'src', 'include']
     for p in test_files:
         paths.append(str(p))
 
@@ -101,7 +100,8 @@ def simple_tests(term_size, test_files: list[Path]) -> None:
                 elif opcode == 'delete':
                     print(f"Delete '{ft_ls_output[a0:a1]}'")
             # raise AssertionError('output ls and ft_ls are different')
-            print('-' * term_size, file=sys.stderr)
+            # print('-' * term_size, file=sys.stderr)
+        break
 
 
 def run_with_pty(cmd: list[str], cols: int = 80):
