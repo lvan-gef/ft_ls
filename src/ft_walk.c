@@ -10,7 +10,6 @@
 
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
-#include "../include/ft_free.h"
 #include "../include/ft_ls.h"
 #include "../include/ft_walk.h"
 #include "../libft/include/ft_fprintf.h"
@@ -73,8 +72,8 @@ bool walk(t_args *args) {
         closedir(dir);
 
         if (!path->max_len) {
-            free_array(path->files, free_file);
-            remove_elem_array(args->paths, (void *)path, free_path);
+            free_array(path->files);
+            remove_elem_array(args->paths, (void *)path);
         } else {
             ++index;
         }
@@ -197,20 +196,24 @@ static bool create_path_node_(t_args *args, const t_path *path,
         return false;
     }
 
-    sub_path->files = init_array(10);
+    sub_path->files = init_array(DEFAULT_SIZE, ARRAY_FILES);
     if (!sub_path->files) {
-        free(sub_path);
-        return false;
+        goto failed;
     }
 
     set_fullpath_(sub_path->path, path->path, pathname);
     if (!append_array(args->paths, (void *)sub_path)) {
-        free_array(sub_path->files, free_file);
-        free(sub_path);
-        return false;
+        goto failed;
     }
 
     return true;
+failed:
+    if (sub_path->files) {
+        free_array(sub_path->files);
+    }
+    free(sub_path);
+
+    return false;
 }
 
 static void set_fullpath_(char *fullpath, const char *filename,
@@ -228,6 +231,7 @@ static void set_fullpath_(char *fullpath, const char *filename,
     if (filename[len - 1] != '/') {
         ft_strlcat(fullpath, "/", PATH_MAX);
     }
+
     ft_strlcat(fullpath, dir_name, PATH_MAX);
 }
 

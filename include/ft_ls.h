@@ -29,6 +29,10 @@
 #define USER_SIZE 256
 #endif // !USER_SIZE
 
+#ifndef DEFAULT_SIZE
+#define DEFAULT_SIZE 10
+#endif // !DEFAULT_SIZE
+
 typedef struct s_args {
     bool list;
     bool recursive;

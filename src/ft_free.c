@@ -8,12 +8,14 @@ void free_args(t_args *args) {
     size_t index = 0;
     while (index < args->paths->len) {
         t_path *path = args->paths->data[index];
-        free_array(path->files, free_file);
+        free_array(path->files);
 
         ++index;
     }
 
-    free_array(args->paths, free_path);
+    if (args->paths) {
+        free_array(args->paths);
+    }
 }
 
 void free_file(void *content) {

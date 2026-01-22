@@ -4,12 +4,13 @@
 #include "../include/ft_parser.h"
 #include "../include/ft_print.h"
 #include "../include/ft_walk.h"
+#include "../include/ft_ls.h"
 
 static void clean_program(t_args *args);
 
 int main(int argc, char **argv) {
     t_args args = {0};
-    args.paths = init_array(10);
+    args.paths = init_array(DEFAULT_SIZE, ARRAY_PATHS);
     if (!args.paths) {
         return 1;
     }

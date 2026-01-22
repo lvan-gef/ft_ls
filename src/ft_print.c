@@ -14,9 +14,9 @@
 static void printer_(const t_args *args, t_array *files, size_t len,
                      bool quoted);
 static void single_row_(t_array *files, size_t max_len, bool quoted);
-static void multi_row_(t_array *files, size_t max_len, bool quoted);
+static void multi_row_(t_array *files);
 static size_t get_rows_(size_t file_count, size_t max_len);
-static size_t ft_min_(t_array *arr);
+static void free_multi_row_(t_array *arr);
 
 void print_ls(t_args *args) {
     ASSERT_(args, "args can not be NULL");
@@ -54,13 +54,13 @@ static void printer_(const t_args *args, t_array *files, size_t max_len,
     if (get_rows_(files->len, max_len) == 1) {
         single_row_(files, max_len, quoted);
     } else {
-        multi_row_(files, max_len, quoted);
+        multi_row_(files);
     }
 }
 
 static void single_row_(t_array *files, size_t max_len, bool quoted) {
     ASSERT_(files, "files can not be NULL");
-    ASSERT_(files->len > 0, "files->len must be > 0");
+    ASSERT_(files->len, "files->len must be > 0");
     ASSERT_(max_len, "max_len must be > 0");
 
     size_t buf_size = (files->len * (max_len + 8) + quoted);
@@ -68,6 +68,7 @@ static void single_row_(t_array *files, size_t max_len, bool quoted) {
     if (!buf) {
         return;
     }
+
     size_t buf_len = 0;
     size_t cur_pos = 0;
     t_file *f = files->data[0];
@@ -123,18 +124,55 @@ static void single_row_(t_array *files, size_t max_len, bool quoted) {
     free(buf);
 }
 
-static void multi_row_(t_array *files, size_t max_len, bool quoted) {
+static void multi_row_(t_array *files) {
     ASSERT_(files, "file can not be NULL");
-    ASSERT_(max_len, "max_len can not be NULL");
 
-    size_t min_col_width = ft_min_(files) + 3;
-    size_t max_possible_cols = TERM_SIZE / min_col_width;
-    max_possible_cols =
-        max_possible_cols < files->len
-            ? max_possible_cols
-            : files->len; //  min(max_possible_cols, file_count);
-    ft_fprintf(STDOUT_FILENO, "%d\n", max_possible_cols);
-    (void)quoted;
+    t_array *inner = NULL;
+    t_array *arr = (t_array *)init_array(files->len, ARRAY_ARRAY);
+    if (!arr) {
+        ft_fprintf(STDERR_FILENO, "Failed to malloc arr");
+        return;
+    }
+
+    size_t index = 0;
+    while (index < files->len) {
+        inner = init_array(DEFAULT_SIZE, ARRAY_FILES);
+        if (!inner) {
+            goto failed;
+        }
+
+        if (!append_array(arr, inner)) {
+            goto failed;
+        }
+
+        ++index;
+    }
+
+    bool fit = false;
+    size_t rows = 2;
+
+    while (!fit) {
+        index = 0;
+        while (index < rows && arr->len < rows) {
+        }
+
+        ++rows;
+        fit = true;
+    }
+
+    free_multi_row_(arr);
+    return;
+
+failed:
+    ft_fprintf(STDERR_FILENO, "Failed to alloc for multi row");
+
+    if (inner) {
+        free((void *)inner->data);
+        free(inner);
+    }
+
+    free_multi_row_(arr);
+    return;
 }
 
 static size_t get_rows_(size_t file_count, size_t max_len) {
@@ -161,17 +199,14 @@ static size_t get_rows_(size_t file_count, size_t max_len) {
     return rows;
 }
 
-static size_t ft_min_(t_array *arr) {
-    size_t index = 0;
-    size_t min_val = SIZE_MAX;
+static void free_multi_row_(t_array *arr) {
+    ASSERT_(arr, "arr can not be NULL");
 
+    size_t index = 0;
     while (index < arr->len) {
-        t_file *file = arr->data[index];
-        if (file->len < min_val) {
-            min_val = file->len;
-        }
+        free_array(arr->data[index]);
         ++index;
     }
 
-    return min_val;
+    free_array(arr);
 }
