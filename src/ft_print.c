@@ -21,20 +21,16 @@ void print_ls(t_args *args) {
     ASSERT_(args, "args can not be NULL");
 
     t_array *paths = args->paths;
-    if (paths->len == 0) {
+    if (!paths->len) {
         return;
-    } else if (paths->len > 1) {
-        size_t index = 0;
-        while (index < paths->len) {
-            t_path *path = paths->data[index];
-            ASSERT_(path->max_len, "path->max_len must be more then 0");
-            printer_(args, path->files, path->max_len, path->quoted);
-            ++index;
-        }
-    } else {
-        t_path *path = paths->data[0];
+    }
+
+    size_t index = 0;
+    while (index < paths->len) {
+        t_path *path = paths->data[index];
         ASSERT_(path->max_len, "path->max_len must be more then 0");
         printer_(args, path->files, path->max_len, path->quoted);
+        ++index;
     }
 }
 
@@ -50,7 +46,13 @@ static void printer_(const t_args *args, t_array *files, size_t max_len,
         sort_alpha(files, args->reverse);
     }
 
-    if (get_rows_(files->len, max_len) == 1) {
+    // create array probeer eerst alles op een regel
+    // als dat niet lukt probeer over 2 regels enz
+    // aan het loop over alle elem in array en print it
+    //
+
+    if (args->list) {
+    } else if (get_rows_(files->len, max_len) == 1) {
         single_row_(files, max_len, quoted);
     } else {
         multi_row_(files);
@@ -121,57 +123,6 @@ static void single_row_(t_array *files, size_t max_len, bool quoted) {
 
     (void)write(STDOUT_FILENO, buf, buf_len);
     free(buf);
-}
-
-static void multi_row_(t_array *files) {
-    ASSERT_(files, "file can not be NULL");
-
-    // t_array *inner = NULL;
-    // t_array *arr = (t_array *)init_array(files->len, ARRAY_ARRAY);
-    // if (!arr) {
-    //     ft_fprintf(STDERR_FILENO, "Failed to malloc arr");
-    //     return;
-    // }
-    //
-    // size_t index = 0;
-    // while (index < files->len) {
-    //     inner = init_array(DEFAULT_SIZE, ARRAY_FILES);
-    //     if (!inner) {
-    //         goto failed;
-    //     }
-    //
-    //     if (!append_array(arr, inner)) {
-    //         goto failed;
-    //     }
-    //
-    //     ++index;
-    // }
-    //
-    // bool fit = false;
-    // size_t rows = 2;
-    //
-    // while (!fit) {
-    //     index = 0;
-    //     while (index < rows && arr->len < rows) {
-    //     }
-    //
-    //     ++rows;
-    //     fit = true;
-    // }
-    //
-    // free_multi_row_(arr);
-    return;
-
-// failed:
-//     ft_fprintf(STDERR_FILENO, "Failed to alloc for multi row");
-//
-//     // if (inner) {
-//     //     free((void *)inner->data);
-//     //     free(inner);
-//     // }
-//     //
-//     // free_multi_row_(arr);
-//     return;
 }
 
 static size_t get_rows_(size_t file_count, size_t max_len) {

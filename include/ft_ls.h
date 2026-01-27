@@ -12,6 +12,7 @@
 #include <time.h>
 
 #include "./ft_array.h"
+#include "./ft_arena.h"
 
 #ifndef PERMISSION_SIZE
 #define PERMISSION_SIZE 12
@@ -33,7 +34,7 @@
 #define DEFAULT_SIZE 10
 #endif // !DEFAULT_SIZE
 
-typedef struct s_args {
+typedef struct {
     bool list;
     bool recursive;
     bool all;
@@ -42,14 +43,14 @@ typedef struct s_args {
     t_array *paths;
 } t_args;
 
-typedef struct s_path {
+typedef struct {
     size_t max_len;
     char path[PATH_MAX];
     bool quoted;
     t_array *files;
 } t_path;
 
-typedef struct s_file {
+typedef struct {
     unsigned long hardlink;
     long long size;
     size_t len;
