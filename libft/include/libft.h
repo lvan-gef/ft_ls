@@ -184,11 +184,11 @@ void *ft_memmove(void *dst, const void *src, size_t len);
  *
  * @param dest Memory area              (void*)
  * @param val  Value to set memory area (int)
- * @param len  Size of the memory area  (int)
+ * @param len  Size of the memory area  (size_t)
  *
  * @return void*
  */
-void *ft_memset(void *b, int c, int len);
+void *ft_memset(void *b, int c, size_t len);
 
 /**
  * @brief Write a char

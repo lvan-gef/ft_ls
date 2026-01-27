@@ -1,23 +1,29 @@
 #include <dirent.h>
 #include <errno.h>
 #include <grp.h>
-#include <linux/limits.h>
 #include <pwd.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 
+#ifdef __linux__
+#include <linux/limits.h>
+#elif defined(__APPLE__)
+#include <sys/syslimits.h>
+#endif
+
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
 #include "../include/ft_ls.h"
 #include "../include/ft_walk.h"
+#include "../include/ft_arena.h"
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
 
 static char *walk_files_(t_args *args, DIR *dir, t_path *path);
 static char *parse_file_(const struct dirent *dirent, struct stat *sb,
-                         t_path *path);
+                         t_path *path, Arena *arena);
 static bool create_path_node_(t_args *args, const t_path *path,
                               const char *pathname);
 static void set_fullpath_(char *fullpath, const char *filename,
@@ -72,7 +78,6 @@ bool walk(t_args *args) {
         closedir(dir);
 
         if (!path->max_len) {
-            free_array(path->files);
             remove_elem_array(args->paths, (void *)path);
         } else {
             ++index;
@@ -126,7 +131,7 @@ static char *walk_files_(t_args *args, DIR *dir, t_path *path) {
             continue;
         }
 
-        char *parse_error = parse_file_(dirent, &sb, path);
+        char *parse_error = parse_file_(dirent, &sb, path, args->paths->arena);
         if (parse_error) {
             return parse_error;
         }
@@ -139,7 +144,7 @@ static char *walk_files_(t_args *args, DIR *dir, t_path *path) {
 }
 
 static char *parse_file_(const struct dirent *dirent, struct stat *sb,
-                         t_path *path) {
+                         t_path *path, Arena *arena) {
     ASSERT_(dirent, "dirent can not be NULL");
     ASSERT_(sb, "sb can not be NULL");
     ASSERT_(path, "path can not be NULL");
@@ -154,7 +159,7 @@ static char *parse_file_(const struct dirent *dirent, struct stat *sb,
         return strerror(errno);
     }
 
-    t_file *file = ft_calloc(1, sizeof(*file));
+    t_file *file = ArenaPush(arena, sizeof(*file));
     if (!file) {
         return strerror(errno);
     }
@@ -169,7 +174,6 @@ static char *parse_file_(const struct dirent *dirent, struct stat *sb,
     set_filename(file, dirent->d_name, path);
 
     if (!append_array(path->files, (void *)file)) {
-        free(file);
         return strerror(errno);
     }
 
@@ -191,12 +195,12 @@ static bool create_path_node_(t_args *args, const t_path *path,
         return true;
     }
 
-    t_path *sub_path = ft_calloc(1, sizeof(*path));
+    t_path *sub_path = ArenaPush(args->paths->arena, sizeof(*path));
     if (!sub_path) {
         return false;
     }
 
-    sub_path->files = init_array(DEFAULT_SIZE, ARRAY_FILES);
+    sub_path->files = init_array(args->paths->arena, DEFAULT_SIZE, ARRAY_FILES);
     if (!sub_path->files) {
         goto failed;
     }
@@ -208,11 +212,6 @@ static bool create_path_node_(t_args *args, const t_path *path,
 
     return true;
 failed:
-    if (sub_path->files) {
-        free_array(sub_path->files);
-    }
-    free(sub_path);
-
     return false;
 }
 

@@ -1,45 +1,44 @@
-#include "../include/ft_array.h"
 #include "../include/ft_assert.h"
-#include "../include/ft_free.h"
 #include "../include/ft_parser.h"
 #include "../include/ft_print.h"
 #include "../include/ft_walk.h"
 #include "../include/ft_ls.h"
+#include "../include/ft_arena.h"
 
-static void clean_program(t_args *args);
+static void clean_program(Arena *arena);
 
 int main(int argc, char **argv) {
     t_args args = {0};
-    args.paths = init_array(DEFAULT_SIZE, ARRAY_PATHS);
-    if (!args.paths) {
+    Arena *arena = ArenaAlloc((U64)4096 * 2);
+    if (!arena) {
         return 1;
     }
 
     if (argc > 1) {
-        if (!parse_args(argc, argv, &args)) {
-            free_args(&args);
-            return 1;
+        if (!parse_args(arena, argc, argv, &args)) {
+            clean_program(arena);
+            return 3;
         }
     } else {
         if (!default_arg(&args)) {
-            free_args(&args);
-            return 1;
+            clean_program(arena);
+            return 4;
         }
     }
 
     if (!walk(&args)) {
-        clean_program(&args);
-        return 2;
+        clean_program(arena);
+        return 5;
     }
 
     print_ls(&args);
 
-    clean_program(&args);
+    clean_program(arena);
     return 0;
 }
 
-static void clean_program(t_args *args) {
-    ASSERT_(args, "args can not be NULL");
+static void clean_program(Arena *arena) {
+    ASSERT_(arena, "arena can not be NULL");
 
-    free_args(args);
+    ArenaRelease(arena);
 }

@@ -31,7 +31,7 @@ D_LDFLAGS  := $(SANITIZERS)
 
 SRC_DIR := src
 
-SRC_FILES := main.c ft_parser.c ft_assert.c ft_walk.c ft_print.c ft_sort.c ft_array.c ft_free.c
+SRC_FILES := main.c ft_parser.c ft_assert.c ft_walk.c ft_print.c ft_sort.c ft_array.c ft_arena.c
 
 SRCS := $(addprefix $(SRC_DIR)/, $(SRC_FILES))
 
