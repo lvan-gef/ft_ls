@@ -14,13 +14,13 @@
 #include "../libft/include/libft.h"
 
 static void printer_(const t_args *args, t_path *path);
+static void print_(Arena *arena, t_path *path);
+static bool calc_cols_(Arena *arena, t_path *path, size_t **col_widths,
+                       size_t *num_cols, size_t *num_rows);
 #ifdef __linux__
 static size_t calc_layout_width_(t_array *files, size_t num_cols,
                                  size_t *col_widths, bool quoted);
 #endif
-static void print_(Arena *arena, t_path *path);
-static bool calc_cols_(Arena *arena, t_path *path, size_t **col_widths,
-                       size_t *num_cols, size_t *num_rows);
 
 void print_ls(t_args *args) {
     ASSERT_(args, "args can not be NULL");
@@ -64,6 +64,7 @@ static void printer_(const t_args *args, t_path *path) {
     } else {
         print_(arena, path);
     }
+
     ArenaRelease(arena);
 }
 
@@ -74,35 +75,12 @@ static void print_(Arena *arena, t_path *path) {
     ASSERT_(path->files->len, "path->files->len must be > 0");
     ASSERT_(path->files->data, "path->files->data can not be NULL");
     ASSERT_(path->files->data[0], "path->files->data[0] can not be NULL");
+    ASSERT_(path->max_len, "path->max_len must be > 0");
 
     size_t num_cols = 1;
     size_t num_rows = path->files->len;
     size_t *col_widths = NULL;
 
-#ifdef __APPLE__
-    size_t colwidth = max_len;
-    if (quoted) {
-        colwidth += 1;
-    }
-    colwidth = (colwidth + 8) & ~((size_t)7);
-
-    num_cols = TERM_SIZE / colwidth;
-    if (num_cols < 1) {
-        num_cols = 1;
-    }
-    if (num_cols > files->len) {
-        num_cols = files->len;
-    }
-    num_rows = (files->len + num_cols - 1) / num_cols;
-
-    col_widths = Arena(arena, num_cols * sizeof(*col_widths));
-    if (!col_widths) {
-        return;
-    }
-    for (size_t c = 0; c < num_cols; c++) {
-        col_widths[c] = colwidth - 2;
-    }
-#endif
     if (!calc_cols_(arena, path, &col_widths, &num_cols, &num_rows)) {
         ft_fprintf(STDERR_FILENO, "Failed to alloc memory in arena\n");
         return;
@@ -214,8 +192,31 @@ static bool calc_cols_(Arena *arena, t_path *path, size_t **col_widths,
     ASSERT_(num_rows, "num_rows can not be NULL");
     ASSERT_(*num_rows, "*num_rows must be > 0");
 
-#ifdef __APPLE__
-    size_t colwidth = path->len;
+    size_t files_len = path->files->len;
+#ifdef __linux__
+    size_t max_cols = path->files->len;
+    if (max_cols > TERM_SIZE / 2) {
+        max_cols = TERM_SIZE / 2;
+    }
+
+    *col_widths = ArenaPush(arena, max_cols * sizeof(**col_widths));
+    if (!*col_widths) {
+        return false;
+    }
+
+    for (size_t try_cols = max_cols; try_cols > 1; --try_cols) {
+        size_t width = calc_layout_width_(path->files, try_cols, *col_widths,
+                                          path->quoted);
+        if (width <= TERM_SIZE) {
+            *num_cols = try_cols;
+            *num_rows = (files_len + *num_cols - 1) / *num_cols;
+            break;
+        }
+    }
+
+    (void)calc_layout_width_(path->files, *num_cols, *col_widths, path->quoted);
+#elif __APPLE__
+    size_t colwidth = path->max_len;
     if (path->quoted) {
         colwidth += 1;
     }
@@ -225,41 +226,19 @@ static bool calc_cols_(Arena *arena, t_path *path, size_t **col_widths,
     if (*num_cols < 1) {
         *num_cols = 1;
     }
-    if (*num_cols > files->len) {
-        *num_cols = files->len;
+    if (*num_cols > files_len) {
+        *num_cols = files_len;
     }
-    *num_rows = (files->len + *num_cols - 1) / *num_cols;
+    *num_rows = (files_len + *num_cols - 1) / *num_cols;
 
-    col_widths = malloc(*num_cols * sizeof(*col_widths));
-    if (!col_widths) {
-        return false;
-    }
-    for (size_t c = 0; c < *num_cols; c++) {
-        col_widths[c] = colwidth - 2;
-    }
-    return true;
-#elif __linux__
-    size_t max_cols = path->files->len;
-    if (max_cols > TERM_SIZE / 2) {
-        max_cols = TERM_SIZE / 2;
-    }
-
-    *col_widths = ArenaPush(arena, max_cols * sizeof(*col_widths));
-    if (!col_widths) {
+    *col_widths = ArenaPush(arena, *num_cols * sizeof(**col_widths));
+    if (!*col_widths) {
         return false;
     }
 
-    for (size_t try_cols = max_cols; try_cols > 1; --try_cols) {
-        size_t width = calc_layout_width_(path->files, try_cols, *col_widths,
-                                          path->quoted);
-        if (width <= TERM_SIZE) {
-            *num_cols = try_cols;
-            *num_rows = (path->files->len + *num_cols - 1) / *num_cols;
-            break;
-        }
+    for (size_t c = 0; c < *num_cols; ++c) {
+        (*col_widths)[c] = colwidth - 2;
     }
-
-    (void)calc_layout_width_(path->files, *num_cols, *col_widths, path->quoted);
 #else
     ft_fprintf(STDERR_FILENO, "OS is not supported\n");
     return false;
