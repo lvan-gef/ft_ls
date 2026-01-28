@@ -7,14 +7,14 @@
 #include "../include/ft_ls.h"
 #include "../include/ft_sort.h"
 
-#ifdef __linux__
+#if defined(__linux__)
 #include "../libft/include/libft.h"
 #endif
 
 static int compare_time(const struct timespec *a, const struct timespec *b);
 static void reverse_(t_array *files);
 static int compare_(const char *a, const char *b);
-#ifdef __APPLE__
+#if defined(__APPLE__)
 static int compare_bsd_(const char *a, const char *b);
 #else
 static int compare_gnu_(const char *a, const char *b);
@@ -119,7 +119,7 @@ static void reverse_(t_array *files) {
 }
 
 static int compare_(const char *a, const char *b) {
-#ifdef __APPLE__
+#if defined(__APPLE__)
     int result = compare_bsd_(a, b);
 #else
     int result = compare_gnu_(a, b);
@@ -127,7 +127,7 @@ static int compare_(const char *a, const char *b) {
     return result;
 }
 
-#ifdef __APPLE__
+#if defined(__APPLE__)
 static int compare_bsd_(const char *a, const char *b) {
     ASSERT_(a, "a can not be NULL");
     ASSERT_(*a, "*a can not be '\\0'");

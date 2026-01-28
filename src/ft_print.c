@@ -17,7 +17,7 @@ static void printer_(const t_args *args, t_path *path);
 static void print_(Arena *arena, t_path *path);
 static bool calc_cols_(Arena *arena, t_path *path, size_t **col_widths,
                        size_t *num_cols, size_t *num_rows);
-#ifdef __linux__
+#if defined(__linux__)
 static size_t calc_layout_width_(t_array *files, size_t num_cols,
                                  size_t *col_widths, bool quoted);
 #endif
@@ -193,7 +193,7 @@ static bool calc_cols_(Arena *arena, t_path *path, size_t **col_widths,
     ASSERT_(*num_rows, "*num_rows must be > 0");
 
     const size_t files_len = path->files->len;
-#ifdef __linux__
+#if defined(__linux__)
     size_t max_cols = path->files->len;
     if (max_cols > TERM_SIZE / 2) {
         max_cols = TERM_SIZE / 2;
@@ -215,7 +215,7 @@ static bool calc_cols_(Arena *arena, t_path *path, size_t **col_widths,
     }
 
     (void)calc_layout_width_(path->files, *num_cols, *col_widths, path->quoted);
-#elif __APPLE__
+#elif defined(__APPLE__)
     size_t colwidth = path->max_len;
     if (path->quoted) {
         colwidth += 1;
@@ -247,7 +247,7 @@ static bool calc_cols_(Arena *arena, t_path *path, size_t **col_widths,
     return true;
 }
 
-#ifdef __linux__
+#if defined(__linux__)
 static size_t calc_layout_width_(t_array *files, size_t num_cols,
                                  size_t *col_widths, bool quoted) {
     ASSERT_(files, "files can not be NULL");

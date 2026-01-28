@@ -7,7 +7,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#ifdef __linux__
+#if defined(__linux__)
 #include <linux/limits.h>
 #elif defined(__APPLE__)
 #include <sys/syslimits.h>
@@ -320,7 +320,7 @@ static char *get_dt_(const struct stat *sb) {
 
 #if defined(__linux__)
     return ctime(&sb->st_atim.tv_sec);
-#elif defined(__APPLE__) && defined(__MACH__)
+#elif defined(__APPLE__)
     return ctime(&sb->st_atimespec.tv_sec);
 #else
     ft_fprintf(STDERR_FILENO, "OS is not supported\n");
@@ -333,7 +333,7 @@ static struct timespec get_time_spec(const struct stat *sb) {
 
 #if defined(__linux__)
     return sb->st_mtim;
-#elif defined(__APPLE__) && defined(__MACH__)
+#elif defined(__APPLE__)
     return sb->st_mtimespec;
 #else
     ft_fprintf(STDERR_FILENO, "OS is not supported\n");
@@ -366,7 +366,7 @@ static void set_filename(t_file *file, const char *filename, t_path *path) {
         ++index;
     }
 
-#ifdef __linux__
+#if defined(__linux__)
     if (c) {
         size_t len = 0;
         len += ft_strlcpy(file->filename, quote, NAME_MAX);
