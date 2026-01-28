@@ -332,7 +332,7 @@ static struct timespec get_time_spec(const struct stat *sb) {
     ASSERT_(sb, "sb cannot be NULL");
 
 #if defined(__linux__)
-    return sb->st_mtim
+    return sb->st_mtim;
 #elif defined(__APPLE__) && defined(__MACH__)
     return sb->st_mtimespec;
 #else
