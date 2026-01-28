@@ -107,7 +107,6 @@ static void reverse_(t_array *files) {
 
     size_t index = 0;
     size_t end = files->len - 1;
-    ASSERT_(index <= end, "index <= end");
 
     while (index < end) {
         t_file *tmp = files->data[index];
@@ -115,6 +114,7 @@ static void reverse_(t_array *files) {
         files->data[end] = tmp;
         ++index;
         --end;
+        ASSERT_(index <= end, "index crossed end");
     }
 }
 
