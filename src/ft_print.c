@@ -36,7 +36,6 @@ void print_ls(t_args *args) {
     size_t index = 0;
     while (index < paths->len) {
         t_path *path = paths->data[index];
-        ASSERT_(path->max_len, "path->max_len must be more then 0");
         printer_(args, path);
         ++index;
     }
@@ -49,6 +48,9 @@ static void printer_(const t_args *args, t_path *path) {
     ASSERT_(path->files->len, "path->files->len must be > 0");
     ASSERT_(path->files->data, "path->files->data can not be NULL");
     ASSERT_(path->files->data[0], "path->files->data[0] can not be NULL");
+    ASSERT_(path->max_len, "path->max_len must be more then 0");
+    ASSERT_(path->path, "path->path can not be NULL");
+    ASSERT_(*path->path, "*path->path can not be '\\0'");
 
     if (args->time) {
         sort_time(path->files, args->reverse);
