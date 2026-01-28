@@ -3,15 +3,15 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "../include/ft_arena.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
 #include "../include/ft_ls.h"
 #include "../include/ft_print.h"
 #include "../include/ft_sort.h"
-#include "../include/ft_arena.h"
 
-#include "../libft/include/libft.h"
 #include "../libft/include/ft_fprintf.h"
+#include "../libft/include/libft.h"
 
 static void printer_(const t_args *args, t_path *path);
 #ifdef __linux__
@@ -24,6 +24,9 @@ static bool calc_cols_(Arena *arena, t_path *path, size_t **col_widths,
 
 void print_ls(t_args *args) {
     ASSERT_(args, "args can not be NULL");
+    ASSERT_(args->paths, "args->paths can not be NULL");
+    ASSERT_(args->paths->data, "args->path->data can not be NULL");
+    ASSERT_(args->paths->data[0], "args->path->data[0] can not be NULL");
 
     t_array *paths = args->paths;
     if (!paths->len) {
@@ -42,6 +45,10 @@ void print_ls(t_args *args) {
 static void printer_(const t_args *args, t_path *path) {
     ASSERT_(args, "args can not be NULL");
     ASSERT_(path, "path can not be NULL");
+    ASSERT_(path->files, "path->files can not be NULL");
+    ASSERT_(path->files->len, "path->files->len must be > 0");
+    ASSERT_(path->files->data, "path->files->data can not be NULL");
+    ASSERT_(path->files->data[0], "path->files->data[0] can not be NULL");
 
     if (args->time) {
         sort_time(path->files, args->reverse);
@@ -61,6 +68,10 @@ static void printer_(const t_args *args, t_path *path) {
 static void print_(Arena *arena, t_path *path) {
     ASSERT_(arena, "arena can not be NULL");
     ASSERT_(path, "path can not be NULL");
+    ASSERT_(path->files, "path->files can not be NULL");
+    ASSERT_(path->files->len, "path->files->len must be > 0");
+    ASSERT_(path->files->data, "path->files->data can not be NULL");
+    ASSERT_(path->files->data[0], "path->files->data[0] can not be NULL");
 
     size_t num_cols = 1;
     size_t num_rows = path->files->len;
@@ -112,19 +123,20 @@ static void print_(Arena *arena, t_path *path) {
         return;
     }
 
+    const size_t files_len = path->files->len;
     for (size_t row = 0; row < num_rows; row++) {
         size_t buf_len = 0;
         size_t cur_pos = 0;
 
         for (size_t col = 0; col < num_cols; col++) {
             size_t idx = row + col * num_rows;
-            if (idx >= path->files->len) {
+            if (idx >= files_len) {
                 break;
             }
 
             t_file *f = path->files->data[idx];
             bool is_last_col = (col == num_cols - 1) ||
-                               (row + (col + 1) * num_rows >= path->files->len);
+                               (row + (col + 1) * num_rows >= files_len);
 
             if (path->quoted &&
                 !(f->filename[0] == '"' || f->filename[0] == '\'')) {
@@ -145,16 +157,16 @@ static void print_(Arena *arena, t_path *path) {
                 size_t num_tabs = 0;
                 while (test_pos < target_pos) {
                     size_t next_tab = ((test_pos / 8) + 1) * 8;
-                    if (next_tab <= target_pos) {
-                        test_pos = next_tab;
-                        num_tabs++;
-                    } else {
+                    if (next_tab > target_pos) {
                         break;
                     }
+
+                    test_pos = next_tab;
+                    num_tabs++;
                 }
+
                 size_t spaces_after_tabs = target_pos - test_pos;
                 size_t chars_with_tabs = num_tabs + spaces_after_tabs;
-
                 if (num_tabs > 0 && chars_with_tabs < gap) {
                     while (cur_pos < target_pos) {
                         size_t next_tab = ((cur_pos / 8) + 1) * 8;
@@ -188,6 +200,18 @@ static void print_(Arena *arena, t_path *path) {
 
 static bool calc_cols_(Arena *arena, t_path *path, size_t **col_widths,
                        size_t *num_cols, size_t *num_rows) {
+    ASSERT_(arena, "arena con not be NULL");
+    ASSERT_(path, "path can not be NULL");
+    ASSERT_(path->files, "path->files can not be NULL");
+    ASSERT_(path->files->len, "path->files->len must be > 0");
+    ASSERT_(path->files->data, "path->files->data can not be NULL");
+    ASSERT_(path->files->data[0], "path->files->data[0] can not be NULL");
+    ASSERT_(col_widths, "col_widths can not be NULL");
+    ASSERT_(num_cols, "num_cols can not be NULL");
+    ASSERT_(*num_cols, "*num_cols must be > 0");
+    ASSERT_(num_rows, "num_rows can not be NULL");
+    ASSERT_(*num_rows, "*num_rows must be > 0");
+
 #ifdef __APPLE__
     size_t colwidth = path->len;
     if (path->quoted) {
@@ -223,7 +247,7 @@ static bool calc_cols_(Arena *arena, t_path *path, size_t **col_widths,
         return false;
     }
 
-    for (size_t try_cols = max_cols; try_cols > 1; try_cols--) {
+    for (size_t try_cols = max_cols; try_cols > 1; --try_cols) {
         size_t width = calc_layout_width_(path->files, try_cols, *col_widths,
                                           path->quoted);
         if (width <= TERM_SIZE) {
@@ -245,21 +269,30 @@ static bool calc_cols_(Arena *arena, t_path *path, size_t **col_widths,
 #ifdef __linux__
 static size_t calc_layout_width_(t_array *files, size_t num_cols,
                                  size_t *col_widths, bool quoted) {
-    size_t num_rows = (files->len + num_cols - 1) / num_cols;
+    ASSERT_(files, "files can not be NULL");
+    ASSERT_(files->len, "files->len must be > 0");
+    ASSERT_(files->data, "files->data can not be NULL");
+    ASSERT_(num_cols, "num_cols musr be > 0");
+    ASSERT_(col_widths, "col_widths can not be NULL");
 
+    size_t num_rows = (files->len + num_cols - 1) / num_cols;
     for (size_t c = 0; c < num_cols; ++c) {
         col_widths[c] = 0;
     }
 
     for (size_t col = 0; col < num_cols; ++col) {
         for (size_t row = 0; row < num_rows; ++row) {
-            size_t idx = row + col * num_rows;
-            if (idx >= files->len) {
+            ASSERT_(row + col * num_rows >= row + col, "index did overflow");
+            size_t index = row + col * num_rows;
+            if (index >= files->len) {
                 break;
             }
-            t_file *f = files->data[idx];
+            t_file *f = files->data[index];
+            ASSERT_(f, "f can not be NULL");
+            ASSERT_(f->len, "f->len can not be NULL");
             size_t len = f->len;
             if (quoted && !(f->filename[0] == '"' || f->filename[0] == '\'')) {
+                ASSERT_(len + 1 > len, "len did overflow");
                 len += 1;
             }
 
@@ -273,6 +306,7 @@ static size_t calc_layout_width_(t_array *files, size_t num_cols,
     for (size_t c = 0; c < num_cols; c++) {
         total += col_widths[c];
         if (c < num_cols - 1) {
+            ASSERT_(total + 2 > total, "total did overflow");
             total += 2;
         }
     }
