@@ -13,11 +13,11 @@
 #include <sys/syslimits.h>
 #endif
 
+#include "../include/ft_arena.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
 #include "../include/ft_ls.h"
 #include "../include/ft_walk.h"
-#include "../include/ft_arena.h"
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
 
@@ -339,7 +339,6 @@ static struct timespec get_time_spec(const struct stat *sb) {
     ft_fprintf(STDERR_FILENO, "OS is not supported\n");
     return NULL;
 #endif
-
 }
 
 static void set_filename(t_file *file, const char *filename, t_path *path) {

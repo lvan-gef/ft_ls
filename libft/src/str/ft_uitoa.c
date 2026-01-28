@@ -47,4 +47,3 @@ static size_t get_len(unsigned int c) {
     }
     return (counter);
 }
-

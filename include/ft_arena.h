@@ -65,26 +65,32 @@ void *ArenaPushNoZero(Arena *arena, U64 size);
 void *ArenaPush(Arena *arena, U64 size);
 
 /**
- * @brief Aligns the arena position and allocates a block of that alignment size.
+ * @brief Aligns the arena position and allocates a block of that alignment
+ * size.
  * @param arena (Arena*) Pointer to the arena.
  * @param alignment (U64) Alignment and allocation size in bytes.
- * @return (void*) Pointer to the aligned, zeroed memory. Aborts if out of capacity.
+ * @return (void*) Pointer to the aligned, zeroed memory. Aborts if out of
+ * capacity.
  */
 void *ArenaPushAligner(Arena *arena, U64 alignment);
 
 /**
  * @brief Resets the arena position to a previously saved position.
  * @param arena (Arena*) Pointer to the arena.
- * @param pos (U64) Position to reset to. Ignored if greater than current position.
- * @note Only works within the current block. Use ArenaClear to reset across all blocks.
+ * @param pos (U64) Position to reset to. Ignored if greater than current
+ * position.
+ * @note Only works within the current block. Use ArenaClear to reset across all
+ * blocks.
  */
 void ArenaPopTo(Arena *arena, U64 pos);
 
 /**
  * @brief Pops a number of bytes from the end of the arena.
  * @param arena (Arena*) Pointer to the arena.
- * @param size (U64) Number of bytes to pop. Resets to 0 if size exceeds current position.
- * @note Only works within the current block. Use ArenaClear to reset across all blocks.
+ * @param size (U64) Number of bytes to pop. Resets to 0 if size exceeds current
+ * position.
+ * @note Only works within the current block. Use ArenaClear to reset across all
+ * blocks.
  */
 void ArenaPop(Arena *arena, U64 size);
 

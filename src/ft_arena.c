@@ -3,8 +3,8 @@
 
 #include "../include/ft_arena.h"
 
-#include "../libft/include/libft.h"
 #include "../libft/include/ft_fprintf.h"
+#include "../libft/include/libft.h"
 
 static ArenaBlock *new_block_(U64 cap);
 

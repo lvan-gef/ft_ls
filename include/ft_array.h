@@ -6,7 +6,11 @@
 
 #include "./ft_arena.h"
 
-typedef enum e_array_type { ARRAY_PATHS, ARRAY_FILES, ARRAY_ARRAY } t_array_type;
+typedef enum e_array_type {
+    ARRAY_PATHS,
+    ARRAY_FILES,
+    ARRAY_ARRAY
+} t_array_type;
 
 typedef struct s_array {
     t_array_type type;

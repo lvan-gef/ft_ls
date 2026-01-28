@@ -6,8 +6,8 @@
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
 
-#include "../libft/include/libft.h"
 #include "../include/ft_arena.h"
+#include "../libft/include/libft.h"
 
 static bool realloc_arr_(t_array *array);
 
@@ -83,7 +83,8 @@ static bool realloc_arr_(t_array *array) {
     }
 
     void **old_data = array->data;
-    void **new_data = (void **)ArenaPush(array->arena, new_cap * sizeof(*new_data));
+    void **new_data =
+        (void **)ArenaPush(array->arena, new_cap * sizeof(*new_data));
     if (!new_data) {
         return false;
     }
