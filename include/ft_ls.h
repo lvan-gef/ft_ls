@@ -1,7 +1,7 @@
 #ifndef FT_LS_H
 #define FT_LS_H
 
-#ifdef __linux__
+#if defined(__linux__)
 #include <linux/limits.h>
 #else
 #include <sys/syslimits.h>
