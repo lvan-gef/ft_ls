@@ -321,7 +321,7 @@ static char *get_dt_(const struct stat *sb) {
 #if defined(__linux__)
     return ctime(&sb->st_atim.tv_sec);
 #elif defined(__APPLE__) && defined(__MACH__)
-    return ctime(&sb->st_atimespec.tv_nsec);
+    return ctime(&sb->st_atimespec.tv_sec);
 #else
     ft_fprintf(STDERR_FILENO, "OS is not supported\n");
     return NULL;
