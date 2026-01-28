@@ -350,7 +350,7 @@ static void set_filename(t_file *file, const char *filename, t_path *path) {
     ASSERT_(path, "path can not be NULL");
 
     char targets[4] = " '\"";
-    char *c = NULL;
+    const char *c = NULL;
     char quote[2] = "'";
     size_t len = 0;
     size_t index = 0;

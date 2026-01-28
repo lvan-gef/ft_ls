@@ -114,7 +114,7 @@ static void print_(Arena *arena, t_path *path) {
                 break;
             }
 
-            t_file *f = path->files->data[idx];
+            const t_file *f = path->files->data[idx];
             bool is_last_col = (col == num_cols - 1) ||
                                (row + (col + 1) * num_rows >= files_len);
 
@@ -268,7 +268,7 @@ static size_t calc_layout_width_(t_array *files, size_t num_cols,
             if (index >= files->len) {
                 break;
             }
-            t_file *f = files->data[index];
+            const t_file *f = files->data[index];
             ASSERT_(f, "f can not be NULL");
             ASSERT_(f->len, "f->len can not be NULL");
             size_t len = f->len;
