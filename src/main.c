@@ -1,9 +1,10 @@
+#include "../include/ft_arena.h"
+#include "../include/ft_array.h"
 #include "../include/ft_assert.h"
+#include "../include/ft_ls.h"
 #include "../include/ft_parser.h"
 #include "../include/ft_print.h"
 #include "../include/ft_walk.h"
-#include "../include/ft_ls.h"
-#include "../include/ft_arena.h"
 
 static void clean_program(Arena *arena);
 
@@ -14,15 +15,21 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    args.paths = init_array(arena, DEFAULT_SIZE, ARRAY_PATHS);
+    if (!args.paths) {
+        clean_program(arena);
+        return 1;
+    }
+
     if (argc > 1) {
-        if (!parse_args(arena, argc, argv, &args)) {
+        if (!parse_args(argc, argv, &args)) {
             clean_program(arena);
-            return 3;
+            return 1;
         }
     } else {
         if (!default_arg(&args)) {
             clean_program(arena);
-            return 4;
+            return 1;
         }
     }
 

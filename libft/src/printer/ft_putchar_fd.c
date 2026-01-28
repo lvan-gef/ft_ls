@@ -13,5 +13,7 @@
 #include "../../include/libft.h"
 
 void ft_putchar_fd(char c, int fd) {
-    (void)write(fd, &c, 1);
+    if (write(fd, &c, 1) < 0) {
+        // write error, ignore
+    }
 }

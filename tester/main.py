@@ -99,8 +99,8 @@ def simple_tests(term_size, test_files: list[Path]) -> None:
                     print(f"Insert '{ls_output[b0:b1]}'")
                 elif opcode == 'delete':
                     print(f"Delete '{ft_ls_output[a0:a1]}'")
-            # raise AssertionError('output ls and ft_ls are different')
-            # print('-' * term_size, file=sys.stderr)
+            raise AssertionError('output ls and ft_ls are different')
+            print('-' * term_size, file=sys.stderr)
         break
 
 
