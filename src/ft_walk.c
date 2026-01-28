@@ -349,10 +349,9 @@ static void set_filename(t_file *file, const char *filename, t_path *path) {
     ASSERT_(*filename, "*filename can not be '\\0'");
     ASSERT_(path, "path can not be NULL");
 
-    char targets[4] = " '\"";
+    const char targets[4] = " '\"";
     const char *c = NULL;
     char quote[2] = "'";
-    size_t len = 0;
     size_t index = 0;
 
     while (targets[index]) {
@@ -367,7 +366,9 @@ static void set_filename(t_file *file, const char *filename, t_path *path) {
         ++index;
     }
 
+#ifdef __linux__
     if (c) {
+        size_t len = 0;
         len += ft_strlcpy(file->filename, quote, NAME_MAX);
         len += ft_strlcpy(file->filename + len, filename, NAME_MAX);
         len += ft_strlcpy(file->filename + len, quote, NAME_MAX);
@@ -377,5 +378,6 @@ static void set_filename(t_file *file, const char *filename, t_path *path) {
         path->quoted = true;
         return;
     }
+#endif
     (void)ft_strlcpy(file->filename, filename, NAME_MAX);
 }
