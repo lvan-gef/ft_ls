@@ -192,7 +192,7 @@ static bool calc_cols_(Arena *arena, t_path *path, size_t **col_widths,
     ASSERT_(num_rows, "num_rows can not be NULL");
     ASSERT_(*num_rows, "*num_rows must be > 0");
 
-    size_t files_len = path->files->len;
+    const size_t files_len = path->files->len;
 #ifdef __linux__
     size_t max_cols = path->files->len;
     if (max_cols > TERM_SIZE / 2) {
