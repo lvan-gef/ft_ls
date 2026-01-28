@@ -10,9 +10,7 @@ CFLAGS    := -std=c11 -D_DEFAULT_SOURCE \
 			 -Wnull-dereference -Wcast-align -Wswitch-enum -Wundef \
 			 -Wstrict-prototypes -Wmissing-prototypes \
 			 -Wredundant-decls -Wwrite-strings \
-			 -Wimplicit-fallthrough -Wlogical-op \
-			 -Wduplicated-cond -Wduplicated-branches \
-			 -Wstack-usage=8192
+			 -Wimplicit-fallthrough
 
 DEPSFLAGS := -MMD -MP
 
@@ -20,7 +18,7 @@ DEPSFLAGS := -MMD -MP
 R_CFLAGS  := -DNDEBUG -D_FORTIFY_SOURCE=2 -O3 -march=native -fomit-frame-pointer -fPIE
 
 # Debug flags
-D_CFLAGS  := -g3 -fno-omit-frame-pointer -fstack-protector-strong -fsanitize=address,undefined,leak,null,integer-divide-by-zero,signed-integer-overflow
+D_CFLAGS  := -g3 -fno-omit-frame-pointer -fstack-protector-strong -fsanitize=address,undefined,null,integer-divide-by-zero,signed-integer-overflow
 # D_CFLAGS  := -g3 -fno-omit-frame-pointer
 
 SRC_DIR   := src

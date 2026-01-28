@@ -3,7 +3,7 @@
 
 #ifdef __linux__
 #include <linux/limits.h>
-#elif defined(__APPLE__)
+#else
 #include <sys/syslimits.h>
 #endif
 
@@ -12,7 +12,6 @@
 #include <time.h>
 
 #include "./ft_array.h"
-#include "./ft_arena.h"
 
 #ifndef PERMISSION_SIZE
 #define PERMISSION_SIZE 12

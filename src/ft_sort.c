@@ -6,11 +6,20 @@
 #include "../include/ft_assert.h"
 #include "../include/ft_ls.h"
 #include "../include/ft_sort.h"
-#include "../libft/include/libft.h"
 
-static int compare_(const char *a, const char *b);
+#ifdef __linux__
+#include "../libft/include/libft.h"
+#endif
+
 static int compare_time(struct timespec *a, struct timespec *b);
 static void reverse_(t_array *files);
+static int compare_(const char *a, const char *b);
+#ifdef __APPLE__
+static int compare_bsd_(const char *a, const char *b);
+#else
+static int compare_gnu_(const char *a, const char *b);
+static int get_priority(char c);
+#endif
 
 void sort_alpha(t_array *files, bool reverse) {
     ASSERT_(files, "files can not be NULL");
@@ -81,6 +90,65 @@ void sort_time(t_array *files, bool reverse) {
     }
 }
 
+static int compare_time(struct timespec *a, struct timespec *b) {
+    ASSERT_(a, "a can not be NULL");
+    ASSERT_(b, "b can not be NULL");
+
+    if (a->tv_sec != b->tv_sec) {
+        return (a->tv_sec > b->tv_sec) - (a->tv_sec < b->tv_sec);
+    }
+
+    return (a->tv_nsec > b->tv_nsec) - (a->tv_nsec < b->tv_nsec);
+}
+
+static void reverse_(t_array *files) {
+    ASSERT_(files, "files can not be NULL");
+    ASSERT_(files->len, "files->len must be more then 0");
+
+    size_t index = 0;
+    size_t end = files->len - 1;
+    ASSERT_(index <= end, "index <= end");
+
+    while (index < end) {
+        t_file *tmp = files->data[index];
+        files->data[index] = files->data[end];
+        files->data[end] = tmp;
+        ++index;
+        --end;
+    }
+}
+
+static int compare_(const char *a, const char *b) {
+#ifdef __APPLE__
+    int result = compare_bsd_(a, b);
+#else
+    int result = compare_gnu_(a, b);
+#endif
+    return result;
+}
+
+#ifdef __APPLE__
+static int compare_bsd_(const char *a, const char *b) {
+    ASSERT_(a, "a can not be NULL");
+    ASSERT_(*a, "*a can not be '\\0'");
+    ASSERT_(b, "b can not be NULL");
+    ASSERT_(*b, "*b can not be '\\0'");
+
+    if (*a == '\'' || *a == '"') {
+        ++a;
+    }
+    if (*b == '\'' || *b == '"') {
+        ++b;
+    }
+
+    while (*a && *b && *a == *b) {
+        ++a;
+        ++b;
+    }
+
+    return (unsigned char)*a - (unsigned char)*b;
+}
+#else
 static int get_priority(char c) {
     ASSERT_(c, "c can not be '\\0'");
     if (ft_isalpha(c)) {
@@ -94,7 +162,7 @@ static int get_priority(char c) {
     return 2;
 }
 
-static int compare_(const char *a, const char *b) {
+static int compare_gnu_(const char *a, const char *b) {
     ASSERT_(a, "a can not be NULL");
     ASSERT_(*a, "*a can not be '\\0'");
     ASSERT_(b, "b can not be NULL");
@@ -163,31 +231,4 @@ static int compare_(const char *a, const char *b) {
 
     return *a - *b;
 }
-
-static int compare_time(struct timespec *a, struct timespec *b) {
-    ASSERT_(a, "a can not be NULL");
-    ASSERT_(b, "b can not be NULL");
-
-    if (a->tv_sec != b->tv_sec) {
-        return (a->tv_sec > b->tv_sec) - (a->tv_sec < b->tv_sec);
-    }
-
-    return (a->tv_nsec > b->tv_nsec) - (a->tv_nsec < b->tv_nsec);
-}
-
-static void reverse_(t_array *files) {
-    ASSERT_(files, "files can not be NULL");
-    ASSERT_(files->len, "files->len must be more then 0");
-
-    size_t index = 0;
-    size_t end = files->len - 1;
-    ASSERT_(index <= end, "index <= end");
-
-    while (index < end) {
-        t_file *tmp = files->data[index];
-        files->data[index] = files->data[end];
-        files->data[end] = tmp;
-        ++index;
-        --end;
-    }
-}
+#endif

@@ -32,6 +32,7 @@ static void get_user_group_(t_file *file, unsigned int group_id,
                             unsigned int user_id);
 static void get_permission_(t_file *file, const struct stat *sb);
 static char *get_dt_(const struct stat *sb);
+static struct timespec get_time_spec(const struct stat *sb);
 static void set_filename(t_file *file, const char *filename, t_path *path);
 
 static uid_t cached_uid = (uid_t)-1;
@@ -165,7 +166,7 @@ static char *parse_file_(const struct dirent *dirent, struct stat *sb,
     }
 
     ft_strlcpy(file->date_fmt, dt + 4, DT_LEN);
-    file->mtime = sb->st_mtim;
+    file->mtime = get_time_spec(sb);
     get_permission_(file, sb);
     get_user_group_(file, sb->st_gid, sb->st_uid);
     file->size = sb->st_size;
@@ -325,6 +326,20 @@ static char *get_dt_(const struct stat *sb) {
     ft_fprintf(STDERR_FILENO, "OS is not supported\n");
     return NULL;
 #endif
+}
+
+static struct timespec get_time_spec(const struct stat *sb) {
+    ASSERT_(sb, "sb cannot be NULL");
+
+#if defined(__linux__)
+    return sb->st_mtim
+#elif defined(__APPLE__) && defined(__MACH__)
+    return sb->st_mtimespec;
+#else
+    ft_fprintf(STDERR_FILENO, "OS is not supported\n");
+    return NULL;
+#endif
+
 }
 
 static void set_filename(t_file *file, const char *filename, t_path *path) {

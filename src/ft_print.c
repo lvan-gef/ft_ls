@@ -12,11 +12,14 @@
 
 static void printer_(const t_args *args, t_array *files, size_t len,
                      bool quoted);
+#ifdef __linux__
 static void single_row_(t_array *files, size_t max_len, bool quoted);
 static size_t calc_layout_width_(t_array *files, size_t num_cols,
                                  size_t *col_widths, bool quoted);
-static void multi_row_(t_array *files, size_t max_len, bool quoted);
 static size_t get_rows_(size_t file_count, size_t max_len);
+#endif
+static void multi_row_(t_array *files, size_t max_len, bool quoted);
+// static bool calc_cols_(t_array *files, size_t *num_cols, size_t *num_rows, size_t *col_widths, size_t max_len, bool quoted);
 
 void print_ls(t_args *args) {
     ASSERT_(args, "args can not be NULL");
@@ -49,13 +52,20 @@ static void printer_(const t_args *args, t_array *files, size_t max_len,
 
     if (args->list) {
         // TODO: implement list view
+#ifdef __APPLE__
+    } else {
+        multi_row_(files, max_len, quoted);
+    }
+#else
     } else if (get_rows_(files->len, max_len) == 1) {
         single_row_(files, max_len, quoted);
     } else {
         multi_row_(files, max_len, quoted);
     }
+#endif
 }
 
+#ifdef __linux__
 static void single_row_(t_array *files, size_t max_len, bool quoted) {
     ASSERT_(files, "files can not be NULL");
     ASSERT_(files->len, "files->len must be > 0");
@@ -160,24 +170,54 @@ static size_t calc_layout_width_(t_array *files, size_t num_cols,
 
     return total;
 }
+#endif
 
 static void multi_row_(t_array *files, size_t max_len, bool quoted) {
     ASSERT_(files, "files can not be NULL");
     ASSERT_(files->len, "files->len must be > 0");
     ASSERT_(max_len, "max_len must be > 0");
 
+    size_t num_cols = 1;
+    size_t num_rows = files->len;
+    size_t *col_widths = NULL;
+
+#ifdef __APPLE__
+    // if (!calc_cols_(files, &num_cols, &num_rows, col_widths, max_len, quoted)) {
+    //     // TODO: print error
+    //     return;
+    // }
+    size_t colwidth = max_len;
+    if (quoted) {
+        colwidth += 1;
+    }
+    colwidth = (colwidth + 8) & ~((size_t)7);
+
+    num_cols = TERM_SIZE / colwidth;
+    if (num_cols < 1) {
+        num_cols = 1;
+    }
+    if (num_cols > files->len) {
+        num_cols = files->len;
+    }
+    num_rows = (files->len + num_cols - 1) / num_cols;
+
+    col_widths = malloc(num_cols * sizeof(*col_widths));
+    if (!col_widths) {
+        return;
+    }
+    for (size_t c = 0; c < num_cols; c++) {
+        col_widths[c] = colwidth - 2;
+    }
+#else
     size_t max_cols = files->len;
     if (max_cols > TERM_SIZE / 2) {
         max_cols = TERM_SIZE / 2;
     }
 
-    size_t *col_widths = malloc(max_cols * sizeof(*col_widths));
+    col_widths = malloc(max_cols * sizeof(*col_widths));
     if (!col_widths) {
         return;
     }
-
-    size_t num_cols = 1;
-    size_t num_rows = files->len;
 
     for (size_t try_cols = max_cols; try_cols > 1; try_cols--) {
         size_t width = calc_layout_width_(files, try_cols, col_widths, quoted);
@@ -189,6 +229,7 @@ static void multi_row_(t_array *files, size_t max_len, bool quoted) {
     }
 
     (void)calc_layout_width_(files, num_cols, col_widths, quoted);
+#endif
 
     size_t *col_starts = malloc((num_cols + 1) * sizeof(*col_starts));
     if (!col_starts) {
@@ -285,6 +326,7 @@ static void multi_row_(t_array *files, size_t max_len, bool quoted) {
     free(col_widths);
 }
 
+#ifdef __linux__
 static size_t get_rows_(size_t file_count, size_t max_len) {
     ASSERT_(file_count, "file_count should be more then 0");
     ASSERT_(max_len, "max_len should be more then 0");
@@ -308,3 +350,54 @@ static size_t get_rows_(size_t file_count, size_t max_len) {
 
     return rows;
 }
+#endif
+
+// static bool calc_cols_(t_array *files, size_t *num_cols, size_t *num_rows, size_t *col_widths, size_t max_len, bool quoted) {
+// #ifdef __APPLE__
+//     size_t colwidth = max_len;
+//     if (quoted) {
+//         colwidth += 1;
+//     }
+//     colwidth = (colwidth + 8) & ~((size_t)7);
+//
+//     *num_cols = TERM_SIZE / colwidth;
+//     if (*num_cols < 1) {
+//         *num_cols = 1;
+//     }
+//     if (*num_cols > files->len) {
+//         *num_cols = files->len;
+//     }
+//     *num_rows = (files->len + *num_cols - 1) / *num_cols;
+//
+//     col_widths = malloc(*num_cols * sizeof(*col_widths));
+//     if (!col_widths) {
+//         return false;
+//     }
+//     for (size_t c = 0; c < *num_cols; c++) {
+//         col_widths[c] = colwidth - 2;
+//     }
+//     return true;
+// #else
+//     size_t max_cols = files->len;
+//     if (max_cols > TERM_SIZE / 2) {
+//         max_cols = TERM_SIZE / 2;
+//     }
+//
+//     col_widths = malloc(max_cols * sizeof(*col_widths));
+//     if (!col_widths) {
+//         return;
+//     }
+//
+//     for (size_t try_cols = max_cols; try_cols > 1; try_cols--) {
+//         size_t width = calc_layout_width_(files, try_cols, col_widths, quoted);
+//         if (width <= TERM_SIZE) {
+//             num_cols = try_cols;
+//             num_rows = (files->len + num_cols - 1) / num_cols;
+//             break;
+//         }
+//     }
+//
+//     (void)calc_layout_width_(files, num_cols, col_widths, quoted);
+// #endif
+//
+// }
