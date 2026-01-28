@@ -11,7 +11,7 @@
 #include "../libft/include/libft.h"
 #endif
 
-static int compare_time(struct timespec *a, struct timespec *b);
+static int compare_time(const struct timespec *a, const struct timespec *b);
 static void reverse_(t_array *files);
 static int compare_(const char *a, const char *b);
 #ifdef __APPLE__
@@ -90,7 +90,7 @@ void sort_time(t_array *files, bool reverse) {
     }
 }
 
-static int compare_time(struct timespec *a, struct timespec *b) {
+static int compare_time(const struct timespec *a, const struct timespec *b) {
     ASSERT_(a, "a can not be NULL");
     ASSERT_(b, "b can not be NULL");
 
