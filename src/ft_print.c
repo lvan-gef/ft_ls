@@ -15,8 +15,8 @@
 
 static void printer_(const t_args *args, t_path *path);
 static void print_(Arena *arena, t_path *path);
-static bool calc_cols_(const Arena *arena, t_path *path, size_t **col_widths,
-                       const size_t *num_cols, const size_t *num_rows);
+static bool calc_cols_(Arena *arena, t_path *path, size_t **col_widths,
+                       size_t *num_cols, size_t *num_rows);
 #ifdef __linux__
 static size_t calc_layout_width_(t_array *files, size_t num_cols,
                                  size_t *col_widths, bool quoted);
@@ -178,8 +178,8 @@ static void print_(Arena *arena, t_path *path) {
     }
 }
 
-static bool calc_cols_(const Arena *arena, t_path *path, size_t **col_widths,
-                       const size_t *num_cols, const size_t *num_rows) {
+static bool calc_cols_(Arena *arena, t_path *path, size_t **col_widths,
+                       size_t *num_cols, size_t *num_rows) {
     ASSERT_(arena, "arena con not be NULL");
     ASSERT_(path, "path can not be NULL");
     ASSERT_(path->files, "path->files can not be NULL");
