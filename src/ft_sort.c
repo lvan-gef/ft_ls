@@ -24,6 +24,8 @@ static int get_priority(char c);
 void sort_alpha(t_array *files, bool reverse) {
     ASSERT_(files, "files can not be NULL");
     ASSERT_(files->len, "files->len must be more then 0");
+    ASSERT_(files->data, "files->data can not be NULL");
+    ASSERT_(files->data[0], "files->data[0] can not be NULL");
 
     size_t index = 0;
     while (index < files->len) {
@@ -49,6 +51,8 @@ void sort_alpha(t_array *files, bool reverse) {
 void sort_time(t_array *files, bool reverse) {
     ASSERT_(files, "files can not be NULL");
     ASSERT_(files->len, "files->len must be more then 0");
+    ASSERT_(files->data, "files->data can not be NULL");
+    ASSERT_(files->data[0], "files->data[0] can not be NULL");
 
     size_t size = files->len - 1;
     ASSERT_(size < files->len, "size should be less then files->len");
@@ -149,19 +153,6 @@ static int compare_bsd_(const char *a, const char *b) {
     return (unsigned char)*a - (unsigned char)*b;
 }
 #else
-static int get_priority(char c) {
-    ASSERT_(c, "c can not be '\\0'");
-    if (ft_isalpha(c)) {
-        return 0;
-    }
-
-    if (ft_isdigit(c)) {
-        return 1;
-    }
-
-    return 2;
-}
-
 static int compare_gnu_(const char *a, const char *b) {
     ASSERT_(a, "a can not be NULL");
     ASSERT_(*a, "*a can not be '\\0'");
@@ -230,5 +221,19 @@ static int compare_gnu_(const char *a, const char *b) {
     }
 
     return *a - *b;
+}
+
+static int get_priority(char c) {
+    ASSERT_(c, "c can not be '\\0'");
+
+    if (ft_isalpha(c)) {
+        return 2;
+    }
+
+    if (ft_isdigit(c)) {
+        return 1;
+    }
+
+    return 0;
 }
 #endif
