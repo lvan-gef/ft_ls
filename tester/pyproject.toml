@@ -3,15 +3,8 @@ name = "tester"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
-    "pyrefly>=0.46.0",
-]
-
-[tool]
-
-[tool.pyrefly]
-project-includes = [
-    "**/*.py*",
-    "**/*.ipynb",
+    "flake8>=7.3.0",
+    "pyrefly>=0.50.0",
 ]
