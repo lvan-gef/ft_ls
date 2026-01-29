@@ -18,7 +18,6 @@ static int compare_(const char *a, const char *b);
 static int compare_bsd_(const char *a, const char *b);
 #else
 static int compare_gnu_(const char *a, const char *b);
-static int get_priority(char c);
 #endif
 
 void sort_alpha(t_array *files, bool reverse) {
@@ -167,14 +166,13 @@ static int compare_gnu_(const char *a, const char *b) {
         ++b;
     }
 
-    const char *a_clean = a;
-    const char *b_clean = b;
+    const char *a_start = a;
+    const char *b_start = b;
     while (*a || *b) {
-        while (*a && !ft_isalpha(*a)) {
+        while (*a && !ft_isalpha(*a) && !ft_isdigit(*a)) {
             ++a;
         }
-
-        while (*b && !ft_isalpha(*b)) {
+        while (*b && !ft_isalpha(*b) && !ft_isdigit(*b)) {
             ++b;
         }
 
@@ -182,58 +180,53 @@ static int compare_gnu_(const char *a, const char *b) {
             break;
         }
 
-        if (ft_tolower(*a) != ft_tolower(*b)) {
-            return ft_tolower(*a) - ft_tolower(*b);
+        int va;
+        int vb;
+        if (ft_isdigit(*a)) {
+            va = *a - '0';
+        } else {
+            va = ft_tolower(*a) - 'a' + 10;
+        }
+        if (ft_isdigit(*b)) {
+            vb = *b - '0';
+        } else {
+            vb = ft_tolower(*b) - 'a' + 10;
+        }
+
+        if (va != vb) {
+            return va - vb;
         }
 
         ++a;
         ++b;
     }
 
-    while (*a && !ft_isalpha(*a)) {
+    while (*a && !ft_isalpha(*a) && !ft_isdigit(*a)) {
         ++a;
     }
-
-    while (*b && !ft_isalpha(*b)) {
+    while (*b && !ft_isalpha(*b) && !ft_isdigit(*b)) {
         ++b;
     }
 
     if (*a || *b) {
-        return ft_isalpha(*a) ? 1 : -1;
+        return *a ? 1 : -1;
     }
 
-    a = a_clean;
-    b = b_clean;
+    a = a_start;
+    b = b_start;
     while (*a && *b) {
-        int pa = get_priority(*a);
-        int pb = get_priority(*b);
-
-        if (pa != pb) {
-            return pa - pb;
+        if (*a != *b) {
+            if (ft_isalpha(*a) && ft_isalpha(*b) &&
+                ft_tolower(*a) == ft_tolower(*b)) {
+                int a_lower = (*a >= 'a' && *a <= 'z');
+                int b_lower = (*b >= 'a' && *b <= 'z');
+                return b_lower - a_lower;
+            }
+            return (unsigned char)*a - (unsigned char)*b;
         }
-
-        if (ft_tolower(*a) != ft_tolower(*b)) {
-            return ft_tolower(*a) - ft_tolower(*b);
-        }
-
         ++a;
         ++b;
     }
-
-    return *a - *b;
-}
-
-static int get_priority(char c) {
-    ASSERT_(c, "c can not be '\\0'");
-
-    if (ft_isalpha(c)) {
-        return 2;
-    }
-
-    if (ft_isdigit(c)) {
-        return 1;
-    }
-
-    return 0;
+    return (unsigned char)*a - (unsigned char)*b;
 }
 #endif
