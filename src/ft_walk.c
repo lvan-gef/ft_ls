@@ -25,7 +25,7 @@
 
 static char *walk_files_(Arena *arena, t_args *args, DIR *dir, t_path *path);
 static char *parse_file_(Arena *arena, const struct dirent *dirent,
-                         struct stat *sb, t_path *path, t_array *paths);
+                         struct stat *sb, t_path *path, t_array *paths, const char *fullpath);
 static bool create_path_node_(t_args *args, const t_path *path,
                               const char *pathname);
 static void set_fullpath_(char *fullpath, const char *filename,
@@ -34,8 +34,9 @@ static void get_user_group_(Arena *arena, t_file *file, unsigned int group_id,
                             unsigned int user_id);
 static void get_permission_(t_file *file, const struct stat *sb);
 static bool get_dt_(char *buffer, const struct stat *sb);
-static struct timespec get_time_spec(const struct stat *sb);
+static struct timespec get_time_spec_(const struct stat *sb);
 static void set_filename(t_file *file, const char *filename, t_path *path);
+static bool get_symlink_(char *buffer, const char *filename, struct stat *sb);
 
 static uid_t cached_uid = (uid_t)-1;
 static gid_t cached_gid = (gid_t)-1;
@@ -58,11 +59,11 @@ bool walk(t_args *args) {
     while (index < args->paths->len) {
         errno = 0;
         t_path *path = args->paths->data[index];
-        dir = opendir(path->path);
+        dir = opendir(path->name);
         if (!dir) {
             if (errno == EACCES) {
                 ft_fprintf(STDERR_FILENO, "ft_ls: cannot access: '%s': %s\n",
-                           path->path, strerror(errno));
+                           path->name, strerror(errno));
                 errno = 0;
                 ++index;
                 continue;
@@ -84,12 +85,7 @@ bool walk(t_args *args) {
         }
 
         closedir(dir);
-
-        if (!path->max_len) {
-            remove_elem_array(args->paths, (void *)path);
-        } else {
-            ++index;
-        }
+        ++index;
     }
 
     ArenaRelease(arena);
@@ -104,7 +100,6 @@ failed:
     return false;
 }
 
-// TODO: . and .. we need that for ls even if not in recursive mode
 static char *walk_files_(Arena *arena, t_args *args, DIR *dir, t_path *path) {
     ASSERT_(args, "args can not be NULL");
     ASSERT_(dir, "dir can not be NULL");
@@ -115,7 +110,6 @@ static char *walk_files_(Arena *arena, t_args *args, DIR *dir, t_path *path) {
 
     while (dirent) {
         errno = 0;
-        struct stat sb;
 
         if (*dirent->d_name == '.' && !args->all) {
             dirent = readdir(dir);
@@ -123,28 +117,25 @@ static char *walk_files_(Arena *arena, t_args *args, DIR *dir, t_path *path) {
         }
 
         char fullpath[PATH_MAX] = {0};
-        set_fullpath_(fullpath, path->path, dirent->d_name);
+        set_fullpath_(fullpath, path->name, dirent->d_name);
 
+        struct stat sb;
         if (lstat(fullpath, &sb) == -1) {
             ft_fprintf(STDERR_FILENO, "ft_ls: cannot access: '%s': %s\n",
                        fullpath, strerror(errno));
             errno = 0;
-            dirent = readdir(dir);
-            continue;
-        }
-
-        if (S_ISDIR(sb.st_mode) && args->recursive) {
-            if (!create_path_node_(args, path, dirent->d_name)) {
-                return strerror(errno);
+        } else {
+            if (S_ISDIR(sb.st_mode) && args->recursive) {
+                if (!create_path_node_(args, path, dirent->d_name)) {
+                    return strerror(errno);
+                }
             }
 
-            dirent = readdir(dir);
-            continue;
-        }
-
-        char *parse_error = parse_file_(arena, dirent, &sb, path, args->paths);
-        if (parse_error) {
-            return parse_error;
+            char *parse_error =
+                parse_file_(arena, dirent, &sb, path, args->paths, fullpath);
+            if (parse_error) {
+                return parse_error;
+            }
         }
 
         dirent = readdir(dir);
@@ -155,7 +146,7 @@ static char *walk_files_(Arena *arena, t_args *args, DIR *dir, t_path *path) {
 }
 
 static char *parse_file_(Arena *arena, const struct dirent *dirent,
-                         struct stat *sb, t_path *path, t_array *paths) {
+                         struct stat *sb, t_path *path, t_array *paths, const char *fullpath) {
     ASSERT_(dirent, "dirent can not be NULL");
     ASSERT_(sb, "sb can not be NULL");
     ASSERT_(path, "path can not be NULL");
@@ -174,7 +165,11 @@ static char *parse_file_(Arena *arena, const struct dirent *dirent,
         return strerror(errno);
     }
 
-    file->mtime = get_time_spec(sb);
+    if (!get_symlink_(file->linkedname, fullpath, sb)) {
+        return strerror(errno);
+    }
+
+    file->mtime = get_time_spec_(sb);
     get_permission_(file, sb);
     get_user_group_(arena, file, sb->st_gid, sb->st_uid);
     file->size = sb->st_size;
@@ -182,6 +177,7 @@ static char *parse_file_(Arena *arena, const struct dirent *dirent,
     file->hardlink = sb->st_nlink;
     file->filename_len = len;
     set_filename(file, dirent->d_name, path);
+
 
     if (!append_array(path->files, (void *)file)) {
         return strerror(errno);
@@ -215,7 +211,16 @@ static bool create_path_node_(t_args *args, const t_path *path,
         goto failed;
     }
 
-    set_fullpath_(sub_path->path, path->path, pathname);
+    set_fullpath_(sub_path->name, path->name, pathname);
+    struct stat sb;
+    if (lstat(sub_path->name, &sb) == -1) {
+        ft_fprintf(STDERR_FILENO, "ft_ls: cannot access: '%s': %s\n",
+                   sub_path->name, strerror(errno));
+        errno = 0;
+        return true;
+    }
+
+    sub_path->mtime = get_time_spec_(&sb);
     if (!append_array(args->paths, (void *)sub_path)) {
         goto failed;
     }
@@ -324,9 +329,9 @@ static bool get_dt_(char *buffer, const struct stat *sb) {
     ASSERT_(sb, "sb cannot be NULL");
 
 #if defined(__linux__)
-    char *dt = ctime(&sb->st_ctim.tv_sec);
+    char *dt = ctime(&sb->st_mtim.tv_sec);
 #elif defined(__APPLE__)
-    char *dt = ctime(&sb->st_ctimespec.tv_sec);
+    char *dt = ctime(&sb->st_mtimespec.tv_sec);
 #else
     ft_fprintf(STDERR_FILENO, "OS is not supported\n");
     return false;
@@ -360,7 +365,7 @@ static bool get_dt_(char *buffer, const struct stat *sb) {
     return true;
 }
 
-static struct timespec get_time_spec(const struct stat *sb) {
+static struct timespec get_time_spec_(const struct stat *sb) {
     ASSERT_(sb, "sb cannot be NULL");
 
 #if defined(__linux__)
@@ -411,4 +416,15 @@ static void set_filename(t_file *file, const char *filename, t_path *path) {
     }
 #endif
     (void)ft_strlcpy(file->filename, filename, NAME_MAX);
+}
+
+static bool get_symlink_(char *buffer, const char *filename, struct stat *sb) {
+    if (S_ISLNK(sb->st_mode)) {
+        ssize_t len = readlink(filename, buffer, NAME_MAX - 1);
+        if (len < 0) {
+            return false;
+        }
+    }
+
+    return true;
 }
