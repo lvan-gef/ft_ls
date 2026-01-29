@@ -495,6 +495,13 @@ char *ft_strtrim(char const *s1, char const *set);
 char *ft_substr(char const *s, unsigned int start, size_t len);
 
 /**
+ * @brief Convert str to lowercase
+ *
+ * @param str String that must to be in lowercase (char*)
+ */
+void ft_str_to_lower(char *str);
+
+/**
  * @brief Make lowercase of a char
  *
  * @param c Char that must be lowercase (int)
