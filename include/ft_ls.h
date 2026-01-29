@@ -51,8 +51,9 @@ typedef struct {
 
 typedef struct {
     unsigned long hardlink;
+    unsigned long blocks;
     long long size;
-    size_t len;
+    size_t filename_len;
     char filename[NAME_MAX];
     char permission[PERMISSION_SIZE];
     char group[USER_SIZE];
