@@ -16,29 +16,31 @@
 #include "../include/ft_arena.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
+#include "../include/ft_helpers.h"
 #include "../include/ft_ls.h"
+
 #include "../include/ft_walk.h"
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
 
-static char *walk_files_(t_args *args, DIR *dir, t_path *path);
-static char *parse_file_(const struct dirent *dirent, struct stat *sb,
-                         t_path *path, Arena *arena);
+static char *walk_files_(Arena *arena, t_args *args, DIR *dir, t_path *path);
+static char *parse_file_(Arena *arena, const struct dirent *dirent,
+                         struct stat *sb, t_path *path, t_array *paths);
 static bool create_path_node_(t_args *args, const t_path *path,
                               const char *pathname);
 static void set_fullpath_(char *fullpath, const char *filename,
                           const char *dir_name);
-static void get_user_group_(t_file *file, unsigned int group_id,
+static void get_user_group_(Arena *arena, t_file *file, unsigned int group_id,
                             unsigned int user_id);
 static void get_permission_(t_file *file, const struct stat *sb);
-static char *get_dt_(const struct stat *sb);
+static bool get_dt_(char *buffer, const struct stat *sb);
 static struct timespec get_time_spec(const struct stat *sb);
 static void set_filename(t_file *file, const char *filename, t_path *path);
 
 static uid_t cached_uid = (uid_t)-1;
 static gid_t cached_gid = (gid_t)-1;
-static char cached_user[32] = "";
-static char cached_group[32] = "";
+static char cached_user[USER_SIZE] = "";
+static char cached_group[USER_SIZE] = "";
 
 bool walk(t_args *args) {
     ASSERT_(args, "args can not be NULL");
@@ -47,6 +49,11 @@ bool walk(t_args *args) {
     DIR *dir = NULL;
     char *err_msg = NULL;
     size_t index = 0;
+    Arena *arena = ArenaAlloc((USER_SIZE * 2) + 1);
+    if (!arena) {
+        // TODO: print error
+        return false;
+    }
 
     while (index < args->paths->len) {
         errno = 0;
@@ -71,7 +78,7 @@ bool walk(t_args *args) {
             goto failed;
         }
 
-        err_msg = walk_files_(args, dir, path);
+        err_msg = walk_files_(arena, args, dir, path);
         if (err_msg || errno) {
             goto failed;
         }
@@ -85,17 +92,20 @@ bool walk(t_args *args) {
         }
     }
 
+    ArenaRelease(arena);
     return true;
 failed:
     ft_fprintf(STDERR_FILENO, "errno: %d, %s\n", errno, err_msg);
     if (dir) {
         closedir(dir);
     }
+
+    ArenaRelease(arena);
     return false;
 }
 
 // TODO: . and .. we need that for ls even if not in recursive mode
-static char *walk_files_(t_args *args, DIR *dir, t_path *path) {
+static char *walk_files_(Arena *arena, t_args *args, DIR *dir, t_path *path) {
     ASSERT_(args, "args can not be NULL");
     ASSERT_(dir, "dir can not be NULL");
     ASSERT_(path, "path can not be NULL");
@@ -132,7 +142,7 @@ static char *walk_files_(t_args *args, DIR *dir, t_path *path) {
             continue;
         }
 
-        char *parse_error = parse_file_(dirent, &sb, path, args->paths->arena);
+        char *parse_error = parse_file_(arena, dirent, &sb, path, args->paths);
         if (parse_error) {
             return parse_error;
         }
@@ -144,8 +154,8 @@ static char *walk_files_(t_args *args, DIR *dir, t_path *path) {
     return NULL;
 }
 
-static char *parse_file_(const struct dirent *dirent, struct stat *sb,
-                         t_path *path, Arena *arena) {
+static char *parse_file_(Arena *arena, const struct dirent *dirent,
+                         struct stat *sb, t_path *path, t_array *paths) {
     ASSERT_(dirent, "dirent can not be NULL");
     ASSERT_(sb, "sb can not be NULL");
     ASSERT_(path, "path can not be NULL");
@@ -155,23 +165,22 @@ static char *parse_file_(const struct dirent *dirent, struct stat *sb,
         path->max_len = len;
     }
 
-    const char *dt = get_dt_(sb);
-    if (!dt) {
-        return strerror(errno);
-    }
-
-    t_file *file = ArenaPush(arena, sizeof(*file));
+    t_file *file = ArenaPush(paths->arena, sizeof(*file));
     if (!file) {
         return strerror(errno);
     }
 
-    ft_strlcpy(file->date_fmt, dt + 4, DT_LEN);
+    if (!get_dt_(file->date_fmt, sb)) {
+        return strerror(errno);
+    }
+
     file->mtime = get_time_spec(sb);
     get_permission_(file, sb);
-    get_user_group_(file, sb->st_gid, sb->st_uid);
+    get_user_group_(arena, file, sb->st_gid, sb->st_uid);
     file->size = sb->st_size;
+    file->blocks = (unsigned long)sb->st_blocks;
     file->hardlink = sb->st_nlink;
-    file->len = len;
+    file->filename_len = len;
     set_filename(file, dirent->d_name, path);
 
     if (!append_array(path->files, (void *)file)) {
@@ -227,30 +236,32 @@ static void set_fullpath_(char *fullpath, const char *filename,
 
     const size_t len = ft_strlen(filename);
 
-    ft_strlcpy(fullpath, filename, PATH_MAX);
+    size_t cpy_len = ft_strlcpy(fullpath, filename, PATH_MAX);
     if (filename[len - 1] != '/') {
-        ft_strlcat(fullpath, "/", PATH_MAX);
+        cpy_len += ft_strlcpy(fullpath + cpy_len, "/", PATH_MAX);
     }
 
-    ft_strlcat(fullpath, dir_name, PATH_MAX);
+    ft_strlcpy(fullpath + cpy_len, dir_name, PATH_MAX);
 }
 
-static void get_user_group_(t_file *file, gid_t group_id, uid_t user_id) {
+static void get_user_group_(Arena *arena, t_file *file, gid_t group_id,
+                            uid_t user_id) {
     ASSERT_(file, "file can not be NULL");
 
+    char *id = ArenaPush(arena, (U64)USER_SIZE * 2);
+    if (!id) {
+        // TODO: handle error
+        return;
+    }
+
+    size_t len = 0;
     if (user_id != cached_uid) {
         const struct passwd *pwd = getpwuid(user_id);
         if (pwd) {
             ft_strlcpy(cached_user, pwd->pw_name, sizeof(cached_user));
         } else {
-            char *id = ft_uitoa(user_id);
-            if (!id) {
-                // TODO: close program we can not get mem for a small name
-                exit(99);
-            }
-
+            len = uitoa(id, USER_SIZE, user_id);
             ft_strlcpy(cached_user, id, sizeof(cached_user));
-            free(id);
         }
         cached_uid = user_id;
     }
@@ -261,71 +272,92 @@ static void get_user_group_(t_file *file, gid_t group_id, uid_t user_id) {
         if (grp) {
             ft_strlcpy(cached_group, grp->gr_name, sizeof(cached_group));
         } else {
-            char *id = ft_uitoa(group_id);
-            if (!id) {
-                // TODO: close program we can not get mem for a small name
-                exit(99);
-            }
-
-            ft_strlcpy(cached_group, id, sizeof(cached_group));
-            free(id);
+            uitoa(id, USER_SIZE, group_id);
+            ft_strlcpy(cached_group, id + len, sizeof(cached_group));
         }
         cached_gid = group_id;
     }
     ft_strlcpy(file->group, cached_group, USER_SIZE);
+    ArenaClear(arena);
 }
 
 static void get_permission_(t_file *file, const struct stat *sb) {
     ASSERT_(file, "file can not be NULL");
     ASSERT_(sb, "sb can not be NULL");
 
+    size_t len = 0;
     switch (sb->st_mode & S_IFMT) {
         case S_IFLNK:
-            // ft_fprintf(STDOUT_FILENO, "symbolic link\n");
-            ft_strlcat(file->permission, "l", PERMISSION_SIZE);
+            len += ft_strlcpy(file->permission + len, "l", PERMISSION_SIZE);
             break;
         case S_IFREG:
-            ft_strlcat(file->permission, "-", PERMISSION_SIZE);
+            len += ft_strlcpy(file->permission + len, "-", PERMISSION_SIZE);
             break;
         case S_IFDIR:
-            ft_strlcat(file->permission, "d", PERMISSION_SIZE);
+            len += ft_strlcpy(file->permission + len, "d", PERMISSION_SIZE);
             break;
         default:
-            // ft_fprintf(STDOUT_FILENO, "others have to check it\n");
             break;
     }
 
-    ft_strlcat(file->permission, (sb->st_mode & S_IRUSR) ? "r" : "-",
-               PERMISSION_SIZE);
-    ft_strlcat(file->permission, (sb->st_mode & S_IWUSR) ? "w" : "-",
-               PERMISSION_SIZE);
-    ft_strlcat(file->permission, (sb->st_mode & S_IXUSR) ? "x" : "-",
-               PERMISSION_SIZE);
-    ft_strlcat(file->permission, (sb->st_mode & S_IRGRP) ? "r" : "-",
-               PERMISSION_SIZE);
-    ft_strlcat(file->permission, (sb->st_mode & S_IWGRP) ? "w" : "-",
-               PERMISSION_SIZE);
-    ft_strlcat(file->permission, (sb->st_mode & S_IXGRP) ? "x" : "-",
-               PERMISSION_SIZE);
-    ft_strlcat(file->permission, (sb->st_mode & S_IROTH) ? "r" : "-",
-               PERMISSION_SIZE);
-    ft_strlcat(file->permission, (sb->st_mode & S_IWOTH) ? "w" : "-",
-               PERMISSION_SIZE);
-    ft_strlcat(file->permission, (sb->st_mode & S_IXOTH) ? "x" : "-",
-               PERMISSION_SIZE);
+    len += ft_strlcpy(file->permission + len,
+                      (sb->st_mode & S_IRUSR) ? "r" : "-", PERMISSION_SIZE);
+    len += ft_strlcpy(file->permission + len,
+                      (sb->st_mode & S_IWUSR) ? "w" : "-", PERMISSION_SIZE);
+    len += ft_strlcpy(file->permission + len,
+                      (sb->st_mode & S_IXUSR) ? "x" : "-", PERMISSION_SIZE);
+    len += ft_strlcpy(file->permission + len,
+                      (sb->st_mode & S_IRGRP) ? "r" : "-", PERMISSION_SIZE);
+    len += ft_strlcpy(file->permission + len,
+                      (sb->st_mode & S_IWGRP) ? "w" : "-", PERMISSION_SIZE);
+    len += ft_strlcpy(file->permission + len,
+                      (sb->st_mode & S_IXGRP) ? "x" : "-", PERMISSION_SIZE);
+    len += ft_strlcpy(file->permission + len,
+                      (sb->st_mode & S_IROTH) ? "r" : "-", PERMISSION_SIZE);
+    len += ft_strlcpy(file->permission + len,
+                      (sb->st_mode & S_IWOTH) ? "w" : "-", PERMISSION_SIZE);
+    len += ft_strlcpy(file->permission + len,
+                      (sb->st_mode & S_IXOTH) ? "x" : "-", PERMISSION_SIZE);
 }
 
-static char *get_dt_(const struct stat *sb) {
+static bool get_dt_(char *buffer, const struct stat *sb) {
     ASSERT_(sb, "sb cannot be NULL");
 
 #if defined(__linux__)
-    return ctime(&sb->st_atim.tv_sec);
+    char *dt = ctime(&sb->st_ctim.tv_sec);
 #elif defined(__APPLE__)
-    return ctime(&sb->st_atimespec.tv_sec);
+    char *dt = ctime(&sb->st_ctimespec.tv_sec);
 #else
     ft_fprintf(STDERR_FILENO, "OS is not supported\n");
-    return NULL;
+    return false;
 #endif
+    if (!dt) {
+        return false;
+    }
+
+    // TODO: dont want to use malloc
+    char **splitter = ft_split(dt, ' ');
+    if (!splitter) {
+        // TODO: print error
+        return false;
+    }
+
+    size_t len = ft_strlcpy(buffer, splitter[2], DT_LEN);
+    len += ft_strlcpy(buffer + len, " ", DT_LEN);
+    len += ft_strlcpy(buffer + len, splitter[1], DT_LEN);
+    len += ft_strlcpy(buffer + len, " ", DT_LEN);
+    len += ft_strlcpy(buffer + len, splitter[3], DT_LEN);
+    buffer[len - 3] = '\0'; // remove seconds
+    ft_str_to_lower(buffer);
+
+    size_t index = 0;
+    while (splitter[index]) {
+        free(splitter[index]);
+        ++index;
+    }
+    free((void *)splitter);
+
+    return true;
 }
 
 static struct timespec get_time_spec(const struct stat *sb) {
@@ -343,7 +375,7 @@ static struct timespec get_time_spec(const struct stat *sb) {
 
 static void set_filename(t_file *file, const char *filename, t_path *path) {
     ASSERT_(file, "file can not be NULL");
-    ASSERT_(file->len, "file->len must be more then 0");
+    ASSERT_(file->filename_len, "file->len must be more then 0");
     ASSERT_(filename, "filename can not be NULL");
     ASSERT_(*filename, "*filename can not be '\\0'");
     ASSERT_(path, "path can not be NULL");
@@ -354,7 +386,7 @@ static void set_filename(t_file *file, const char *filename, t_path *path) {
     size_t index = 0;
 
     while (targets[index]) {
-        c = ft_memchr(filename, targets[index], file->len);
+        c = ft_memchr(filename, targets[index], file->filename_len);
         if (c) {
             if (*c == '\'') {
                 *quote = '"';
@@ -373,7 +405,7 @@ static void set_filename(t_file *file, const char *filename, t_path *path) {
         len += ft_strlcpy(file->filename + len, quote, NAME_MAX);
 
         ASSERT_(len == ft_strlen(file->filename), "len is not == to strlen()");
-        file->len = len;
+        file->filename_len = len;
         path->quoted = true;
         return;
     }
