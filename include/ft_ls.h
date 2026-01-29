@@ -44,8 +44,9 @@ typedef struct {
 
 typedef struct {
     size_t max_len;
-    char path[PATH_MAX];
+    char name[PATH_MAX];
     bool quoted;
+    struct timespec mtime;
     t_array *files;
 } t_path;
 
@@ -55,6 +56,7 @@ typedef struct {
     long long size;
     size_t filename_len;
     char filename[NAME_MAX];
+    char linkedname[NAME_MAX];
     char permission[PERMISSION_SIZE];
     char group[USER_SIZE];
     char user[USER_SIZE];
