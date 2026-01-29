@@ -20,7 +20,7 @@ static int compare_bsd_(const char *a, const char *b);
 static int compare_gnu_(const char *a, const char *b);
 #endif
 
-void sort_alpha(t_array *files, bool reverse) {
+void sort_alpha_files(t_array *files, bool reverse) {
     ASSERT_(files, "files can not be NULL");
     ASSERT_(files->len, "files->len must be more then 0");
     ASSERT_(files->data, "files->data can not be NULL");
@@ -47,7 +47,7 @@ void sort_alpha(t_array *files, bool reverse) {
     }
 }
 
-void sort_time(t_array *files, bool reverse) {
+void sort_time_files(t_array *files, bool reverse) {
     ASSERT_(files, "files can not be NULL");
     ASSERT_(files->len, "files->len must be more then 0");
     ASSERT_(files->data, "files->data can not be NULL");
@@ -93,6 +93,80 @@ void sort_time(t_array *files, bool reverse) {
     }
 }
 
+void sort_alpha_paths(t_array *paths, bool reverse) {
+    ASSERT_(paths, "paths can not be NULL");
+    ASSERT_(paths->len, "paths->len must be more then 0");
+    ASSERT_(paths->data, "paths->data can not be NULL");
+    ASSERT_(paths->data[0], "paths->data[0] can not be NULL");
+
+    size_t index = 0;
+    while (index < paths->len) {
+        size_t sub_index = index + 1;
+        while (sub_index < paths->len) {
+            t_path *path_a = (t_path *)paths->data[index];
+            t_path *path_b = (t_path *)paths->data[sub_index];
+            int result = compare_(path_a->name, path_b->name);
+            if (result > 0) {
+                paths->data[sub_index] = path_a;
+                paths->data[index] = path_b;
+            }
+            ++sub_index;
+        }
+        ++index;
+    }
+
+    if (reverse) {
+        reverse_(paths);
+    }
+
+}
+
+void sort_time_paths(t_array *paths, bool reverse) {
+    ASSERT_(paths, "paths can not be NULL");
+    ASSERT_(paths->len, "paths->len must be more then 0");
+    ASSERT_(paths->data, "paths->data can not be NULL");
+    ASSERT_(paths->data[0], "paths->data[0] can not be NULL");
+
+    size_t size = paths->len - 1;
+    ASSERT_(size < paths->len, "size should be less then paths->len");
+
+    while (true) {
+        bool changed = false;
+        size_t index = 0;
+
+        while (index < size) {
+            t_path *path_a = paths->data[index];
+            t_path *path_b = paths->data[index + 1];
+
+            int cmp = compare_time(&path_a->mtime, &path_b->mtime);
+            bool should_swap = false;
+            if (cmp == 0) {
+                should_swap = compare_(path_a->name, path_b->name) > 0;
+            } else {
+                should_swap = cmp < 0;
+            }
+
+            if (should_swap) {
+                paths->data[index] = path_b;
+                paths->data[index + 1] = path_a;
+                changed = true;
+            }
+
+            ++index;
+        }
+
+        if (!changed) {
+            break;
+        }
+
+        --size;
+    }
+
+    if (reverse) {
+        reverse_(paths);
+    }
+}
+
 static int compare_time(const struct timespec *a, const struct timespec *b) {
     ASSERT_(a, "a can not be NULL");
     ASSERT_(b, "b can not be NULL");
@@ -117,7 +191,7 @@ static void reverse_(t_array *files) {
         files->data[end] = tmp;
         ++index;
         --end;
-        ASSERT_(index <= end, "index crossed end");
+        // ASSERT_(index <= end, "index crossed end");  need to chage it on even it triggert
     }
 }
 
@@ -154,9 +228,7 @@ static int compare_bsd_(const char *a, const char *b) {
 #else
 static int compare_gnu_(const char *a, const char *b) {
     ASSERT_(a, "a can not be NULL");
-    ASSERT_(*a, "*a can not be '\\0'");
     ASSERT_(b, "b can not be NULL");
-    ASSERT_(*b, "*b can not be '\\0'");
 
     if (*a == '\'' || *a == '"') {
         ++a;
