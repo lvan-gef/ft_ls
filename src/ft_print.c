@@ -14,7 +14,6 @@
 
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
-#include "ft_printf.h"
 
 static void printer_(Arena *arena, const t_args *args, t_path *path);
 static void print_row(Arena *arena, t_path *path);
@@ -41,28 +40,67 @@ void print_ls(t_args *args) {
 
     Arena *arena = ArenaAlloc(4096);
     size_t index = 0;
-    while (index < paths->len) {
-        t_path *path = paths->data[index];
-        printer_(arena, args, path);
-        ++index;
+
+    if (args->recursive) {
+        if (args->time) {
+            sort_time_files(args->paths, args->reverse);
+        } else {
+            sort_alpha_paths(args->paths, args->reverse);
+        }
+        while (index < paths->len) {
+            t_path *path = paths->data[index];
+            U64 arena_pos = ArenaPos(arena);
+            const size_t str_len = ft_strlen(path->name) + 3;
+            char *dir_nam = ArenaPush(arena, str_len);
+            if (!dir_nam) {
+                goto failed;
+            }
+
+            size_t len = ft_strlcpy(dir_nam, path->name, str_len);
+            len += ft_strlcpy(dir_nam + len, ":\n", str_len);
+            write(STDOUT_FILENO, dir_nam, len);
+            ArenaPopTo(arena, arena_pos);
+
+            printer_(arena, args, path);
+            if (index + 1 < paths->len) {
+                write(STDOUT_FILENO, "\n", 1);
+            }
+            ++index;
+        }
+    } else {
+        while (index < paths->len) {
+            t_path *path = paths->data[index];
+            printer_(arena, args, path);
+            ++index;
+        }
     }
+
+    ArenaRelease(arena);
+    return;
+
+failed:
+    ArenaRelease(arena);
 }
 
 static void printer_(Arena *arena, const t_args *args, t_path *path) {
     ASSERT_(args, "args can not be NULL");
     ASSERT_(path, "path can not be NULL");
     ASSERT_(path->files, "path->files can not be NULL");
-    ASSERT_(path->files->len, "path->files->len must be > 0");
     ASSERT_(path->files->data, "path->files->data can not be NULL");
-    ASSERT_(path->files->data[0], "path->files->data[0] can not be NULL");
-    ASSERT_(path->max_len, "path->max_len must be more then 0");
-    ASSERT_(path->path, "path->path can not be NULL");
-    ASSERT_(*path->path, "*path->path can not be '\\0'");
+    ASSERT_(path->name, "path->path can not be NULL");
+    ASSERT_(*path->name, "*path->path can not be '\\0'");
+
+    if (!path->max_len) {
+        if (args->list) {
+            write(STDOUT_FILENO, "totaal 0\n", 9);
+        }
+        return;
+    }
 
     if (args->time) {
-        sort_time(path->files, args->reverse);
+        sort_time_files(path->files, args->reverse);
     } else {
-        sort_alpha(path->files, args->reverse);
+        sort_alpha_files(path->files, args->reverse);
     }
 
     if (args->list) {
@@ -70,8 +108,6 @@ static void printer_(Arena *arena, const t_args *args, t_path *path) {
     } else {
         print_row(arena, path);
     }
-
-    ArenaRelease(arena);
 }
 
 static void print_row(Arena *arena, t_path *path) {
@@ -314,7 +350,7 @@ static void print_list_(Arena *arena, t_path *path) {
     ASSERT_(path->files->data[0], "path->files->data[0] can not be NULL");
     ASSERT_(path->max_len, "path->max_len must be > 0");
 
-    size_t *lens = ArenaPush(arena, 7 * sizeof(*lens));
+    size_t *lens = ArenaPush(arena, 8 * sizeof(*lens));
     if (!lens) {
         // TODO: print error
         return;
@@ -337,7 +373,7 @@ static void print_list_(Arena *arena, t_path *path) {
         goto failed;
     }
 
-    size_t len = ft_strlcpy(total_str, "total ", str_len);
+    size_t len = ft_strlcpy(total_str, "totaal ", str_len);
     len += uitoa(total_str + len, str_len, total / 2);
     len += ft_strlcpy(total_str + len, "\n", str_len);
     if (write(STDOUT_FILENO, total_str, len) < 0) {
@@ -384,10 +420,14 @@ static void print_list_(Arena *arena, t_path *path) {
         len += ft_strlcpy(total_str + len, file->date_fmt, str_len);
         len += ft_strlcpy(total_str + len, " ", str_len);
 
-        if (!(file->filename[0] == '\'' || file->filename[0] == '"')) {
+        if (file->filename[0] == '\'' || file->filename[0] == '"') {
             len += ft_strlcpy(total_str + len, " ", str_len);
         }
         len += ft_strlcpy(total_str + len, file->filename, str_len);
+        if (*file->linkedname) {
+            len += ft_strlcpy(total_str + len, " -> ", str_len);
+            len += ft_strlcpy(total_str + len, file->linkedname, str_len);
+        }
 
         len += ft_strlcpy(total_str + len, "\n", str_len);
         if (write(STDOUT_FILENO, total_str, len) < 0) {
@@ -459,6 +499,14 @@ static size_t list_str_len_(t_path *path, size_t **lens, size_t *total) {
             (*lens)[6] = filename_len;
         }
 
+        if (*file->linkedname) {
+            size_t extra_space = 4;  // ' -> '
+            size_t linked_len = ft_strlen(file->linkedname) + extra_space;
+            if (linked_len > (*lens)[7]) {
+                (*lens)[7] = linked_len;
+            }
+        }
+
         ++index;
         ArenaClear(scratch_arena);
     }
@@ -466,7 +514,7 @@ static size_t list_str_len_(t_path *path, size_t **lens, size_t *total) {
     size_t str_len = 0;
     index = 0;
 
-    while (index < 7) {
+    while (index < 8) {
         str_len += (*lens)[index] + 2;
         ++index;
     }
