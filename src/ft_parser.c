@@ -97,7 +97,7 @@ static bool add_path_(t_args *args, const char *pathname) {
         return false;
     }
 
-    ft_strlcpy(path->path, pathname, PATH_MAX);
+    ft_strlcpy(path->name, pathname, PATH_MAX);
     if (!append_array(args->paths, (void *)path)) {
         return false;
     }
