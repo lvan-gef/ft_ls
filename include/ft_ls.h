@@ -1,6 +1,7 @@
 #ifndef FT_LS_H
 #define FT_LS_H
 
+#include "ft_arena.h"
 #if defined(__linux__)
 #include <linux/limits.h>
 #else
@@ -33,6 +34,10 @@
 #define DEFAULT_SIZE 10
 #endif // !DEFAULT_SIZE
 
+#ifndef ARENA_SIZE
+#define ARENA_SIZE 4096
+#endif // !ARENA_SIZE
+
 typedef struct {
     bool list;
     bool recursive;
@@ -43,25 +48,27 @@ typedef struct {
 } t_args;
 
 typedef struct {
+    char *str;
+    size_t cap;
+    size_t len;
+} t_str;
+
+typedef struct {
     size_t max_len;
-    char name[PATH_MAX];
-    bool quoted;
     struct timespec mtime;
+    t_str *name;
     t_array *files;
+    t_array *paths;
 } t_path;
 
 typedef struct {
-    unsigned long hardlink;
-    unsigned long blocks;
-    long long size;
-    size_t filename_len;
-    char filename[NAME_MAX];
-    char linkedname[NAME_MAX];
-    char permission[PERMISSION_SIZE];
-    char group[USER_SIZE];
-    char user[USER_SIZE];
-    char date_fmt[DT_LEN];
     struct timespec mtime;
+    t_str *filename;
 } t_file;
+
+t_path *init_path(Arena *arena);
+t_file *init_file(Arena *arena);
+
+t_str *create_str(Arena *arena, const char *str);
 
 #endif // !FT_LS_H

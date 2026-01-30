@@ -4,13 +4,12 @@
 #include "../include/ft_ls.h"
 #include "../include/ft_parser.h"
 #include "../include/ft_print.h"
-#include "../include/ft_walk.h"
 
 static void clean_program(Arena *arena);
 
 int main(int argc, char **argv) {
     t_args args = {0};
-    Arena *arena = ArenaAlloc((U64)4096 * 2);
+    Arena *arena = ArenaAlloc(ARENA_SIZE);
     if (!arena) {
         return 1;
     }
@@ -33,12 +32,8 @@ int main(int argc, char **argv) {
         }
     }
 
-    if (!walk(&args)) {
-        clean_program(arena);
-        return 5;
-    }
-
-    print_ls(&args);
+    printer(&args);
+    // print_ls(&args);
 
     clean_program(arena);
     return 0;

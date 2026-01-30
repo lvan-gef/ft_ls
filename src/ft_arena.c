@@ -9,7 +9,7 @@
 static ArenaBlock *new_block_(U64 cap);
 
 Arena *ArenaAlloc(U64 cap) {
-    ft_fprintf(STDERR_FILENO, "Alloc new block\n");
+    ft_fprintf(STDERR_FILENO, "Alloc new block with size: %d\n", cap);
     ArenaBlock *block = new_block_(cap);
     if (!block) {
         return NULL;

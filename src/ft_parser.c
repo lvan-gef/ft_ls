@@ -14,7 +14,7 @@ static bool add_path_(t_args *args, const char *pathname);
 static void print_error_(const char *flag);
 
 bool parse_args(int argc, char **argv, t_args *args) {
-    ASSERT_(argc, "argc must be more then 0");
+    ASSERT_(argc, "argc must be > 0");
     ASSERT_(argv, "argv can not be NULL");
     ASSERT_(argv[0], "argv[0] can not be NULL");
     ASSERT_(*argv[0], "*argv[0] can not be '\\0'");
@@ -87,17 +87,26 @@ static bool add_path_(t_args *args, const char *pathname) {
     ASSERT_(pathname, "pathname can not be NULL");
     ASSERT_(*pathname, "*pathname can not be '\\0'");
 
-    t_path *path = ArenaPush(args->paths->arena, sizeof(*path));
+    Arena *arena = ArenaAlloc(ARENA_SIZE);
+    if (!arena) {
+        return false;
+    }
+
+    t_path *path = init_path(args->paths->arena);
     if (!path) {
         return false;
     }
 
-    path->files = init_array(args->paths->arena, DEFAULT_SIZE, ARRAY_FILES);
+    path->files = init_array(arena, DEFAULT_SIZE, ARRAY_FILES);
     if (!path->files) {
         return false;
     }
 
-    ft_strlcpy(path->name, pathname, PATH_MAX);
+    path->name = create_str(args->paths->arena, pathname);
+    if (!path->name) {
+        // TODO: handle error
+    }
+
     if (!append_array(args->paths, (void *)path)) {
         return false;
     }

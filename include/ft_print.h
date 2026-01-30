@@ -3,6 +3,7 @@
 
 #include "./ft_ls.h"
 
-void print_ls(t_args *args);
+// void print_ls(t_args *args);
+void printer(t_args *args);
 
 #endif // !FT_PRINT_H
