@@ -9,7 +9,6 @@
 typedef enum e_array_type {
     ARRAY_PATHS,
     ARRAY_FILES,
-    ARRAY_ARRAY
 } t_array_type;
 
 typedef struct s_array {

@@ -10,7 +10,6 @@
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
 
-static bool add_path_(t_args *args, const char *pathname);
 static void print_error_(const char *flag);
 
 bool parse_args(int argc, char **argv, t_args *args) {
@@ -57,12 +56,12 @@ bool parse_args(int argc, char **argv, t_args *args) {
                     ++sub_index;
                 }
             } else {
-                if (!add_path_(args, argv[index])) {
+                if (!add_path(args->paths, argv[index])) {
                     return false;
                 }
             }
         } else {
-            if (!add_path_(args, argv[index])) {
+            if (!add_path(args->paths, argv[index])) {
                 return false;
             }
         }
@@ -79,35 +78,29 @@ bool parse_args(int argc, char **argv, t_args *args) {
 
 bool default_arg(t_args *args) {
     ASSERT_(args, "args can not be NULL");
-    return add_path_(args, ".");
+    return add_path(args->paths, ".");
 }
 
-static bool add_path_(t_args *args, const char *pathname) {
-    ASSERT_(args, "args can not be NULL");
+bool add_path(t_array *paths, const char *pathname) {
     ASSERT_(pathname, "pathname can not be NULL");
     ASSERT_(*pathname, "*pathname can not be '\\0'");
 
-    Arena *arena = ArenaAlloc(ARENA_SIZE);
-    if (!arena) {
-        return false;
-    }
-
-    t_path *path = init_path(args->paths->arena);
+    t_path *path = init_path(paths->arena);
     if (!path) {
         return false;
     }
 
-    path->files = init_array(arena, DEFAULT_SIZE, ARRAY_FILES);
+    path->files = init_array(paths->arena, DEFAULT_SIZE, ARRAY_FILES);
     if (!path->files) {
         return false;
     }
 
-    path->name = create_str(args->paths->arena, pathname);
+    path->name = create_str(paths->arena, pathname);
     if (!path->name) {
         // TODO: handle error
     }
 
-    if (!append_array(args->paths, (void *)path)) {
+    if (!append_array(paths, (void *)path)) {
         return false;
     }
 

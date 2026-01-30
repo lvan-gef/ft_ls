@@ -7,5 +7,6 @@
 
 bool parse_args(int argc, char **argv, t_args *args);
 bool default_arg(t_args *args);
+bool add_path(t_array *paths, const char *pathname);
 
 #endif // !FT_PARSER_H

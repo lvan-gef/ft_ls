@@ -11,7 +11,7 @@
 #include "../libft/include/libft.h"
 #endif
 
-static int compare_time(const struct timespec *a, const struct timespec *b);
+// static int compare_time(const struct timespec *a, const struct timespec *b);
 static void reverse_(t_array *files);
 static int compare_(const char *a, const char *b);
 #if defined(__APPLE__)
@@ -20,163 +20,157 @@ static int compare_bsd_(const char *a, const char *b);
 static int compare_gnu_(const char *a, const char *b);
 #endif
 
-void sort_alpha_files(t_array *files, bool reverse) {
-    ASSERT_(files, "files can not be NULL");
-    ASSERT_(files->len, "files->len must be more then 0");
-    ASSERT_(files->data, "files->data can not be NULL");
-    ASSERT_(files->data[0], "files->data[0] can not be NULL");
+void sort_alpha(t_array *array, bool reverse) {
+    ASSERT_(array, "files can not be NULL");
+    ASSERT_(array->len, "files->len must be more then 0");
+    ASSERT_(array->data, "files->data can not be NULL");
+    ASSERT_(array->data[0], "files->data[0] can not be NULL");
 
     size_t index = 0;
-    while (index < files->len) {
+    while (index < array->len) {
         size_t sub_index = index + 1;
-        while (sub_index < files->len) {
-            t_file *file_a = (t_file *)files->data[index];
-            t_file *file_b = (t_file *)files->data[sub_index];
-            int result = compare_(file_a->filename, file_b->filename);
-            if (result > 0) {
-                files->data[sub_index] = file_a;
-                files->data[index] = file_b;
+        while (sub_index < array->len) {
+            switch (array->type) {
+                case ARRAY_FILES: {
+                    t_file *file_a = (t_file *)array->data[index];
+                    const char *filename_a = file_a->name->str;
+                    t_file *file_b = (t_file *)array->data[sub_index];
+                    const char *filename_b = file_b->name->str;
+
+                    int result = compare_(filename_a, filename_b);
+                    if (result > 0) {
+                        array->data[sub_index] = file_a;
+                        array->data[index] = file_b;
+                    }
+                    break;
+                }
+                case ARRAY_PATHS: {
+                    t_path *path_a = (t_path *)array->data[index];
+                    const char *filename_a = path_a->name->str;
+                    t_path *path_b = (t_path *)array->data[sub_index];
+                    const char *filename_b = path_b->name->str;
+
+                    int result = compare_(filename_a, filename_b);
+                    if (result > 0) {
+                        array->data[sub_index] = path_a;
+                        array->data[index] = path_b;
+                    }
+                    break;
+                }
             }
+
             ++sub_index;
         }
         ++index;
     }
 
     if (reverse) {
-        reverse_(files);
+        reverse_(array);
     }
 }
 
-void sort_time_files(t_array *files, bool reverse) {
-    ASSERT_(files, "files can not be NULL");
-    ASSERT_(files->len, "files->len must be more then 0");
-    ASSERT_(files->data, "files->data can not be NULL");
-    ASSERT_(files->data[0], "files->data[0] can not be NULL");
-
-    size_t size = files->len - 1;
-    ASSERT_(size < files->len, "size should be less then files->len");
-
-    while (true) {
-        bool changed = false;
-        size_t index = 0;
-
-        while (index < size) {
-            t_file *file_a = files->data[index];
-            t_file *file_b = files->data[index + 1];
-
-            int cmp = compare_time(&file_a->mtime, &file_b->mtime);
-            bool should_swap = false;
-            if (cmp == 0) {
-                should_swap = compare_(file_a->filename, file_b->filename) > 0;
-            } else {
-                should_swap = cmp < 0;
-            }
-
-            if (should_swap) {
-                files->data[index] = file_b;
-                files->data[index + 1] = file_a;
-                changed = true;
-            }
-
-            ++index;
-        }
-
-        if (!changed) {
-            break;
-        }
-
-        --size;
-    }
-
-    if (reverse) {
-        reverse_(files);
-    }
-}
-
-void sort_alpha_paths(t_array *paths, bool reverse) {
-    ASSERT_(paths, "paths can not be NULL");
-    ASSERT_(paths->len, "paths->len must be more then 0");
-    ASSERT_(paths->data, "paths->data can not be NULL");
-    ASSERT_(paths->data[0], "paths->data[0] can not be NULL");
-
-    size_t index = 0;
-    while (index < paths->len) {
-        size_t sub_index = index + 1;
-        while (sub_index < paths->len) {
-            t_path *path_a = (t_path *)paths->data[index];
-            t_path *path_b = (t_path *)paths->data[sub_index];
-            int result = compare_(path_a->name, path_b->name);
-            if (result > 0) {
-                paths->data[sub_index] = path_a;
-                paths->data[index] = path_b;
-            }
-            ++sub_index;
-        }
-        ++index;
-    }
-
-    if (reverse) {
-        reverse_(paths);
-    }
-
-}
-
-void sort_time_paths(t_array *paths, bool reverse) {
-    ASSERT_(paths, "paths can not be NULL");
-    ASSERT_(paths->len, "paths->len must be more then 0");
-    ASSERT_(paths->data, "paths->data can not be NULL");
-    ASSERT_(paths->data[0], "paths->data[0] can not be NULL");
-
-    size_t size = paths->len - 1;
-    ASSERT_(size < paths->len, "size should be less then paths->len");
-
-    while (true) {
-        bool changed = false;
-        size_t index = 0;
-
-        while (index < size) {
-            t_path *path_a = paths->data[index];
-            t_path *path_b = paths->data[index + 1];
-
-            int cmp = compare_time(&path_a->mtime, &path_b->mtime);
-            bool should_swap = false;
-            if (cmp == 0) {
-                should_swap = compare_(path_a->name, path_b->name) > 0;
-            } else {
-                should_swap = cmp < 0;
-            }
-
-            if (should_swap) {
-                paths->data[index] = path_b;
-                paths->data[index + 1] = path_a;
-                changed = true;
-            }
-
-            ++index;
-        }
-
-        if (!changed) {
-            break;
-        }
-
-        --size;
-    }
-
-    if (reverse) {
-        reverse_(paths);
-    }
-}
-
-static int compare_time(const struct timespec *a, const struct timespec *b) {
-    ASSERT_(a, "a can not be NULL");
-    ASSERT_(b, "b can not be NULL");
-
-    if (a->tv_sec != b->tv_sec) {
-        return (a->tv_sec > b->tv_sec) - (a->tv_sec < b->tv_sec);
-    }
-
-    return (a->tv_nsec > b->tv_nsec) - (a->tv_nsec < b->tv_nsec);
-}
+// void sort_time_files(t_array *files, bool reverse) {
+//     ASSERT_(files, "files can not be NULL");
+//     ASSERT_(files->len, "files->len must be more then 0");
+//     ASSERT_(files->data, "files->data can not be NULL");
+//     ASSERT_(files->data[0], "files->data[0] can not be NULL");
+//
+//     size_t size = files->len - 1;
+//     ASSERT_(size < files->len, "size should be less then files->len");
+//
+//     while (true) {
+//         bool changed = false;
+//         size_t index = 0;
+//
+//         while (index < size) {
+//             t_file *file_a = files->data[index];
+//             t_file *file_b = files->data[index + 1];
+//
+//             int cmp = compare_time(&file_a->mtime, &file_b->mtime);
+//             bool should_swap = false;
+//             if (cmp == 0) {
+//                 should_swap = compare_(file_a->filename, file_b->filename) > 0;
+//             } else {
+//                 should_swap = cmp < 0;
+//             }
+//
+//             if (should_swap) {
+//                 files->data[index] = file_b;
+//                 files->data[index + 1] = file_a;
+//                 changed = true;
+//             }
+//
+//             ++index;
+//         }
+//
+//         if (!changed) {
+//             break;
+//         }
+//
+//         --size;
+//     }
+//
+//     if (reverse) {
+//         reverse_(files);
+//     }
+// }
+//
+// void sort_time_paths(t_array *paths, bool reverse) {
+//     ASSERT_(paths, "paths can not be NULL");
+//     ASSERT_(paths->len, "paths->len must be more then 0");
+//     ASSERT_(paths->data, "paths->data can not be NULL");
+//     ASSERT_(paths->data[0], "paths->data[0] can not be NULL");
+//
+//     size_t size = paths->len - 1;
+//     ASSERT_(size < paths->len, "size should be less then paths->len");
+//
+//     while (true) {
+//         bool changed = false;
+//         size_t index = 0;
+//
+//         while (index < size) {
+//             t_path *path_a = paths->data[index];
+//             t_path *path_b = paths->data[index + 1];
+//
+//             int cmp = compare_time(&path_a->mtime, &path_b->mtime);
+//             bool should_swap = false;
+//             if (cmp == 0) {
+//                 should_swap = compare_(path_a->name, path_b->name) > 0;
+//             } else {
+//                 should_swap = cmp < 0;
+//             }
+//
+//             if (should_swap) {
+//                 paths->data[index] = path_b;
+//                 paths->data[index + 1] = path_a;
+//                 changed = true;
+//             }
+//
+//             ++index;
+//         }
+//
+//         if (!changed) {
+//             break;
+//         }
+//
+//         --size;
+//     }
+//
+//     if (reverse) {
+//         reverse_(paths);
+//     }
+// }
+//
+// static int compare_time(const struct timespec *a, const struct timespec *b) {
+//     ASSERT_(a, "a can not be NULL");
+//     ASSERT_(b, "b can not be NULL");
+//
+//     if (a->tv_sec != b->tv_sec) {
+//         return (a->tv_sec > b->tv_sec) - (a->tv_sec < b->tv_sec);
+//     }
+//
+//     return (a->tv_nsec > b->tv_nsec) - (a->tv_nsec < b->tv_nsec);
+// }
 
 static void reverse_(t_array *files) {
     ASSERT_(files, "files can not be NULL");
@@ -191,7 +185,8 @@ static void reverse_(t_array *files) {
         files->data[end] = tmp;
         ++index;
         --end;
-        // ASSERT_(index <= end, "index crossed end");  need to chage it on even it triggert
+        // ASSERT_(index <= end, "index crossed end");  need to chage it on even
+        // it triggert
     }
 }
 

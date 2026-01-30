@@ -100,7 +100,7 @@ static void printer_(Arena *arena, const t_args *args, t_path *path) {
     if (args->time) {
         sort_time_files(path->files, args->reverse);
     } else {
-        sort_alpha_files(path->files, args->reverse);
+        sort_alpha(path->files, args->reverse);
     }
 
     if (args->list) {

@@ -55,20 +55,18 @@ typedef struct {
 
 typedef struct {
     size_t max_len;
-    struct timespec mtime;
     t_str *name;
     t_array *files;
     t_array *paths;
 } t_path;
 
 typedef struct {
-    struct timespec mtime;
-    t_str *filename;
+    t_str *name;
+    unsigned char type;
 } t_file;
 
 t_path *init_path(Arena *arena);
 t_file *init_file(Arena *arena);
-
 t_str *create_str(Arena *arena, const char *str);
 
 #endif // !FT_LS_H
