@@ -44,7 +44,7 @@ t_str *create_str(Arena *arena, const char *str) {
 
     const size_t len = ft_strlen(str);
     new_str->str = ArenaPush(arena, len + 1);
-    if (!new_str) {
+    if (!new_str->str) {
         ArenaPopTo(arena, arena_pos);
         return NULL;
     }
