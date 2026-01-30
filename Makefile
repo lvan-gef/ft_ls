@@ -18,10 +18,10 @@ DEPSFLAGS := -MMD -MP
 
 # Release flags (with hardening)
 R_CFLAGS  := -DNDEBUG -D_FORTIFY_SOURCE=2 -O3 -march=native -fomit-frame-pointer -fPIE
-R_LDFLAGS := -pie -Wl,-z,relro,-z,now
+R_LDFLAGS := -Wl
 
 # Debug flags
-SANITIZERS := -fsanitize=address,undefined,null,leak,integer-divide-by-zero,signed-integer-overflow
+SANITIZERS := -fsanitize=address,undefined,null,integer-divide-by-zero,signed-integer-overflow
 # SANITIZERS :=
 D_CFLAGS   := -g3 -fno-omit-frame-pointer -fstack-protector-strong $(SANITIZERS)
 D_LDFLAGS  := $(SANITIZERS)
@@ -29,6 +29,12 @@ D_LDFLAGS  := $(SANITIZERS)
 SRC_DIR := src
 
 SRC_FILES := main.c ft_arena.c ft_array.c ft_parser.c ft_assert.c ft_printer.c ft_ls.c ft_sort.c
+
+# Add macOS-specific source files
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+SRC_FILES += ft_printer_mac.c
+endif
 
 SRCS := $(addprefix $(SRC_DIR)/, $(SRC_FILES))
 

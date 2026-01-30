@@ -44,7 +44,30 @@ bool append_array(t_array *array, void *content) {
         }
     }
 
-    ((void **)array->data)[array->len] = content;
+    array->data[array->len] = content;
+    ++array->len;
+    return true;
+}
+
+bool insert_array(t_array *array, size_t index, void *content) {
+    ASSERT_(array, "array can not be NULL");
+    ASSERT_(content, "content can not be NULL");
+    ASSERT_(index <= array->len, "index out of bounds");
+
+    errno = 0;
+    if (array->len == array->cap) {
+        if (!realloc_arr_(array)) {
+            return false;
+        }
+    }
+
+    size_t i = array->len;
+    while (i > index) {
+        array->data[i] = array->data[i - 1];
+        --i;
+    }
+
+    array->data[index] = content;
     ++array->len;
     return true;
 }

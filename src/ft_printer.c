@@ -9,14 +9,23 @@
 #include "../include/ft_fprintf.h"
 #include "../include/ft_ls.h"
 #include "../include/ft_print.h"
-#include "ft_arena.h"
-#include "ft_parser.h"
-#include "ft_sort.h"
-#include "libft.h"
+#include "../include/ft_arena.h"
+#include "../include/ft_parser.h"
+#include "../include/ft_sort.h"
+#include "../libft/include/libft.h"
+
+#if defined(__APPLE__)
+#include "../include/ft_printer_mac.h"
+#endif
 
 static char *walk_files_(Arena *arena, t_args *args, t_path *path, DIR *dir);
 static bool print_(t_args *args, t_path *path, bool print_header);
 static t_str *join_paths_(Arena *arena, t_str *path, t_str *filename);
+
+#if defined(__linux__)
+static bool calc_cols_(Arena *arena, t_path *path, size_t **col_widths,
+                       size_t *num_cols, size_t *num_rows);
+#endif
 
 void printer(t_args *args) {
     ASSERT_(args, "args can not be NULL");
@@ -47,17 +56,11 @@ void printer(t_args *args) {
 
         dir = opendir(path->name->str);
         if (!dir) {
-            if (errno == EACCES) {
+            if (errno == EACCES || errno == ENOENT || errno == EPERM) {
                 ft_fprintf(STDERR_FILENO, "ft_ls: cannot access '%s': %s\n",
                            path->name->str, strerror(errno));
                 ++queue_index;
-                continue;
-            }
-
-            if (errno == ENOENT) {
-                ft_fprintf(STDERR_FILENO, "ft_ls: cannot access '%s': %s\n",
-                           path->name->str, strerror(errno));
-                ++queue_index;
+                errno = 0;
                 continue;
             }
 
@@ -74,16 +77,15 @@ void printer(t_args *args) {
             goto failed;
         }
 
-        print_(args, path, args->recursive);
+        print_(args, path, args->recursive && queue_index > 0);
 
         if (args->recursive) {
-            if (path->paths->len > 0) {
-                sort_alpha(path->paths, args->reverse);
-            }
+            sort_alpha(path->paths, args->reverse);
 
             size_t sub_index = 0;
             while (sub_index < path->paths->len) {
-                if (!append_array(queue, path->paths->data[sub_index])) {
+                if (!insert_array(queue, queue_index + 1 + sub_index,
+                                  path->paths->data[sub_index])) {
                     err_msg = (char *)"failed to add subdirectory to queue";
                     goto failed;
                 }
@@ -170,7 +172,6 @@ static bool print_(t_args *args, t_path *path, bool print_header) {
     ASSERT_(args, "args can not be NULL");
     ASSERT_(path, "path can not be NULL");
     ASSERT_(path->files, "path->files can not be NULL");
-    ASSERT_(path->files->len, "path->files->len must be > 0");
 
     if (print_header) {
         if (write(STDOUT_FILENO, "\n", 1) < 0) {
@@ -186,24 +187,36 @@ static bool print_(t_args *args, t_path *path, bool print_header) {
         }
     }
 
+    if (!path->files->len) {
+        return true;
+    }
+
     sort_alpha(path->files, args->reverse);
 
-    size_t index = 0;
-    while (index < path->files->len) {
-        t_file *file = path->files->data[index];
-        if (write(STDOUT_FILENO, file->name->str, file->name->len) < 0) {
-            return false;
-        }
+    size_t num_cols = 1;
+    size_t num_rows = path->files->len;
 
-        if (write(STDOUT_FILENO, "  ", 2) < 0) {
-            return false;
-        }
+#if defined(__APPLE__)
+    calc_cols_mac(path, &num_cols, &num_rows);
 
-        ++index;
-    }
-    if (write(STDOUT_FILENO, "\n", 1) < 0) {
+    if (!print_cols_mac(path, num_cols, num_rows)) {
         return false;
     }
+#elif defined(__linux__)
+    size_t *col_widths = NULL;
+
+    if (!calc_cols_(path->paths->arena, path, &col_widths, &num_cols,
+                    &num_rows)) {
+        ft_fprintf(STDERR_FILENO, "Failed to alloc memory in arena\n");
+        return false;
+    }
+
+    // TODO: Linux column printing implementation
+    (void)col_widths;
+#else
+    ft_fprintf(STDERR_FILENO, "OS is not supported\n");
+    return false;
+#endif
 
     return true;
 }
@@ -244,5 +257,44 @@ static t_str *join_paths_(Arena *arena, t_str *path, t_str *filename) {
     return new_path;
 }
 
-// ./ft_ls -R /home/lvan-gef  0,42s user 0,18s system 99% cpu 0,601 total
-// \    ls -R /home/lvan-gef  0,05s user 0,06s system 98% cpu 0,111 total
+#if defined(__linux__)
+static bool calc_cols_(Arena *arena, t_path *path, size_t **col_widths,
+                       size_t *num_cols, size_t *num_rows) {
+    ASSERT_(arena, "arena con not be NULL");
+    ASSERT_(path, "path can not be NULL");
+    ASSERT_(path->files, "path->files can not be NULL");
+    ASSERT_(path->files->len, "path->files->len must be > 0");
+    ASSERT_(path->files->data, "path->files->data can not be NULL");
+    ASSERT_(path->files->data[0], "path->files->data[0] can not be NULL");
+    ASSERT_(col_widths, "col_widths can not be NULL");
+    ASSERT_(num_cols, "num_cols can not be NULL");
+    ASSERT_(*num_cols, "*num_cols must be > 0");
+    ASSERT_(num_rows, "num_rows can not be NULL");
+    ASSERT_(*num_rows, "*num_rows must be > 0");
+
+    const size_t files_len = path->files->len;
+    size_t max_cols = path->files->len;
+    if (max_cols > TERM_SIZE / 2) {
+        max_cols = TERM_SIZE / 2;
+    }
+
+    *col_widths = ArenaPush(arena, max_cols * sizeof(**col_widths));
+    if (!*col_widths) {
+        return false;
+    }
+
+    for (size_t try_cols = max_cols; try_cols > 1; --try_cols) {
+        size_t width = calc_layout_width_(path->files, try_cols, *col_widths,
+                                          path->quoted);
+        if (width < TERM_SIZE) {
+            *num_cols = try_cols;
+            *num_rows = (files_len + *num_cols - 1) / *num_cols;
+            break;
+        }
+    }
+
+    (void)calc_layout_width_(path->files, *num_cols, *col_widths, path->quoted);
+
+    return true;
+}
+#endif
