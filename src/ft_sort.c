@@ -22,9 +22,9 @@ static int compare_gnu_(const char *a, const char *b);
 
 void sort_alpha(t_array *array, bool reverse) {
     ASSERT_(array, "files can not be NULL");
-    ASSERT_(array->len, "files->len must be more then 0");
+    // ASSERT_(array->len, "files->len must > 0");
     ASSERT_(array->data, "files->data can not be NULL");
-    ASSERT_(array->data[0], "files->data[0] can not be NULL");
+    // ASSERT_(array->data[0], "files->data[0] can not be NULL");
 
     size_t index = 0;
     while (index < array->len) {
