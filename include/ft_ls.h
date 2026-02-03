@@ -65,6 +65,11 @@ typedef struct {
     unsigned char type;
 } t_file;
 
+typedef struct {
+    size_t col;
+    size_t row;
+} t_map;
+
 t_path *init_path(Arena *arena);
 t_file *init_file(Arena *arena);
 t_str *create_str(Arena *arena, const char *str);

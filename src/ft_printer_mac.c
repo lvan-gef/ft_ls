@@ -7,8 +7,38 @@
 #include "../include/ft_assert.h"
 #include "../include/ft_ls.h"
 #include "../include/ft_printer_mac.h"
+#include "../include/ft_sort.h"
 
-bool print_cols_mac(t_path *path, size_t num_cols, size_t num_rows) {
+static bool print_cols_mac_(t_path *path, size_t num_cols, size_t num_rows);
+static void calc_cols_mac_(t_path *path, size_t *num_cols, size_t *num_rows);
+
+bool print_mac(t_args *args, t_path *path, t_map *map, bool print_header, size_t queue_index) {
+    if (print_header && queue_index) {
+        if (write(STDOUT_FILENO, path->name->str, path->name->len) < 0) {
+            return false;
+        }
+
+        if (write(STDOUT_FILENO, ":\n", 2) < 0) {
+            return false;
+        }
+    }
+
+    if (!path->files->len) {
+        return true;
+    }
+
+    if (args->time) {
+
+    } else {
+        sort_alpha(path->files, args->reverse);
+    }
+
+    calc_cols_mac_(path, &map->col, &map->row);
+    return print_cols_mac_(path, map->col, map->row);
+
+}
+
+static bool print_cols_mac_(t_path *path, size_t num_cols, size_t num_rows) {
     ASSERT_(path, "path can not be NULL");
     ASSERT_(path->files, "path->files can not be NULL");
 
@@ -48,7 +78,7 @@ bool print_cols_mac(t_path *path, size_t num_cols, size_t num_rows) {
     return true;
 }
 
-void calc_cols_mac(t_path *path, size_t *num_cols, size_t *num_rows) {
+static void calc_cols_mac_(t_path *path, size_t *num_cols, size_t *num_rows) {
     ASSERT_(path, "path can not be NULL");
     ASSERT_(path->files, "path->files can not be NULL");
     ASSERT_(path->files->len, "path->files->len must be > 0");

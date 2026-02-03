@@ -8,8 +8,7 @@
 
 #include "./ft_ls.h"
 
-bool print_cols_mac(t_path *path, size_t num_cols, size_t num_rows);
-void calc_cols_mac(t_path *path, size_t *num_cols, size_t *num_rows);
+bool print_mac(t_args *args, t_path *path, t_map *map, bool print_header, size_t queue_index);
 
 #endif // __APPLE__
 

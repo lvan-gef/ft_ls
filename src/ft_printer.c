@@ -18,9 +18,12 @@
 #include "../include/ft_printer_mac.h"
 #endif
 
+static int open_dir_(Arena *file_arena, DIR **dir, t_path *path);
 static char *walk_files_(Arena *arena, Arena *file_arena, t_args *args,
                          t_path *path, DIR *dir);
-static bool print_(t_args *args, t_path *path, bool print_header);
+static char *append_queue(t_args *args, t_array *queue, size_t queue_index,
+                          t_array *paths);
+static bool print_(t_args *args, t_path *path, bool print_header, size_t queue_index);
 static t_str *join_paths_(Arena *arena, t_str *path, t_str *filename);
 
 #if defined(__linux__)
@@ -51,6 +54,10 @@ void printer(t_args *args) {
         return;
     }
 
+    // err_msg = append_queue(args, queue, queue_index, args->paths);
+    // if (err_msg) {
+    //     goto failed;
+    // }
     size_t i = 0;
     while (i < args->paths->len) {
         if (!append_array(queue, args->paths->data[i])) {
@@ -66,26 +73,11 @@ void printer(t_args *args) {
         errno = 0;
         t_path *path = queue->data[queue_index];
 
-        dir = opendir(path->name->str);
-        if (!dir) {
-            if (errno == EACCES || errno == ENOENT || errno == EPERM) {
-                ft_fprintf(STDERR_FILENO, "ft_ls: cannot access '%s': %s\n",
-                           path->name->str, strerror(errno));
-                ++queue_index;
-                errno = 0;
-                continue;
-            }
-
-            ft_fprintf(STDERR_FILENO, "ft_ls: %s: %s\n", path->name->str,
-                       strerror(errno));
-            goto failed;
-        }
-
-        path->files = init_array(file_arena, DEFAULT_SIZE, ARRAY_FILES);
-        if (!path->files) {
-            ft_fprintf(STDERR_FILENO,
-                       "ft_ls: failed to allocate files array\n");
-            closedir(dir);
+        int result = open_dir_(file_arena, &dir, path);
+        if (result < 0) {
+            ++queue_index;
+            continue;
+        } else if (!result) {
             goto failed;
         }
 
@@ -100,23 +92,14 @@ void printer(t_args *args) {
         if (queue_index) {
             write(STDOUT_FILENO, "\n", 1);
         }
-        print_(args, path, args->recursive);
+        print_(args, path, args->recursive, queue_index);
 
         ArenaClear(file_arena);
         path->max_len = 0;
 
-        if (args->recursive) {
-            sort_alpha(path->paths, args->reverse);
-
-            size_t sub_index = 0;
-            while (sub_index < path->paths->len) {
-                if (!insert_array(queue, queue_index + 1 + sub_index,
-                                  path->paths->data[sub_index])) {
-                    err_msg = (char *)"failed to add subdirectory to queue";
-                    goto failed;
-                }
-                ++sub_index;
-            }
+        err_msg = append_queue(args, queue, queue_index, path->paths);
+        if (err_msg) {
+            goto failed;
         }
 
         ++queue_index;
@@ -132,6 +115,30 @@ failed:
     }
 
     ArenaRelease(file_arena);
+}
+
+static int open_dir_(Arena *file_arena, DIR **dir, t_path *path) {
+    *dir = opendir(path->name->str);
+    if (!*dir) {
+        if (errno == EACCES || errno == ENOENT || errno == EPERM) {
+            ft_fprintf(STDERR_FILENO, "ft_ls: cannot access '%s': %s\n",
+                       path->name->str, strerror(errno));
+            errno = 0;
+            return -1;
+        }
+
+        ft_fprintf(STDERR_FILENO, "ft_ls: %s: %s\n", path->name->str,
+                   strerror(errno));
+        return 0;
+    }
+
+    path->files = init_array(file_arena, DEFAULT_SIZE, ARRAY_FILES);
+    if (!path->files) {
+        ft_fprintf(STDERR_FILENO, "ft_ls: failed to allocate files array\n");
+        return 0;
+    }
+
+    return 1;
 }
 
 static char *walk_files_(Arena *arena, Arena *file_arena, t_args *args,
@@ -199,11 +206,37 @@ failed:
     return strerror(errno);
 }
 
-static bool print_(t_args *args, t_path *path, bool print_header) {
+static char *append_queue(t_args *args, t_array *queue, size_t queue_index,
+                          t_array *paths) {
+    if (args->recursive) {
+        if (args->time) {
+        } else {
+            sort_alpha(paths, args->reverse);
+        }
+
+        size_t index = 0;
+        while (index < paths->len) {
+            if (!insert_array(queue, queue_index + 1 + index,
+                              paths->data[index])) {
+                return (char *)"failed to add subdirectory to queue";
+            }
+            ++index;
+        }
+    }
+
+    return NULL;
+}
+
+static bool print_(t_args *args, t_path *path, bool print_header, size_t queue_index) {
     ASSERT_(args, "args can not be NULL");
     ASSERT_(path, "path can not be NULL");
     ASSERT_(path->files, "path->files can not be NULL");
 
+    t_map map = {.col = 1, .row = path->files->len};
+
+#if defined(__APPLE__)
+    return print_mac(args, path, &map, print_header, queue_index);
+#elif defined(__linux__)
     if (print_header) {
         if (write(STDOUT_FILENO, path->name->str, path->name->len) < 0) {
             return false;
@@ -223,17 +256,6 @@ static bool print_(t_args *args, t_path *path, bool print_header) {
     } else {
         sort_alpha(path->files, args->reverse);
     }
-
-    size_t num_cols = 1;
-    size_t num_rows = path->files->len;
-
-#if defined(__APPLE__)
-    calc_cols_mac(path, &num_cols, &num_rows);
-
-    if (!print_cols_mac(path, num_cols, num_rows)) {
-        return false;
-    }
-#elif defined(__linux__)
     size_t *col_widths = NULL;
 
     if (!calc_cols_(path->paths->arena, path, &col_widths, &num_cols,
@@ -332,11 +354,7 @@ static bool print_(t_args *args, t_path *path, bool print_header) {
             break;
         }
     }
-#else
-    ft_fprintf(STDERR_FILENO, "OS is not supported\n");
-    return false;
 #endif
-
     return true;
 }
 
