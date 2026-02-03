@@ -48,8 +48,7 @@ bool print_cols_mac(t_path *path, size_t num_cols, size_t num_rows) {
     return true;
 }
 
-void calc_cols_mac(t_path *path, size_t *num_cols,
-                   size_t *num_rows) {
+void calc_cols_mac(t_path *path, size_t *num_cols, size_t *num_rows) {
     ASSERT_(path, "path can not be NULL");
     ASSERT_(path->files, "path->files can not be NULL");
     ASSERT_(path->files->len, "path->files->len must be > 0");

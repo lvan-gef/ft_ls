@@ -25,7 +25,8 @@
 
 static char *walk_files_(Arena *arena, t_args *args, DIR *dir, t_path *path);
 static char *parse_file_(Arena *arena, const struct dirent *dirent,
-                         struct stat *sb, t_path *path, t_array *paths, const char *fullpath);
+                         struct stat *sb, t_path *path, t_array *paths,
+                         const char *fullpath);
 static bool create_path_node_(t_args *args, const t_path *path,
                               const char *pathname);
 static void set_fullpath_(char *fullpath, const char *filename,
@@ -146,7 +147,8 @@ static char *walk_files_(Arena *arena, t_args *args, DIR *dir, t_path *path) {
 }
 
 static char *parse_file_(Arena *arena, const struct dirent *dirent,
-                         struct stat *sb, t_path *path, t_array *paths, const char *fullpath) {
+                         struct stat *sb, t_path *path, t_array *paths,
+                         const char *fullpath) {
     ASSERT_(dirent, "dirent can not be NULL");
     ASSERT_(sb, "sb can not be NULL");
     ASSERT_(path, "path can not be NULL");
@@ -177,7 +179,6 @@ static char *parse_file_(Arena *arena, const struct dirent *dirent,
     file->hardlink = sb->st_nlink;
     file->filename_len = len;
     set_filename(file, dirent->d_name, path);
-
 
     if (!append_array(path->files, (void *)file)) {
         return strerror(errno);

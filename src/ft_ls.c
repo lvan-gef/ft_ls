@@ -1,8 +1,8 @@
 #include "../include/ft_ls.h"
 #include "../include/ft_arena.h"
-#include "../libft/include/libft.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
+#include "../libft/include/libft.h"
 
 t_path *init_path(Arena *arena) {
     ASSERT_(arena, "arena can not be NULL");

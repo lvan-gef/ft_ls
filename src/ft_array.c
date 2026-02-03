@@ -13,7 +13,8 @@ static bool realloc_arr_(t_array *array);
 
 t_array *init_array(Arena *arena, size_t size, t_array_type type) {
     ASSERT_(size, "size must be > 0");
-    ASSERT_(type == ARRAY_PATHS || type == ARRAY_FILES, "type is not supported");
+    ASSERT_(type == ARRAY_PATHS || type == ARRAY_FILES,
+            "type is not supported");
 
     t_array *array = ArenaPush(arena, sizeof(*array));
     if (!array) {

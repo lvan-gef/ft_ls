@@ -90,14 +90,9 @@ bool add_path(t_array *paths, const char *pathname) {
         return false;
     }
 
-    path->files = init_array(paths->arena, DEFAULT_SIZE, ARRAY_FILES);
-    if (!path->files) {
-        return false;
-    }
-
     path->name = create_str(paths->arena, pathname);
     if (!path->name) {
-        // TODO: handle error
+        return false;
     }
 
     if (!append_array(paths, (void *)path)) {

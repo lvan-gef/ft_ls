@@ -500,7 +500,7 @@ static size_t list_str_len_(t_path *path, size_t **lens, size_t *total) {
         }
 
         if (*file->linkedname) {
-            size_t extra_space = 4;  // ' -> '
+            size_t extra_space = 4; // ' -> '
             size_t linked_len = ft_strlen(file->linkedname) + extra_space;
             if (linked_len > (*lens)[7]) {
                 (*lens)[7] = linked_len;

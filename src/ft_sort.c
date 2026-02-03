@@ -22,9 +22,7 @@ static int compare_gnu_(const char *a, const char *b);
 
 void sort_alpha(t_array *array, bool reverse) {
     ASSERT_(array, "files can not be NULL");
-    // ASSERT_(array->len, "files->len must > 0");
     ASSERT_(array->data, "files->data can not be NULL");
-    // ASSERT_(array->data[0], "files->data[0] can not be NULL");
 
     size_t index = 0;
     while (index < array->len) {
@@ -89,7 +87,8 @@ void sort_alpha(t_array *array, bool reverse) {
 //             int cmp = compare_time(&file_a->mtime, &file_b->mtime);
 //             bool should_swap = false;
 //             if (cmp == 0) {
-//                 should_swap = compare_(file_a->filename, file_b->filename) > 0;
+//                 should_swap = compare_(file_a->filename, file_b->filename) >
+//                 0;
 //             } else {
 //                 should_swap = cmp < 0;
 //             }

@@ -4,13 +4,13 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "../include/ft_arena.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
 #include "../include/ft_fprintf.h"
 #include "../include/ft_ls.h"
-#include "../include/ft_print.h"
-#include "../include/ft_arena.h"
 #include "../include/ft_parser.h"
+#include "../include/ft_print.h"
 #include "../include/ft_sort.h"
 #include "../libft/include/libft.h"
 
@@ -18,7 +18,8 @@
 #include "../include/ft_printer_mac.h"
 #endif
 
-static char *walk_files_(Arena *arena, t_args *args, t_path *path, DIR *dir);
+static char *walk_files_(Arena *arena, Arena *file_arena, t_args *args,
+                         t_path *path, DIR *dir);
 static bool print_(t_args *args, t_path *path, bool print_header);
 static t_str *join_paths_(Arena *arena, t_str *path, t_str *filename);
 
@@ -36,9 +37,17 @@ void printer(t_args *args) {
     char *err_msg = NULL;
     DIR *dir = NULL;
 
+    Arena *file_arena = ArenaAlloc(ARENA_SIZE);
+    if (!file_arena) {
+        ft_fprintf(STDERR_FILENO, "ft_ls: failed to allocate file arena\n");
+        return;
+    }
+    ArenaSetAutoAlign(file_arena, 8);
+
     t_array *queue = init_array(arena, DEFAULT_SIZE, ARRAY_PATHS);
     if (!queue) {
         ft_fprintf(STDERR_FILENO, "ft_ls: failed to allocate work queue\n");
+        ArenaRelease(file_arena);
         return;
     }
 
@@ -46,6 +55,7 @@ void printer(t_args *args) {
     while (i < args->paths->len) {
         if (!append_array(queue, args->paths->data[i])) {
             ft_fprintf(STDERR_FILENO, "ft_ls: failed to add path to queue\n");
+            ArenaRelease(file_arena);
             return;
         }
         ++i;
@@ -71,7 +81,15 @@ void printer(t_args *args) {
             goto failed;
         }
 
-        err_msg = walk_files_(arena, args, path, dir);
+        path->files = init_array(file_arena, DEFAULT_SIZE, ARRAY_FILES);
+        if (!path->files) {
+            ft_fprintf(STDERR_FILENO,
+                       "ft_ls: failed to allocate files array\n");
+            closedir(dir);
+            goto failed;
+        }
+
+        err_msg = walk_files_(arena, file_arena, args, path, dir);
         closedir(dir);
         dir = NULL;
 
@@ -83,6 +101,9 @@ void printer(t_args *args) {
             write(STDOUT_FILENO, "\n", 1);
         }
         print_(args, path, args->recursive);
+
+        ArenaClear(file_arena);
+        path->max_len = 0;
 
         if (args->recursive) {
             sort_alpha(path->paths, args->reverse);
@@ -101,6 +122,7 @@ void printer(t_args *args) {
         ++queue_index;
     }
 
+    ArenaRelease(file_arena);
     return;
 failed:
     ft_fprintf(STDERR_FILENO, "errno: %d, %s\n", errno,
@@ -108,11 +130,15 @@ failed:
     if (dir) {
         closedir(dir);
     }
+
+    ArenaRelease(file_arena);
 }
 
-static char *walk_files_(Arena *arena, t_args *args, t_path *path, DIR *dir) {
+static char *walk_files_(Arena *arena, Arena *file_arena, t_args *args,
+                         t_path *path, DIR *dir) {
     ASSERT_(args, "args can not be NULL");
     ASSERT_(path, "path can not be NULL");
+    ASSERT_(file_arena, "file_arena can not be NULL");
     ASSERT_(dir, "dir can not be NULL");
 
     errno = 0;
@@ -129,12 +155,12 @@ static char *walk_files_(Arena *arena, t_args *args, t_path *path, DIR *dir) {
             continue;
         }
 
-        t_file *file = init_file(arena);
+        t_file *file = init_file(file_arena);
         if (!file) {
             goto failed;
         }
 
-        file->name = create_str(arena, dirent->d_name);
+        file->name = create_str(file_arena, dirent->d_name);
         if (!file->name) {
             goto failed;
         }
@@ -192,7 +218,11 @@ static bool print_(t_args *args, t_path *path, bool print_header) {
         return true;
     }
 
-    sort_alpha(path->files, args->reverse);
+    if (args->time) {
+
+    } else {
+        sort_alpha(path->files, args->reverse);
+    }
 
     size_t num_cols = 1;
     size_t num_rows = path->files->len;
@@ -206,14 +236,14 @@ static bool print_(t_args *args, t_path *path, bool print_header) {
 #elif defined(__linux__)
     size_t *col_widths = NULL;
 
-    if (!calc_cols_(path->paths->arena, path, &col_widths, &num_cols, &num_rows)) {
-        ft_fprintf(STDERR_FILENO, "Failed to alloc memory in arena\n");
+    if (!calc_cols_(path->paths->arena, path, &col_widths, &num_cols,
+                    &num_rows)) {
         return false;
     }
 
-    size_t *col_starts = ArenaPush(path->paths->arena, (num_cols + 1) * sizeof(*col_starts));
+    size_t *col_starts =
+        ArenaPush(path->paths->arena, (num_cols + 1) * sizeof(*col_starts));
     if (!col_starts) {
-        ft_fprintf(STDERR_FILENO, "Failed to alloc memory in arena\n");
         return false;
     }
 
@@ -412,7 +442,8 @@ static size_t calc_layout_width_(t_array *files, size_t num_cols,
             ASSERT_(f, "f can not be NULL");
             ASSERT_(f->name->str, "f->len can not be NULL");
             size_t len = f->name->len;
-            // if (quoted && !(f->filename[0] == '"' || f->filename[0] == '\'')) {
+            // if (quoted && !(f->filename[0] == '"' || f->filename[0] == '\''))
+            // {
             //     ASSERT_(len + 1 > len, "len did overflow");
             //     len += 1;
             // }
