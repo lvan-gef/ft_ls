@@ -12,7 +12,8 @@
 static bool print_cols_mac_(t_path *path, size_t num_cols, size_t num_rows);
 static void calc_cols_mac_(t_path *path, size_t *num_cols, size_t *num_rows);
 
-bool print_mac(t_args *args, t_path *path, t_map *map, bool print_header, size_t queue_index) {
+bool print_mac(t_args *args, t_path *path, t_map *map, bool print_header,
+               size_t queue_index) {
     if (print_header && queue_index) {
         if (write(STDOUT_FILENO, path->name->str, path->name->len) < 0) {
             return false;
@@ -35,7 +36,6 @@ bool print_mac(t_args *args, t_path *path, t_map *map, bool print_header, size_t
 
     calc_cols_mac_(path, &map->col, &map->row);
     return print_cols_mac_(path, map->col, map->row);
-
 }
 
 static bool print_cols_mac_(t_path *path, size_t num_cols, size_t num_rows) {

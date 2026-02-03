@@ -23,7 +23,8 @@ static char *walk_files_(Arena *arena, Arena *file_arena, t_args *args,
                          t_path *path, DIR *dir);
 static char *append_queue(t_args *args, t_array *queue, size_t queue_index,
                           t_array *paths);
-static bool print_(t_args *args, t_path *path, bool print_header, size_t queue_index);
+static bool print_(t_args *args, t_path *path, bool print_header,
+                   size_t queue_index);
 static t_str *join_paths_(Arena *arena, t_str *path, t_str *filename);
 
 #if defined(__linux__)
@@ -227,7 +228,8 @@ static char *append_queue(t_args *args, t_array *queue, size_t queue_index,
     return NULL;
 }
 
-static bool print_(t_args *args, t_path *path, bool print_header, size_t queue_index) {
+static bool print_(t_args *args, t_path *path, bool print_header,
+                   size_t queue_index) {
     ASSERT_(args, "args can not be NULL");
     ASSERT_(path, "path can not be NULL");
     ASSERT_(path->files, "path->files can not be NULL");
