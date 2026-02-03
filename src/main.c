@@ -34,7 +34,6 @@ int main(int argc, char **argv) {
     }
 
     printer(&args);
-    // print_ls(&args);
 
     clean_program(&args);
     return 0;

@@ -38,6 +38,18 @@
 #define ARENA_SIZE 4096
 #endif // !ARENA_SIZE
 
+typedef enum {
+    LIST_ENUM_PERMISSION,
+    LIST_ENUM_HARDLINK,
+    LIST_ENUM_USER,
+    LIST_ENUM_GROUP,
+    LIST_ENUM_SIZE,
+    LIST_ENUM_DT,
+    LIST_ENUM_NAME,
+    LIST_ENUM_LINK,
+    LIST_ENUM_COUNT
+} e_list;
+
 typedef struct {
     bool list;
     bool recursive;
@@ -61,8 +73,28 @@ typedef struct {
 } t_path;
 
 typedef struct {
-    t_str *name;
+    t_str *str;
+    size_t count;
+} t_hardlink;
+
+typedef struct {
+    t_str *str;
+    size_t size;
+} t_size;
+
+typedef struct {
     unsigned char type;
+    size_t blocks;
+    t_str *name;
+    t_str *permission;
+    t_str *user;
+    t_str *group;
+    t_str *dt;
+    t_str *linked_name;
+    t_hardlink *hardlink;
+    t_size *size;
+
+    e_list list_types;
 } t_file;
 
 typedef struct {

@@ -2,6 +2,7 @@
 #include "../include/ft_arena.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
+
 #include "../libft/include/libft.h"
 
 t_path *init_path(Arena *arena) {
@@ -43,14 +44,21 @@ t_str *create_str(Arena *arena, const char *str) {
     }
 
     const size_t len = ft_strlen(str);
-    new_str->str = ArenaPush(arena, len + 1);
+    const size_t new_cap = len + 1;
+    ASSERT_(new_cap > len, "new_cap did overflow");
+
+    new_str->str = ArenaPush(arena, new_cap);
     if (!new_str->str) {
         ArenaPopTo(arena, arena_pos);
         return NULL;
     }
 
-    ft_strlcpy(new_str->str, str, len + 1);
-    new_str->cap = len;
+    const size_t cpy_len = ft_strlcpy(new_str->str, str, new_cap);
+    ASSERT_(cpy_len == len, "cpy_len != len");
+    ASSERT_(cpy_len, "cpy_len must be > 0");
+    ASSERT_(*new_str->str, "*new_str->str can not be '\\0'");
+
+    new_str->cap = new_cap;
     new_str->len = len;
 
     return new_str;

@@ -28,12 +28,15 @@ D_LDFLAGS  := $(SANITIZERS)
 
 SRC_DIR := src
 
-SRC_FILES := main.c ft_arena.c ft_array.c ft_parser.c ft_assert.c ft_printer.c ft_ls.c ft_sort.c
+SRC_FILES := ft_arena.c ft_array.c ft_assert.c ft_get_stats.c ft_helpers.c ft_ls.c ft_parser.c ft_print_list.c ft_printer.c ft_sort.c main.c
 
-# Add macOS-specific source files
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
-SRC_FILES += ft_printer_mac.c
+SRC_FILES += ft_print_mac.c
+else ifeq ($(UNAME_S), Linux)
+SRC_FILES += ft_print_linux.c
+else
+$(error os is not supported)
 endif
 
 SRCS := $(addprefix $(SRC_DIR)/, $(SRC_FILES))

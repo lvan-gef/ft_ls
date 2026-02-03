@@ -9,7 +9,6 @@
 #include "../include/ft_assert.h"
 #include "../include/ft_helpers.h"
 #include "../include/ft_ls.h"
-#include "../include/ft_print.h"
 #include "../include/ft_sort.h"
 
 #include "../libft/include/ft_fprintf.h"
