@@ -1,17 +1,18 @@
+#include <stdio.h>
 #include <sys/stat.h>
 
+#include "../include/ft_arena.h"
 #include "../include/ft_assert.h"
+#include "../include/ft_get_stats.h"
 #include "../include/ft_helpers.h"
 #include "../include/ft_ls.h"
 #include "../include/ft_print_list.h"
-#include "../include/ft_arena.h"
-#include "../include/ft_get_stats.h"
 
 #include "../libft/include/libft.h"
 
 static size_t list_str_len_(Arena *scratch_arena, t_path *path, size_t **lens,
                             size_t *total);
-// static char *rigth_pad_(Arena *arena, size_t nbr, size_t nbr_len);
+static char *rigth_pad_(Arena *arena, size_t nbr, size_t nbr_len);
 
 bool print_list(t_path *path, t_array *files) {
     // ASSERT_(arena, "arena can not be NULL");
@@ -46,42 +47,101 @@ bool print_list(t_path *path, t_array *files) {
 
     size_t str_len = ((char_count + 1) * files->len) * sizeof(char);
     size_t header_len = (7 + get_len(total) + 1) * sizeof(char);
-    output_arena = ArenaAlloc(str_len + header_len);
+    size_t output_len = str_len + header_len + 1;
+    output_arena = ArenaAlloc(output_len);
     if (!output_arena) {
         goto failed;
     }
     ArenaSetAutoAlign(output_arena, 8);
 
-    char *output_str = ArenaPush(output_arena, str_len);
+    char *output_str = ArenaPush(output_arena, output_len);
     if (!output_str) {
         goto failed;
     }
 
-    size_t len = ft_strlcpy(output_str, "totaal ", str_len);
-    len += uitoa(output_str + len, str_len, total / 2);
-    len += ft_strlcpy(output_str + len, "\n", str_len);
+    size_t len = ft_strlcpy(output_str, "total ", output_len);
+    len += uitoa(output_str + len, output_len, total);
+    len += ft_strlcpy(output_str + len, "\n", output_len);
 
     size_t index = 0;
     while (index < path->files->len) {
         t_file *file = path->files->data[index];
         size_t list_index = 0;
         while (list_index < LIST_ENUM_COUNT) {
-            switch (file->list_types) {
+            switch (list_index) {
                 case LIST_ENUM_PERMISSION:
+                    len += ft_strlcpy(output_str + len, file->permission->str, output_len);
+                    len += ft_strlcpy(output_str + len, "  ", output_len);
                     break;
-                case LIST_ENUM_HARDLINK:
+                case LIST_ENUM_HARDLINK: {
+                    char *hardlink =
+                        rigth_pad_(scratch_arena, file->hardlink->count,
+                                   lens[LIST_ENUM_HARDLINK]);
+                    if (!hardlink) {
+                        goto failed;
+                    }
+
+                    len += ft_strlcpy(output_str + len, hardlink, output_len);
+                    len += ft_strlcpy(output_str + len, " ", output_len);
                     break;
-                case LIST_ENUM_USER:
+                }
+                case LIST_ENUM_USER: {
+                    len +=
+                        ft_strlcpy(output_str + len, file->user->str, output_len);
+                    size_t user_pad = lens[LIST_ENUM_USER] - file->user->len;
+                    while (user_pad > 0) {
+                        len += ft_strlcpy(output_str + len, " ", output_len);
+                        --user_pad;
+                    }
+                    len += ft_strlcpy(output_str + len, "  ", output_len);
                     break;
-                case LIST_ENUM_GROUP:
+                }
+                case LIST_ENUM_GROUP: {
+                    len +=
+                        ft_strlcpy(output_str + len, file->group->str, output_len);
+                    size_t group_pad = lens[LIST_ENUM_GROUP] - file->group->len;
+                    while (group_pad > 0) {
+                        len += ft_strlcpy(output_str + len, " ", output_len);
+                        --group_pad;
+                    }
+                    len += ft_strlcpy(output_str + len, "  ", output_len);
                     break;
-                case LIST_ENUM_SIZE:
+                }
+                case LIST_ENUM_SIZE: {
+                    char *size = rigth_pad_(scratch_arena, file->size->size,
+                                            lens[LIST_ENUM_SIZE]);
+                    if (!size) {
+                        goto failed;
+                    }
+
+                    len += ft_strlcpy(output_str + len, size, output_len);
+                    len += ft_strlcpy(output_str + len, " ", output_len);
                     break;
-                case LIST_ENUM_DT:
+                }
+                case LIST_ENUM_DT: {
+                    size_t pad = lens[LIST_ENUM_DT] - file->dt->len;
+                    while (pad > 0) {
+                        len += ft_strlcpy(output_str + len, " ", output_len);
+                        --pad;
+                    }
+                    len += ft_strlcpy(output_str + len, file->dt->str, output_len);
+                    len += ft_strlcpy(output_str + len, " ", output_len);
                     break;
+                }
                 case LIST_ENUM_NAME:
+                    if (file->name->str[0] == '\'' ||
+                        file->name->str[0] == '"') {
+                        len += ft_strlcpy(output_str + len, " ", output_len);
+                    }
+                    len +=
+                        ft_strlcpy(output_str + len, file->name->str, output_len);
                     break;
                 case LIST_ENUM_LINK:
+                    if (file->linked_name) {
+                        len += ft_strlcpy(output_str + len, " -> ", output_len);
+                        len += ft_strlcpy(output_str + len,
+                                          file->linked_name->str, output_len);
+                    }
                     break;
                 case LIST_ENUM_COUNT:
                     break;
@@ -90,58 +150,13 @@ bool print_list(t_path *path, t_array *files) {
             }
             ++list_index;
         }
-        // len = ft_strlcpy(total_str, file->permission, str_len);
-        // len += ft_strlcpy(total_str + len, " ", str_len);
-        //
-        // char *hardlink = rigth_pad_(arena, file->hardlink, lens[1]);
-        // if (!hardlink) {
-        //     goto failed;
-        // }
-        // len += ft_strlcpy(total_str + len, hardlink, str_len);
-        // len += ft_strlcpy(total_str + len, " ", str_len);
-        //
-        // size_t group_len = ft_strlcpy(total_str + len, file->group, str_len);
-        // len += group_len;
-        // while (group_len < lens[2]) {
-        //     len += ft_strlcpy(total_str + len, " ", str_len);
-        //     ++group_len;
-        // }
-        // len += ft_strlcpy(total_str + len, " ", str_len);
-        //
-        // size_t user_len = ft_strlcpy(total_str + len, file->user, str_len);
-        // len += user_len;
-        // while (user_len < lens[3]) {
-        //     len += ft_strlcpy(total_str + len, " ", str_len);
-        //     ++user_len;
-        // }
-        // len += ft_strlcpy(total_str + len, " ", str_len);
-        //
-        // char *size = rigth_pad_(arena, (size_t)file->size, lens[4]);
-        // if (!size) {
-        //     goto failed;
-        // }
-        // len += ft_strlcpy(total_str + len, size, str_len);
-        // len += ft_strlcpy(total_str + len, " ", str_len);
-        //
-        // len += ft_strlcpy(total_str + len, file->date_fmt, str_len);
-        // len += ft_strlcpy(total_str + len, " ", str_len);
-        //
-        // if (file->name->str[0] == '\'' || file->name->str[0] == '"') {
-        //     len += ft_strlcpy(total_str + len, " ", str_len);
-        // }
-        // len += ft_strlcpy(total_str + len, file->name->str, str_len);
-        // if (*file->linkedname) {
-        //     len += ft_strlcpy(total_str + len, " -> ", str_len);
-        //     len += ft_strlcpy(total_str + len, file->linkedname, str_len);
-        // }
-        //
-        // len += ft_strlcpy(total_str + len, "\n", str_len);
-        // if (write(STDOUT_FILENO, total_str, len) < 0) {
-        //     goto failed;
-        // }
+        len += ft_strlcpy(output_str + len, "\n", output_len);
 
         ++index;
-        // ArenaClear(scratch_arena);
+    }
+
+    if (write(STDOUT_FILENO, output_str, len) < 0) {
+        goto failed;
     }
 
     ArenaRelease(scratch_arena);
@@ -175,7 +190,7 @@ static size_t list_str_len_(Arena *scratch_arena, t_path *path, size_t **lens,
 
         size_t list_index = 0;
         while (list_index < LIST_ENUM_COUNT) {
-            switch (file->list_types) {
+            switch (list_index) {
                 case LIST_ENUM_PERMISSION:
                     if (!get_permission(scratch_arena, &sb, file)) {
                         return 0;
@@ -191,7 +206,7 @@ static size_t list_str_len_(Arena *scratch_arena, t_path *path, size_t **lens,
                     }
 
                     if (file->hardlink->str->len > (*lens)[list_index]) {
-                        (*lens)[list_index] = file->hardlink->count;
+                        (*lens)[list_index] = file->hardlink->str->len;
                     }
                     break;
                 case LIST_ENUM_USER:
@@ -241,12 +256,12 @@ static size_t list_str_len_(Arena *scratch_arena, t_path *path, size_t **lens,
                     }
                     break;
                 case LIST_ENUM_LINK:
+                    if (!get_linked_name(scratch_arena, &sb, file, fullname->str)) {
+                        return 0;
+                    }
                     if (file->linked_name) {
-                        size_t extra_space = 4; // ' -> '
-                        size_t linked_len =
-                            file->linked_name->len + extra_space;
-                        if (linked_len > (*lens)[list_index]) {
-                            (*lens)[list_index] = linked_len;
+                        if (file->linked_name->len > (*lens)[list_index]) {
+                            (*lens)[list_index] = file->linked_name->len;
                         }
                     }
                     break;
@@ -263,47 +278,46 @@ static size_t list_str_len_(Arena *scratch_arena, t_path *path, size_t **lens,
 
     size_t str_len = 0;
     index = 0;
-
-    while (index < 8) {
+    while (index < LIST_ENUM_COUNT) {
         str_len += (*lens)[index] + 2;
         ++index;
     }
 
+    ASSERT_(str_len, "str_len must be > 0");
     return str_len;
 }
 
-// static char *rigth_pad_(Arena *arena, size_t nbr, size_t nbr_len) {
-//     ASSERT_(arena, "arena can not be NULL");
-//     ASSERT_(nbr, "nbr must be > 0");
-//     ASSERT_(nbr_len, "nbr_len must be > 0");
-//
-//     const size_t new_cap = nbr_len + 1;
-//     ASSERT_(new_cap > nbr_len, "new_cap did overflow");
-//
-//     char *nbr_str = ArenaPush(arena, new_cap);
-//     if (!nbr_str) {
-//         return NULL;
-//     }
-//
-//     size_t str_len = uitoa(nbr_str, new_cap, nbr);
-//     U64 arena_pos = ArenaPos(arena);
-//     char *buffer = ArenaPush(arena, new_cap);
-//     if (!buffer) {
-//         ArenaPopTo(arena, arena_pos);
-//         return NULL;
-//     }
-//
-//     size_t pad_count = (nbr_len > str_len) ? nbr_len - str_len : 0;
-//     size_t len = 0;
-//     while (len < pad_count) {
-//         buffer[len] = ' ';
-//         ++len;
-//     }
-//
-//     len += ft_strlcpy(buffer + len, nbr_str, new_cap - len);
-//     ASSERT_(len == nbr_len, "len != nbr_len");
-//
-//     ASSERT_(buffer, "buffer can not be NULL");
-//     ASSERT_(*buffer, "*buffer can not be '\\0'");
-//     return buffer;
-// }
+static char *rigth_pad_(Arena *arena, size_t nbr, size_t nbr_len) {
+    ASSERT_(arena, "arena can not be NULL");
+    ASSERT_(nbr_len, "nbr_len must be > 0");
+
+    const size_t new_cap = nbr_len + 1;
+    ASSERT_(new_cap > nbr_len, "new_cap did overflow");
+
+    char *nbr_str = ArenaPush(arena, new_cap);
+    if (!nbr_str) {
+        return NULL;
+    }
+
+    size_t str_len = uitoa(nbr_str, new_cap, nbr);
+    U64 arena_pos = ArenaPos(arena);
+    char *buffer = ArenaPush(arena, new_cap);
+    if (!buffer) {
+        ArenaPopTo(arena, arena_pos);
+        return NULL;
+    }
+
+    size_t pad_count = (nbr_len > str_len) ? nbr_len - str_len : 0;
+    size_t len = 0;
+    while (len < pad_count) {
+        buffer[len] = ' ';
+        ++len;
+    }
+
+    len += ft_strlcpy(buffer + len, nbr_str, new_cap - len);
+    ASSERT_(len == nbr_len, "len != nbr_len");
+
+    ASSERT_(buffer, "buffer can not be NULL");
+    ASSERT_(*buffer, "*buffer can not be '\\0'");
+    return buffer;
+}

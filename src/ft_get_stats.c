@@ -1,10 +1,15 @@
 
 #include <errno.h>
 #include <grp.h>
-#include <linux/limits.h>
 #include <pwd.h>
 #include <string.h>
 #include <sys/stat.h>
+
+#if defined (__linux__)
+#include <linux/limits.h>
+#elif defined (__APPLE__)
+#include <sys/syslimits.h>
+#endif
 
 #include "../include/ft_get_stats.h"
 #include "../include/ft_ls.h"
@@ -156,6 +161,7 @@ bool get_size(Arena *arena, struct stat *sb, t_file *file) {
 
     file->size->size = (size_t)sb->st_size;
     file->size->str = create_str(arena, size_str);
+    file->blocks = (size_t)sb->st_blocks;
 
     return true;
 }
@@ -182,7 +188,11 @@ bool get_dt(Arena *arena, struct stat *sb, t_file *file) {
         return false;
     }
 
-    size_t len = ft_strlcpy(buffer, splitter[2], DT_LEN);
+    size_t len = 0;
+    if (ft_strlen(splitter[2]) == 1) {
+        len = ft_strlcpy(buffer, " ", DT_LEN);
+    }
+    len += ft_strlcpy(buffer + len, splitter[2], DT_LEN);
     len += ft_strlcpy(buffer + len, " ", DT_LEN);
     len += ft_strlcpy(buffer + len, splitter[1], DT_LEN);
     len += ft_strlcpy(buffer + len, " ", DT_LEN);
@@ -206,14 +216,16 @@ bool get_dt(Arena *arena, struct stat *sb, t_file *file) {
 }
 
 bool get_linked_name(Arena *arena, struct stat *sb, t_file *file, const char *fullname) {
-    char filename[NAME_MAX] = {0};
-
-    if (S_ISLNK(sb->st_mode)) {
-        ssize_t len = readlink(filename, (char *)fullname, NAME_MAX - 1);
-        if (len < 0) {
-            return false;
-        }
+    if (!S_ISLNK(sb->st_mode)) {
+        return true;
     }
+
+    char filename[NAME_MAX] = {0};
+    ssize_t len = readlink(fullname, filename, NAME_MAX - 1);
+    if (len < 0) {
+        return false;
+    }
+    filename[len] = '\0';
 
     file->linked_name = create_str(arena, filename);
     if (!file->linked_name) {

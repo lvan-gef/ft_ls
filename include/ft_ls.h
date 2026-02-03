@@ -19,7 +19,7 @@
 #endif // !PERMISSION_SIZE
 
 #ifndef DT_LEN
-#define DT_LEN 13
+#define DT_LEN 16
 #endif // !DT_LEN
 
 #ifndef TERM_SIZE

@@ -7,12 +7,12 @@
 #include "../include/ft_arena.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
+#include "../include/ft_helpers.h"
 #include "../include/ft_ls.h"
 #include "../include/ft_parser.h"
 #include "../include/ft_print.h"
-#include "../include/ft_sort.h"
-#include "../include/ft_helpers.h"
 #include "../include/ft_print_list.h"
+#include "../include/ft_sort.h"
 
 #include "../include/ft_fprintf.h"
 #include "../libft/include/libft.h"
@@ -32,7 +32,6 @@ static bool print_(t_args *args, t_path *path, bool print_header,
 #if defined(__APPLE__)
 #include "../include/ft_printer_mac.h"
 #endif
-
 
 void printer(t_args *args) {
     ASSERT_(args, "args can not be NULL");
@@ -253,6 +252,11 @@ static bool print_(t_args *args, t_path *path, bool print_header,
 
     t_map map = {.col = 1, .row = path->files->len};
     if (args->list) {
+        if (args->time) {
+
+        } else {
+            sort_alpha(path->files, args->reverse);
+        }
         return print_list(path, path->files);
     }
 
