@@ -250,7 +250,6 @@ static bool print_(t_args *args, t_path *path, bool print_header,
     ASSERT_(path, "path can not be NULL");
     ASSERT_(path->files, "path->files can not be NULL");
 
-    t_map map = {.col = 1, .row = path->files->len};
     if (args->list) {
         if (args->time) {
 
@@ -259,6 +258,8 @@ static bool print_(t_args *args, t_path *path, bool print_header,
         }
         return print_list(path, path->files);
     }
+
+    t_map map = {.col = 1, .row = path->files->len};
 
 #if defined(__APPLE__)
     return print_mac(args, path, &map, print_header, queue_index);

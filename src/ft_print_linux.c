@@ -1,3 +1,5 @@
+#include "ft_arena.h"
+#include "ft_helpers.h"
 #if defined(__linux__)
 
 #include <stdbool.h>
@@ -6,8 +8,9 @@
 
 #include "../include/ft_assert.h"
 #include "../include/ft_ls.h"
-#include "../include/ft_sort.h"
 #include "../include/ft_printer_linux.h"
+#include "../include/ft_sort.h"
+#include "ft_print_list.h"
 
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
@@ -137,7 +140,98 @@ bool print_linux(t_args *args, t_path *path, t_map *map, bool print_header) {
     return true;
 }
 
-static bool calc_cols_(Arena *arena, t_path *path, size_t **col_widths, t_map *map) {
+bool linux_list_format(Arena *arena, t_file_list *fl, t_file *file, char **output_str) {
+    switch (fl->list_index) {
+        case LIST_ENUM_PERMISSION:
+            fl->wb_len += ft_strlcpy(*output_str + fl->wb_len, file->permission->str,
+                                    fl->buffer_len);
+            fl->wb_len +=
+                ft_strlcpy(*output_str + fl->wb_len, " ", fl->buffer_len - fl->wb_len);
+            break;
+        case LIST_ENUM_HARDLINK: {
+            char *hardlink = left_pad(arena, file->hardlink->count, fl->lens[LIST_ENUM_HARDLINK]);
+            if (!hardlink) {
+                return false;
+            }
+
+            fl->wb_len +=
+                ft_strlcpy(*output_str + fl->wb_len, hardlink, fl->buffer_len - fl->wb_len);
+            fl->wb_len +=
+                ft_strlcpy(*output_str + fl->wb_len, " ", fl->buffer_len - fl->wb_len);
+            break;
+        }
+        case LIST_ENUM_USER: {
+            char *user = rigth_pad(arena, file->user, fl->lens[LIST_ENUM_USER]);
+            if (!user) {
+                return false;
+            }
+
+            fl->wb_len +=
+                ft_strlcpy(*output_str + fl->wb_len, user, fl->buffer_len - fl->wb_len);
+            fl->wb_len +=
+                ft_strlcpy(*output_str + fl->wb_len, " ", fl->buffer_len - fl->wb_len);
+            break;
+        }
+        case LIST_ENUM_GROUP: {
+            char *group =
+                rigth_pad(arena, file->group, fl->lens[LIST_ENUM_GROUP]);
+            if (!group) {
+                return false;
+            }
+
+            fl->wb_len +=
+                ft_strlcpy(*output_str + fl->wb_len, group, fl->buffer_len - fl->wb_len);
+            fl->wb_len +=
+                ft_strlcpy(*output_str + fl->wb_len, " ", fl->buffer_len - fl->wb_len);
+            break;
+        }
+        case LIST_ENUM_SIZE: {
+            char *size =
+                left_pad(arena, file->size->size, fl->lens[LIST_ENUM_SIZE]);
+            if (!size) {
+                return false;
+            }
+
+            fl->wb_len +=
+                ft_strlcpy(*output_str + fl->wb_len, size, fl->buffer_len - fl->wb_len);
+            fl->wb_len +=
+                ft_strlcpy(*output_str + fl->wb_len, " ", fl->buffer_len - fl->wb_len);
+            break;
+        }
+        case LIST_ENUM_DT:
+            fl->wb_len += ft_strlcpy(*output_str + fl->wb_len, file->dt->str,
+                                     fl->wb_len);
+            fl->wb_len +=
+                ft_strlcpy(*output_str + fl->wb_len, " ", fl->buffer_len - fl->wb_len);
+            break;
+        case LIST_ENUM_NAME:
+            if (file->name->str[0] == '\'' || file->name->str[0] == '"') {
+                fl->wb_len +=
+                    ft_strlcpy(*output_str + fl->wb_len, " ", fl->buffer_len - fl->wb_len);
+            }
+            fl->wb_len += ft_strlcpy(*output_str + fl->wb_len,
+                                     file->name->str, fl->buffer_len - fl->wb_len);
+            break;
+        case LIST_ENUM_LINK:
+
+            if (file->linked_name) {
+                fl->wb_len +=
+                    ft_strlcpy(*output_str + fl->wb_len, " -> ", fl->buffer_len - fl->wb_len);
+                fl->wb_len += ft_strlcpy(*output_str + fl->wb_len,
+                                         file->linked_name->str, fl->buffer_len - fl->wb_len);
+            }
+            break;
+        case LIST_ENUM_COUNT:
+            break;
+        default:
+            ASSERT_(true == false, "Should never ever happen");
+    }
+
+    return true;
+}
+
+static bool calc_cols_(Arena *arena, t_path *path, size_t **col_widths,
+                       t_map *map) {
     ASSERT_(arena, "arena con not be NULL");
     ASSERT_(path, "path can not be NULL");
     ASSERT_(path->files, "path->files can not be NULL");

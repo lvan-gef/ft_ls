@@ -38,6 +38,73 @@ size_t get_len(size_t n) {
 
 }
 
+char *left_pad(Arena *arena, size_t nbr, size_t nbr_len) {
+    ASSERT_(arena, "arena can not be NULL");
+    ASSERT_(nbr_len, "nbr_len must be > 0");
+
+    const size_t new_cap = nbr_len + 1;
+    ASSERT_(new_cap > nbr_len, "new_cap did overflow");
+
+    char *nbr_str = ArenaPush(arena, new_cap);
+    if (!nbr_str) {
+        return NULL;
+    }
+
+    size_t str_len = uitoa(nbr_str, new_cap, nbr);
+    U64 arena_pos = ArenaPos(arena);
+    char *buffer = ArenaPush(arena, new_cap);
+    if (!buffer) {
+        ArenaPopTo(arena, arena_pos);
+        return NULL;
+    }
+
+    size_t pad_count = (nbr_len > str_len) ? nbr_len - str_len : 0;
+    size_t len = 0;
+    while (len < pad_count) {
+        buffer[len] = ' ';
+        ++len;
+    }
+
+    len += ft_strlcpy(buffer + len, nbr_str, new_cap - len);
+    ASSERT_(len == nbr_len, "len != nbr_len");
+
+    ASSERT_(buffer, "buffer can not be NULL");
+    ASSERT_(*buffer, "*buffer can not be '\\0'");
+    return buffer;
+}
+
+char *rigth_pad(Arena *arena, t_str *str, size_t len) {
+    ASSERT_(arena, "arena can not be NULL");
+
+    const size_t new_cap = len + 1;
+    ASSERT_(new_cap > len, "new_cap did overflow");
+
+    char *new_str = ArenaPush(arena, new_cap);
+    if (!new_str) {
+        return NULL;
+    }
+
+    U64 arena_pos = ArenaPos(arena);
+    char *buffer = ArenaPush(arena, new_cap);
+    if (!buffer) {
+        ArenaPopTo(arena, arena_pos);
+        return NULL;
+    }
+
+    size_t wb_len = 0;
+    wb_len += ft_strlcpy(buffer, str->str, new_cap);
+
+    while (wb_len < new_cap - 1) {
+        buffer[wb_len] = ' ';
+        ++wb_len;
+    }
+    ASSERT_(len == wb_len, "len != nbr_len");
+
+    ASSERT_(buffer, "buffer can not be NULL");
+    ASSERT_(*buffer, "*buffer can not be '\\0'");
+    return buffer;
+}
+
 t_str *join_paths(Arena *arena, t_str *path, t_str *filename) {
     ASSERT_(arena, "arena can not be NULL");
     ASSERT_(path, "path can not be NULL");
