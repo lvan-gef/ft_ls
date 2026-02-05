@@ -19,6 +19,7 @@ t_path *init_path(Arena *arena) {
         return NULL;
     }
 
+    path->print_total = true;
     return path;
 }
 
@@ -53,10 +54,12 @@ t_str *create_str(Arena *arena, const char *str) {
         return NULL;
     }
 
+#ifndef NDEBUG
     const size_t cpy_len = ft_strlcpy(new_str->str, str, new_cap);
     ASSERT_(cpy_len == len, "cpy_len != len");
     ASSERT_(cpy_len, "cpy_len must be > 0");
     ASSERT_(*new_str->str, "*new_str->str can not be '\\0'");
+#endif // NDEBUG
 
     new_str->cap = new_cap;
     new_str->len = len;

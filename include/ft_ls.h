@@ -56,6 +56,8 @@ typedef struct {
     bool all;
     bool reverse;
     bool time;
+    bool print_header;
+    int exit_code;
     t_array *paths;
 } t_args;
 
@@ -67,6 +69,8 @@ typedef struct {
 
 typedef struct {
     size_t max_len;
+    struct timespec mtime;
+    bool print_total;
     t_str *name;
     t_array *files;
     t_array *paths;
@@ -84,6 +88,7 @@ typedef struct {
 
 typedef struct {
     unsigned char type;
+    struct timespec mtime;
     size_t blocks;
     t_str *name;
     t_str *permission;
@@ -93,8 +98,6 @@ typedef struct {
     t_str *linked_name;
     t_hardlink *hardlink;
     t_size *size;
-
-    e_list list_types;
 } t_file;
 
 typedef struct {
