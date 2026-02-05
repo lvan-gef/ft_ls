@@ -19,6 +19,7 @@ bool parse_args(int argc, char **argv, t_args *args) {
 
     size_t index = 1;
     bool is_flag = true;
+    size_t input_paths = (size_t)argc - 1;
 
     while (index < (size_t)argc) {
         const size_t len = ft_strlen(argv[index]);
@@ -35,6 +36,7 @@ bool parse_args(int argc, char **argv, t_args *args) {
                     switch (argv[index][sub_index]) {
                         case 'R':
                             args->recursive = true;
+                            args->print_header = true;
                             break;
                         case 'a':
                             args->all = true;
@@ -54,6 +56,8 @@ bool parse_args(int argc, char **argv, t_args *args) {
                     }
                     ++sub_index;
                 }
+                ASSERT_(input_paths - 1 < (size_t)argc, "input_paths did underflow");
+                --input_paths;
             } else {
                 if (!add_path(args->paths, argv[index])) {
                     return false;
@@ -70,6 +74,10 @@ bool parse_args(int argc, char **argv, t_args *args) {
 
     if (!args->paths->len) {
         return default_arg(args);
+    }
+
+    if (input_paths > 1) {
+        args->print_header = true;
     }
 
     return true;
