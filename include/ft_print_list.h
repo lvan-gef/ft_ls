@@ -12,6 +12,6 @@ typedef struct {
     size_t buffer_len;
 } t_file_list;
 
-bool print_list(t_path *path, t_array *files);
+bool print_list(t_path *path, t_array *files, bool print_header);
 
 #endif // !FT_PRINT_LIST_H

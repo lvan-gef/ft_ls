@@ -3,29 +3,24 @@
 
 #include "../include/ft_arena.h"
 #include "../include/ft_assert.h"
-#include "../include/ft_get_stats.h"
 #include "../include/ft_helpers.h"
 #include "../include/ft_ls.h"
 #include "../include/ft_print_list.h"
 
 #include "../libft/include/libft.h"
 #include "ft_printer_linux.h"
-#include "ft_printf.h"
 
 static size_t list_str_len_(Arena *scratch_arena, t_path *path, size_t **lens,
                             size_t *total);
 
-bool print_list(t_path *path, t_array *files) {
+bool print_list(t_path *path, t_array *files, bool print_header) {
     ASSERT_(path, "path can not be NULL");
-    ASSERT_(path->max_len, "path->max_len must be > 0");
     ASSERT_(path->name, "path->name can not be NULL");
     ASSERT_(path->name->str, "path->name->str can not be NULL");
     ASSERT_(*path->name->str, "*path->name->str can not be '\\0'");
 
     ASSERT_(files, "files can not be NULL");
-    ASSERT_(files->len, "files->len must be > 0");
     ASSERT_(files->data, "files->data can not be NULL");
-    ASSERT_(*files->data, "*path->files->data can not be NULL");
 
     Arena *output_arena = NULL;
     Arena *scratch_arena = ArenaAlloc(ARENA_SIZE);
@@ -60,9 +55,26 @@ bool print_list(t_path *path, t_array *files) {
     }
     fl.buffer_len = str_len + header_len + 1;
 
-    fl.wb_len = ft_strlcpy(output_str, "total ", fl.buffer_len - fl.wb_len);
-    fl.wb_len += uitoa(output_str + fl.wb_len, fl.buffer_len, total);
-    fl.wb_len += ft_strlcpy(output_str + fl.wb_len, "\n", fl.buffer_len - fl.wb_len);
+    if (print_header) {
+        if (write(STDOUT_FILENO, path->name->str, path->name->len) < 0) {
+            return false;
+        }
+
+        if (write(STDOUT_FILENO, ":\n", 2) < 0) {
+            return false;
+        }
+    }
+
+    if (path->print_total) {
+        fl.wb_len = ft_strlcpy(output_str, "total ", fl.buffer_len - fl.wb_len);
+#if defined(__APPLE__)
+        fl.wb_len += uitoa(output_str + fl.wb_len, fl.buffer_len, total);
+#else
+        fl.wb_len += uitoa(output_str + fl.wb_len, fl.buffer_len, total / 2);
+#endif
+        fl.wb_len +=
+            ft_strlcpy(output_str + fl.wb_len, "\n", fl.buffer_len - fl.wb_len);
+    }
 
     size_t index = 0;
     while (index < path->files->len) {
@@ -70,7 +82,7 @@ bool print_list(t_path *path, t_array *files) {
         fl.list_index = 0;
 
         while (fl.list_index < LIST_ENUM_COUNT) {
-#if defined (__linux)
+#if defined(__linux)
             if (!linux_list_format(scratch_arena, &fl, file, &output_str)) {
                 goto failed;
             }
@@ -79,7 +91,8 @@ bool print_list(t_path *path, t_array *files) {
         }
 
         ++index;
-        fl.wb_len += ft_strlcpy(output_str + fl.wb_len, "\n", fl.buffer_len - fl.wb_len);
+        fl.wb_len +=
+            ft_strlcpy(output_str + fl.wb_len, "\n", fl.buffer_len - fl.wb_len);
     }
 
     if (write(STDOUT_FILENO, output_str, fl.wb_len) < 0) {
@@ -101,17 +114,29 @@ failed:
 
 static size_t list_str_len_(Arena *scratch_arena, t_path *path, size_t **lens,
                             size_t *total) {
+    ASSERT_(scratch_arena, "scratch_arena can not be NULL");
+    ASSERT_(path, "path can not be NULL");
+    ASSERT_(path->files, "path->files can not be NULL");
+    ASSERT_(lens, "lens can not be NULL");
+    ASSERT_(*lens, "*lens can not be NULL");
+    ASSERT_(total, "total can not be NULL");
+    ASSERT_(!*total, "*total must be 0");
+
     size_t index = 0;
-    struct stat sb;
 
     while (index < path->files->len) {
         t_file *file = path->files->data[index];
+        ASSERT_(file, "file can not be NULL");
+        ASSERT_(file->permission, "file->permission can not be NULL");
+        ASSERT_(file->hardlink, "file->hardlink can not be NULL");
+        ASSERT_(file->user, "file->user can not be NULL");
+        ASSERT_(file->group, "file->group can not be NULL");
+        ASSERT_(file->size, "file->size can not be NULL");
+        ASSERT_(file->dt, "file->dt can not be NULL");
+        ASSERT_(file->name, "file->name can not be NULL");
+
         t_str *fullname = join_paths(scratch_arena, path->name, file->name);
         if (!fullname) {
-            return 0;
-        }
-
-        if (!get_stat(&sb, fullname->str)) {
             return 0;
         }
 
@@ -119,46 +144,26 @@ static size_t list_str_len_(Arena *scratch_arena, t_path *path, size_t **lens,
         while (list_index < LIST_ENUM_COUNT) {
             switch (list_index) {
                 case LIST_ENUM_PERMISSION:
-                    if (!get_permission(scratch_arena, &sb, file)) {
-                        return 0;
-                    }
-
                     if (file->permission->len > (*lens)[list_index]) {
                         (*lens)[list_index] = file->permission->len;
                     }
                     break;
                 case LIST_ENUM_HARDLINK:
-                    if (!get_hardlink(scratch_arena, &sb, file)) {
-                        return 0;
-                    }
-
                     if (file->hardlink->str->len > (*lens)[list_index]) {
                         (*lens)[list_index] = file->hardlink->str->len;
                     }
                     break;
                 case LIST_ENUM_USER:
-                    if (!get_user(scratch_arena, file, sb.st_uid)) {
-                        return 0;
-                    }
-
                     if (file->user->len > (*lens)[list_index]) {
                         (*lens)[list_index] = file->user->len;
                     }
                     break;
                 case LIST_ENUM_GROUP:
-                    if (!get_group(scratch_arena, file, sb.st_gid)) {
-                        return 0;
-                    }
-
                     if (file->group->len > (*lens)[list_index]) {
                         (*lens)[list_index] = file->group->len;
                     }
                     break;
                 case LIST_ENUM_SIZE:
-                    if (!get_size(scratch_arena, &sb, file)) {
-                        return 0;
-                    }
-
                     if (file->size->str->len > (*lens)[list_index]) {
                         (*lens)[list_index] = file->size->str->len;
                     }
@@ -168,10 +173,6 @@ static size_t list_str_len_(Arena *scratch_arena, t_path *path, size_t **lens,
                     *total += file->blocks;
                     break;
                 case LIST_ENUM_DT:
-                    if (!get_dt(scratch_arena, &sb, file)) {
-                        return 0;
-                    }
-
                     if (file->dt->len > (*lens)[list_index]) {
                         (*lens)[list_index] = file->dt->len;
                     }
@@ -183,10 +184,6 @@ static size_t list_str_len_(Arena *scratch_arena, t_path *path, size_t **lens,
                     }
                     break;
                 case LIST_ENUM_LINK:
-                    if (!get_linked_name(scratch_arena, &sb, file,
-                                         fullname->str)) {
-                        return 0;
-                    }
                     if (file->linked_name) {
                         if (file->linked_name->len > (*lens)[list_index]) {
                             (*lens)[list_index] = file->linked_name->len;

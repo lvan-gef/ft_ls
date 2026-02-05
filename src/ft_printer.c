@@ -2,11 +2,13 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "../include/ft_arena.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
+#include "../include/ft_get_stats.h"
 #include "../include/ft_helpers.h"
 #include "../include/ft_ls.h"
 #include "../include/ft_parser.h"
@@ -14,7 +16,7 @@
 #include "../include/ft_print_list.h"
 #include "../include/ft_sort.h"
 
-#include "../include/ft_fprintf.h"
+#include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
 
 static int open_dir_(Arena *file_arena, DIR **dir, t_path *path);
@@ -24,6 +26,9 @@ static char *append_queue(t_args *args, t_array *queue, size_t queue_index,
                           t_array *paths);
 static bool print_(t_args *args, t_path *path, bool print_header,
                    size_t queue_index);
+static t_file *create_file_(t_args *args, Arena *arena, t_path *path,
+                            const char *d_name, struct stat *sb,
+                            unsigned char type);
 
 #if defined(__linux__)
 #include "../include/ft_printer_linux.h"
@@ -58,10 +63,6 @@ void printer(t_args *args) {
         return;
     }
 
-    // err_msg = append_queue(args, queue, queue_index, args->paths);
-    // if (err_msg) {
-    //     goto failed;
-    // }
     size_t i = 0;
     while (i < args->paths->len) {
         if (!append_array(queue, args->paths->data[i])) {
@@ -80,13 +81,19 @@ void printer(t_args *args) {
         int result = open_dir_(file_arena, &dir, path);
         if (result < 0) {
             ++queue_index;
+            args->exit_code = 2;
             continue;
         } else if (!result) {
-            goto failed;
+            if (errno != ENOTDIR) {
+                goto failed;
+            }
+            errno = 0;
         }
 
         err_msg = walk_files_(arena, file_arena, args, path, dir);
-        closedir(dir);
+        if (dir) {
+            closedir(dir);
+        }
         dir = NULL;
 
         if (err_msg || errno) {
@@ -94,9 +101,11 @@ void printer(t_args *args) {
         }
 
         if (queue_index) {
-            write(STDOUT_FILENO, "\n", 1);
+            if (write(STDOUT_FILENO, "\n", 1) < 0) {
+                goto failed;
+            }
         }
-        print_(args, path, args->recursive, queue_index);
+        print_(args, path, args->print_header, queue_index);
 
         ArenaClear(file_arena);
         path->max_len = 0;
@@ -118,6 +127,7 @@ failed:
         closedir(dir);
     }
 
+    args->exit_code = 1;
     ArenaRelease(file_arena);
 }
 
@@ -128,6 +138,7 @@ static int open_dir_(Arena *file_arena, DIR **dir, t_path *path) {
     ASSERT_(path->name, "path->name can not be NULL");
     ASSERT_(*path->name->str, "*path->name->str can not be '\\0'");
 
+    int return_code = 1;
     *dir = opendir(path->name->str);
     if (!*dir) {
         if (errno == EACCES || errno == ENOENT || errno == EPERM) {
@@ -137,9 +148,13 @@ static int open_dir_(Arena *file_arena, DIR **dir, t_path *path) {
             return -1;
         }
 
-        ft_fprintf(STDERR_FILENO, "ft_ls: %s: %s\n", path->name->str,
-                   strerror(errno));
-        return 0;
+        if (errno == ENOTDIR) {
+            return_code = 0;
+        } else {
+            ft_fprintf(STDERR_FILENO, "ft_ls: %s: %s\n", path->name->str,
+                       strerror(errno));
+            return 0;
+        }
     }
 
     path->files = init_array(file_arena, DEFAULT_SIZE, ARRAY_FILES);
@@ -148,7 +163,7 @@ static int open_dir_(Arena *file_arena, DIR **dir, t_path *path) {
         return 0;
     }
 
-    return 1;
+    return return_code;
 }
 
 static char *walk_files_(Arena *arena, Arena *file_arena, t_args *args,
@@ -159,9 +174,27 @@ static char *walk_files_(Arena *arena, Arena *file_arena, t_args *args,
     ASSERT_(path, "path can not be NULL");
     ASSERT_(path->name, "path->name can not be NULL");
     ASSERT_(*path->name->str, "*path->name->str can not be NULL");
-    ASSERT_(dir, "dir can not be NULL");
+    ASSERT_(path->files, "path->files can not be NULL");
 
     errno = 0;
+    struct stat sb;
+
+    if (!dir) {
+        t_file *file =
+            create_file_(args, file_arena, path, path->name->str, &sb, DT_REG);
+        if (!file) {
+            goto failed;
+        }
+
+        if (!append_array(path->files, (void *)file)) {
+            goto failed;
+        }
+
+        args->print_header = false;
+        path->print_total = false;
+        return NULL;
+    }
+
     const struct dirent *dirent = readdir(dir);
     if (!dirent && errno) {
         return strerror(errno);
@@ -175,17 +208,12 @@ static char *walk_files_(Arena *arena, Arena *file_arena, t_args *args,
             continue;
         }
 
-        t_file *file = init_file(file_arena);
+        t_file *file = create_file_(args, file_arena, path, dirent->d_name, &sb,
+                                    dirent->d_type);
         if (!file) {
             goto failed;
         }
 
-        file->name = create_str(file_arena, dirent->d_name);
-        if (!file->name) {
-            goto failed;
-        }
-
-        file->type = dirent->d_type;
         if (file->type == DT_DIR && args->recursive) {
             if (ft_strncmp(file->name->str, ".", file->name->len + 1) &&
                 ft_strncmp(file->name->str, "..", file->name->len + 1)) {
@@ -199,10 +227,6 @@ static char *walk_files_(Arena *arena, Arena *file_arena, t_args *args,
                     goto failed;
                 }
             }
-        }
-
-        if (file->name->len > path->max_len) {
-            path->max_len = file->name->len;
         }
 
         if (!append_array(path->files, (void *)file)) {
@@ -226,9 +250,12 @@ static char *append_queue(t_args *args, t_array *queue, size_t queue_index,
     ASSERT_(paths, "paths can not be NULL");
 
     if (args->recursive) {
-        if (args->time) {
-        } else {
-            sort_alpha(paths, args->reverse);
+        if (paths->len) {
+            if (args->time) {
+                sort_time(paths, args->reverse);
+            } else {
+                sort_alpha(paths, args->reverse);
+            }
         }
 
         size_t index = 0;
@@ -251,12 +278,15 @@ static bool print_(t_args *args, t_path *path, bool print_header,
     ASSERT_(path->files, "path->files can not be NULL");
 
     if (args->list) {
-        if (args->time) {
-
-        } else {
-            sort_alpha(path->files, args->reverse);
+        if (path->files->len) {
+            if (args->time) {
+                sort_time(path->files, args->reverse);
+            } else {
+                sort_alpha(path->files, args->reverse);
+            }
         }
-        return print_list(path, path->files);
+
+        return print_list(path, path->files, print_header);
     }
 
     t_map map = {.col = 1, .row = path->files->len};
@@ -268,4 +298,49 @@ static bool print_(t_args *args, t_path *path, bool print_header,
     return print_linux(args, path, &map, print_header);
 #endif
     return false;
+}
+
+// TODO: check if always errno is set
+static t_file *create_file_(t_args *args, Arena *arena, t_path *path,
+                            const char *d_name, struct stat *sb,
+                            unsigned char type) {
+
+    t_file *file = init_file(arena);
+    if (!file) {
+        goto failed;
+    }
+
+    file->name = create_str(arena, d_name);
+    if (!file->name) {
+        goto failed;
+    }
+
+    if (file->name->len > path->max_len) {
+        path->max_len = file->name->len;
+    }
+
+    if (args->list || args->time) {
+        if (*d_name != '/') {
+            t_str *fullname = join_paths(arena, path->name, file->name);
+            if (!fullname) {
+                goto failed;
+            }
+
+            if (!get_file_info(arena, sb, file, fullname->str)) {
+                goto failed;
+            }
+        } else {
+            if (!get_file_info(arena, sb, file, file->name->str)) {
+                goto failed;
+            }
+        }
+    }
+
+    file->type = type;
+
+    ASSERT_(file, "file can not be NULL");
+    return file;
+
+failed:
+    return NULL;
 }

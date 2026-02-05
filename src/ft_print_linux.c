@@ -35,10 +35,12 @@ bool print_linux(t_args *args, t_path *path, t_map *map, bool print_header) {
         return true;
     }
 
-    if (args->time) {
-
-    } else {
-        sort_alpha(path->files, args->reverse);
+    if (path->files->len) {
+        if (args->time) {
+            sort_time(path->files, args->reverse);
+        } else {
+            sort_alpha(path->files, args->reverse);
+        }
     }
 
     size_t *col_widths = NULL;
@@ -140,24 +142,26 @@ bool print_linux(t_args *args, t_path *path, t_map *map, bool print_header) {
     return true;
 }
 
-bool linux_list_format(Arena *arena, t_file_list *fl, t_file *file, char **output_str) {
+bool linux_list_format(Arena *arena, t_file_list *fl, t_file *file,
+                       char **output_str) {
     switch (fl->list_index) {
         case LIST_ENUM_PERMISSION:
-            fl->wb_len += ft_strlcpy(*output_str + fl->wb_len, file->permission->str,
-                                    fl->buffer_len);
-            fl->wb_len +=
-                ft_strlcpy(*output_str + fl->wb_len, " ", fl->buffer_len - fl->wb_len);
+            fl->wb_len += ft_strlcpy(*output_str + fl->wb_len,
+                                     file->permission->str, fl->buffer_len);
+            fl->wb_len += ft_strlcpy(*output_str + fl->wb_len, " ",
+                                     fl->buffer_len - fl->wb_len);
             break;
         case LIST_ENUM_HARDLINK: {
-            char *hardlink = left_pad(arena, file->hardlink->count, fl->lens[LIST_ENUM_HARDLINK]);
+            char *hardlink = left_pad(arena, file->hardlink->count,
+                                      fl->lens[LIST_ENUM_HARDLINK]);
             if (!hardlink) {
                 return false;
             }
 
-            fl->wb_len +=
-                ft_strlcpy(*output_str + fl->wb_len, hardlink, fl->buffer_len - fl->wb_len);
-            fl->wb_len +=
-                ft_strlcpy(*output_str + fl->wb_len, " ", fl->buffer_len - fl->wb_len);
+            fl->wb_len += ft_strlcpy(*output_str + fl->wb_len, hardlink,
+                                     fl->buffer_len - fl->wb_len);
+            fl->wb_len += ft_strlcpy(*output_str + fl->wb_len, " ",
+                                     fl->buffer_len - fl->wb_len);
             break;
         }
         case LIST_ENUM_USER: {
@@ -166,10 +170,10 @@ bool linux_list_format(Arena *arena, t_file_list *fl, t_file *file, char **outpu
                 return false;
             }
 
-            fl->wb_len +=
-                ft_strlcpy(*output_str + fl->wb_len, user, fl->buffer_len - fl->wb_len);
-            fl->wb_len +=
-                ft_strlcpy(*output_str + fl->wb_len, " ", fl->buffer_len - fl->wb_len);
+            fl->wb_len += ft_strlcpy(*output_str + fl->wb_len, user,
+                                     fl->buffer_len - fl->wb_len);
+            fl->wb_len += ft_strlcpy(*output_str + fl->wb_len, " ",
+                                     fl->buffer_len - fl->wb_len);
             break;
         }
         case LIST_ENUM_GROUP: {
@@ -179,10 +183,10 @@ bool linux_list_format(Arena *arena, t_file_list *fl, t_file *file, char **outpu
                 return false;
             }
 
-            fl->wb_len +=
-                ft_strlcpy(*output_str + fl->wb_len, group, fl->buffer_len - fl->wb_len);
-            fl->wb_len +=
-                ft_strlcpy(*output_str + fl->wb_len, " ", fl->buffer_len - fl->wb_len);
+            fl->wb_len += ft_strlcpy(*output_str + fl->wb_len, group,
+                                     fl->buffer_len - fl->wb_len);
+            fl->wb_len += ft_strlcpy(*output_str + fl->wb_len, " ",
+                                     fl->buffer_len - fl->wb_len);
             break;
         }
         case LIST_ENUM_SIZE: {
@@ -192,33 +196,34 @@ bool linux_list_format(Arena *arena, t_file_list *fl, t_file *file, char **outpu
                 return false;
             }
 
-            fl->wb_len +=
-                ft_strlcpy(*output_str + fl->wb_len, size, fl->buffer_len - fl->wb_len);
-            fl->wb_len +=
-                ft_strlcpy(*output_str + fl->wb_len, " ", fl->buffer_len - fl->wb_len);
+            fl->wb_len += ft_strlcpy(*output_str + fl->wb_len, size,
+                                     fl->buffer_len - fl->wb_len);
+            fl->wb_len += ft_strlcpy(*output_str + fl->wb_len, " ",
+                                     fl->buffer_len - fl->wb_len);
             break;
         }
         case LIST_ENUM_DT:
-            fl->wb_len += ft_strlcpy(*output_str + fl->wb_len, file->dt->str,
-                                     fl->wb_len);
             fl->wb_len +=
-                ft_strlcpy(*output_str + fl->wb_len, " ", fl->buffer_len - fl->wb_len);
+                ft_strlcpy(*output_str + fl->wb_len, file->dt->str, fl->wb_len);
+            fl->wb_len += ft_strlcpy(*output_str + fl->wb_len, " ",
+                                     fl->buffer_len - fl->wb_len);
             break;
         case LIST_ENUM_NAME:
             if (file->name->str[0] == '\'' || file->name->str[0] == '"') {
-                fl->wb_len +=
-                    ft_strlcpy(*output_str + fl->wb_len, " ", fl->buffer_len - fl->wb_len);
+                fl->wb_len += ft_strlcpy(*output_str + fl->wb_len, " ",
+                                         fl->buffer_len - fl->wb_len);
             }
-            fl->wb_len += ft_strlcpy(*output_str + fl->wb_len,
-                                     file->name->str, fl->buffer_len - fl->wb_len);
+            fl->wb_len += ft_strlcpy(*output_str + fl->wb_len, file->name->str,
+                                     fl->buffer_len - fl->wb_len);
             break;
         case LIST_ENUM_LINK:
 
             if (file->linked_name) {
+                fl->wb_len += ft_strlcpy(*output_str + fl->wb_len, " -> ",
+                                         fl->buffer_len - fl->wb_len);
                 fl->wb_len +=
-                    ft_strlcpy(*output_str + fl->wb_len, " -> ", fl->buffer_len - fl->wb_len);
-                fl->wb_len += ft_strlcpy(*output_str + fl->wb_len,
-                                         file->linked_name->str, fl->buffer_len - fl->wb_len);
+                    ft_strlcpy(*output_str + fl->wb_len, file->linked_name->str,
+                               fl->buffer_len - fl->wb_len);
             }
             break;
         case LIST_ENUM_COUNT:
