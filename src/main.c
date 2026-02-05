@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
     printer(&args);
 
     clean_program(&args);
-    return 0;
+    return args.exit_code;
 }
 
 static void clean_program(t_args *args) {
