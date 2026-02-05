@@ -67,7 +67,10 @@ void *ArenaPushNoZero(Arena *arena, U64 size) {
             cap = size;
         }
 
+#ifndef NDEBUG
         ft_fprintf(STDERR_FILENO, "No room left\n");
+#endif  // NDEBUG
+
         ArenaBlock *block = new_block_(cap);
         if (!block) {
             return NULL;
@@ -149,7 +152,10 @@ void ArenaClear(Arena *arena) {
 }
 
 static ArenaBlock *new_block_(U64 cap) {
-    ft_fprintf(STDERR_FILENO, "Alloc new block with size: %d\n", cap);
+#ifndef NDEBUG
+        ft_fprintf(STDERR_FILENO, "Alloc new block with size: %d\n", cap);
+#endif  // NDEBUG
+
     ArenaBlock *block = malloc(sizeof(*block) + cap);
     if (!block) {
         return NULL;
