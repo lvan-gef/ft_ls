@@ -24,17 +24,54 @@ static gid_t cached_gid = (gid_t)-1;
 static char cached_user[USER_SIZE] = "";
 static char cached_group[USER_SIZE] = "";
 
-bool get_stat(struct stat *sb, const char *fullpath) {
-    if (lstat(fullpath, sb) == -1) {
-        ft_fprintf(STDERR_FILENO, "ft_ls: cannot access: '%s': %s\n", fullpath,
+
+static bool get_permission_(Arena *arena, struct stat *sb, t_file *file);
+static bool get_hardlink_(Arena *arena, struct stat *sb, t_file *file);
+static bool get_user_(Arena *arena, t_file *file, uid_t user_id);
+static bool get_group_(Arena *arena, t_file *file, gid_t group_id);
+static bool get_size_(Arena *arena, struct stat *sb, t_file *file);
+static bool get_dt_(Arena *arena, struct stat *sb, t_file *file);
+static bool get_linked_name_(Arena *arena, struct stat *sb, t_file *file, const char *fullname);
+
+bool get_file_info(Arena *arena, struct stat *sb, t_file *file,const char *fullname) {
+    if (lstat(fullname, sb) == -1) {
+        ft_fprintf(STDERR_FILENO, "ft_ls: cannot access: '%s': %s\n", fullname,
                    strerror(errno));
+        return false;
+    }
+
+    if (!get_permission_(arena, sb, file)) {
+        return false;
+    }
+
+    if (!get_hardlink_(arena, sb, file)) {
+        return false;
+    }
+
+    if (!get_user_(arena, file, sb->st_uid)) {
+        return false;
+    }
+
+    if (!get_group_(arena, file, sb->st_gid)) {
+        return false;
+    }
+
+    if (!get_size_(arena, sb, file)) {
+        return false;
+    }
+
+    if (!get_dt_(arena, sb, file)) {
+        return false;
+    }
+
+    if (!get_linked_name_(arena, sb, file, fullname)) {
         return false;
     }
 
     return true;
 }
 
-bool get_permission(Arena *arena, struct stat *sb, t_file *file) {
+static bool get_permission_(Arena *arena, struct stat *sb, t_file *file) {
     char permission[PERMISSION_SIZE] = {0};
 
     size_t len = 0;
@@ -79,7 +116,7 @@ bool get_permission(Arena *arena, struct stat *sb, t_file *file) {
     return true;
 }
 
-bool get_hardlink(Arena *arena, struct stat *sb, t_file *file) {
+static bool get_hardlink_(Arena *arena, struct stat *sb, t_file *file) {
     const size_t hardlink_len = get_len(sb->st_nlink) + 1;
 
     char *hardlink_str = ArenaPush(arena, hardlink_len * sizeof(char));
@@ -100,7 +137,7 @@ bool get_hardlink(Arena *arena, struct stat *sb, t_file *file) {
     return true;
 }
 
-bool get_user(Arena *arena, t_file *file, uid_t user_id) {
+static bool get_user_(Arena *arena, t_file *file, uid_t user_id) {
     char id[USER_SIZE] = {0};
 
     if (user_id != cached_uid) {
@@ -122,7 +159,7 @@ bool get_user(Arena *arena, t_file *file, uid_t user_id) {
     return true;
 }
 
-bool get_group(Arena *arena, t_file *file, gid_t group_id) {
+static bool get_group_(Arena *arena, t_file *file, gid_t group_id) {
     char id[USER_SIZE] = {0};
 
     if (group_id != cached_gid) {
@@ -144,7 +181,7 @@ bool get_group(Arena *arena, t_file *file, gid_t group_id) {
     return true;
 }
 
-bool get_size(Arena *arena, struct stat *sb, t_file *file) {
+static bool get_size_(Arena *arena, struct stat *sb, t_file *file) {
     const size_t size_len = get_len((size_t)sb->st_size) + 1;
 
     char *size_str = ArenaPush(arena, size_len * sizeof(char));
@@ -166,11 +203,13 @@ bool get_size(Arena *arena, struct stat *sb, t_file *file) {
     return true;
 }
 
-bool get_dt(Arena *arena, struct stat *sb, t_file *file) {
+static bool get_dt_(Arena *arena, struct stat *sb, t_file *file) {
 #if defined(__linux__)
     char *dt = ctime(&sb->st_mtim.tv_sec);
+    file->mtime = sb->st_mtim;
 #elif defined(__APPLE__)
     char *dt = ctime(&sb->st_mtimespec.tv_sec);
+    file->mtime = sb->st_mtimespec;
 #else
     ft_fprintf(STDERR_FILENO, "OS is not supported\n");
     return false;
@@ -189,16 +228,18 @@ bool get_dt(Arena *arena, struct stat *sb, t_file *file) {
     }
 
     size_t len = 0;
+
+    len += ft_strlcpy(buffer + len, splitter[1], DT_LEN - len);
+    len += ft_strlcpy(buffer + len, " ", DT_LEN - len);
+
     if (ft_strlen(splitter[2]) == 1) {
-        len = ft_strlcpy(buffer, " ", DT_LEN);
+        len += ft_strlcpy(buffer + len, " ", DT_LEN - len);
     }
-    len += ft_strlcpy(buffer + len, splitter[2], DT_LEN);
-    len += ft_strlcpy(buffer + len, " ", DT_LEN);
-    len += ft_strlcpy(buffer + len, splitter[1], DT_LEN);
-    len += ft_strlcpy(buffer + len, " ", DT_LEN);
-    len += ft_strlcpy(buffer + len, splitter[3], DT_LEN);
+
+    len += ft_strlcpy(buffer + len, splitter[2], DT_LEN - len);
+    len += ft_strlcpy(buffer + len, " ", DT_LEN - len);
+    len += ft_strlcpy(buffer + len, splitter[3], DT_LEN - len);
     buffer[len - 3] = '\0'; // remove seconds
-    ft_str_to_lower(buffer);
 
     size_t index = 0;
     while (splitter[index]) {
@@ -215,7 +256,7 @@ bool get_dt(Arena *arena, struct stat *sb, t_file *file) {
     return true;
 }
 
-bool get_linked_name(Arena *arena, struct stat *sb, t_file *file, const char *fullname) {
+static bool get_linked_name_(Arena *arena, struct stat *sb, t_file *file, const char *fullname) {
     if (!S_ISLNK(sb->st_mode)) {
         return true;
     }
