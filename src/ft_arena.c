@@ -7,9 +7,9 @@
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
 
-static ArenaBlock *new_block_(U64 cap);
+static ArenaBlock *new_block_(uint64_t cap);
 
-Arena *ArenaAlloc(U64 cap) {
+Arena *ArenaAlloc(uint64_t cap) {
     ASSERT_GT(cap, 0);
 
     ArenaBlock *block = new_block_(cap);
@@ -46,7 +46,7 @@ void ArenaRelease(Arena *arena) {
     free(arena);
 }
 
-void ArenaSetAutoAlign(Arena *arena, U64 align) {
+void ArenaSetAutoAlign(Arena *arena, uint64_t align) {
     ASSERT_NOTNULL(arena);
     ASSERT_GT(align, 0);
 
@@ -56,27 +56,27 @@ void ArenaSetAutoAlign(Arena *arena, U64 align) {
     }
 }
 
-U64 ArenaPos(Arena *arena) {
+uint64_t ArenaPos(Arena *arena) {
     ASSERT_NOTNULL(arena);
 
     return arena->current->pos;
 }
 
-void *ArenaPushNoZero(Arena *arena, U64 size) {
+void *ArenaPushNoZero(Arena *arena, uint64_t size) {
     ASSERT_NOTNULL(arena);
     ASSERT_GT(size, 0);
 
-    U64 align_pos = arena->current->pos;
+    uint64_t align_pos = arena->current->pos;
 
     if (arena->align) {
-        U64 remainder = align_pos % arena->align;
+        uint64_t remainder = align_pos % arena->align;
         if (remainder) {
             align_pos += arena->align - remainder;
         }
     }
 
     if (align_pos + size > arena->current->cap) {
-        U64 cap = arena->block_size;
+        uint64_t cap = arena->block_size;
         if (size > cap) {
             cap = size;
         }
@@ -104,7 +104,7 @@ void *ArenaPushNoZero(Arena *arena, U64 size) {
     return ptr;
 }
 
-void *ArenaPush(Arena *arena, U64 size) {
+void *ArenaPush(Arena *arena, uint64_t size) {
     ASSERT_NOTNULL(arena);
     ASSERT_GT(size, 0);
 
@@ -119,11 +119,11 @@ void *ArenaPush(Arena *arena, U64 size) {
     return ptr;
 }
 
-void *ArenaPushAligner(Arena *arena, U64 alignment) {
+void *ArenaPushAligner(Arena *arena, uint64_t alignment) {
     ASSERT_NOTNULL(arena);
     ASSERT_GT(alignment, 0);
 
-    U64 remainder = arena->current->pos % alignment;
+    uint64_t remainder = arena->current->pos % alignment;
 
     if (remainder) {
         arena->current->pos += alignment - remainder;
@@ -132,7 +132,7 @@ void *ArenaPushAligner(Arena *arena, U64 alignment) {
     return ArenaPush(arena, alignment);
 }
 
-void ArenaPopTo(Arena *arena, U64 pos) {
+void ArenaPopTo(Arena *arena, uint64_t pos) {
     ASSERT_NOTNULL(arena);
 
     if (pos < arena->current->pos) {
@@ -147,7 +147,7 @@ void ArenaPopTo(Arena *arena, U64 pos) {
     }
 }
 
-void ArenaPop(Arena *arena, U64 size) {
+void ArenaPop(Arena *arena, uint64_t size) {
     ASSERT_NOTNULL(arena);
     ASSERT_GT(size, 0);
 
@@ -182,7 +182,7 @@ void ArenaClear(Arena *arena) {
     arena->current = arena->first;
 }
 
-static ArenaBlock *new_block_(U64 cap) {
+static ArenaBlock *new_block_(uint64_t cap) {
 #ifndef NDEBUG
         ft_fprintf(STDERR_FILENO, "Alloc new block with size: %d\n", cap);
 #endif  // NDEBUG
