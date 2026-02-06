@@ -87,8 +87,6 @@ char **ft_split_ws(char const *s) {
     size_t len;
     char **words;
 
-    if (!s)
-        return (NULL);
     wc = word_counter(s) + 1;
     len = ft_strlen(s);
     words = ft_calloc(wc, sizeof(char *));
