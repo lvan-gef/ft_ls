@@ -3,25 +3,26 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include "./ft_arena.h"
 
-typedef enum e_array_type {
+typedef enum {
     ARRAY_PATHS,
     ARRAY_FILES,
 } t_array_type;
 
 typedef struct s_array {
     t_array_type type;
-    size_t len;
-    size_t cap;
+    uint64_t len;
+    uint64_t cap;
     void **data;
     Arena *arena;
 } t_array;
 
-t_array *init_array(Arena *arena, size_t size, t_array_type type);
+t_array *init_array(Arena *arena, uint64_t size, t_array_type type);
 bool append_array(t_array *array, void *content);
-bool insert_array(t_array *array, size_t index, void *content);
+bool insert_array(t_array *array, void *content, uint64_t index);
 void remove_elem_array(t_array *array, const void *content);
 
 #endif // !FT_ARRAY_H

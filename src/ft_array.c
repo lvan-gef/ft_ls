@@ -11,7 +11,11 @@
 
 static bool realloc_arr_(t_array *array);
 
-t_array *init_array(Arena *arena, size_t size, t_array_type type) {
+t_array *init_array(Arena *arena, uint64_t size, t_array_type type) {
+    ASSERT_NOTNULL(arena);
+    ASSERT_GT(size, 0);
+    ASSERT_TRUE((type == ARRAY_PATHS || type == ARRAY_FILES));
+
     t_array *array = ArenaPush(arena, sizeof(*array));
     if (!array) {
         return NULL;
@@ -27,11 +31,14 @@ t_array *init_array(Arena *arena, size_t size, t_array_type type) {
     array->type = type;
     array->arena = arena;
 
+    ASSERT_NOTNULL(array);
     return array;
 }
 
 bool append_array(t_array *array, void *content) {
-    errno = 0;
+    ASSERT_NOTNULL(array);
+    ASSERT_NOTNULL(content);
+
     if (array->len == array->cap) {
         if (!realloc_arr_(array)) {
             return false;
@@ -43,15 +50,18 @@ bool append_array(t_array *array, void *content) {
     return true;
 }
 
-bool insert_array(t_array *array, size_t index, void *content) {
-    errno = 0;
+bool insert_array(t_array *array, void *content, uint64_t index) {
+    ASSERT_NOTNULL(array);
+    ASSERT_GT(index, 0);
+    ASSERT_NOTNULL(content);
+
     if (array->len == array->cap) {
         if (!realloc_arr_(array)) {
             return false;
         }
     }
 
-    size_t i = array->len;
+    uint64_t i = array->len;
     while (i > index) {
         array->data[i] = array->data[i - 1];
         --i;
@@ -63,10 +73,13 @@ bool insert_array(t_array *array, size_t index, void *content) {
 }
 
 void remove_elem_array(t_array *array, const void *content) {
-    size_t index = 0;
+    ASSERT_NOTNULL(array);
+    ASSERT_NOTNULL(array);
+
+    uint64_t index = 0;
     while (index < array->len) {
         if (array->data[index] == content) {
-            size_t next_index = index + 1;
+            uint64_t next_index = index + 1;
             while (next_index < array->len) {
                 array->data[index] = array->data[next_index];
                 ++index;
@@ -82,8 +95,9 @@ void remove_elem_array(t_array *array, const void *content) {
 }
 
 static bool realloc_arr_(t_array *array) {
-    errno = 0;
-    size_t new_cap = array->cap * 2;
+    ASSERT_NOTNULL(array);
+
+    uint64_t new_cap = array->cap * 2;
     if (new_cap < array->cap) {
         errno = ERANGE;
         return false;
