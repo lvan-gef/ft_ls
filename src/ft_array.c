@@ -12,10 +12,6 @@
 static bool realloc_arr_(t_array *array);
 
 t_array *init_array(Arena *arena, size_t size, t_array_type type) {
-    ASSERT_(size, "size must be > 0");
-    ASSERT_(type == ARRAY_PATHS || type == ARRAY_FILES,
-            "type is not supported");
-
     t_array *array = ArenaPush(arena, sizeof(*array));
     if (!array) {
         return NULL;
@@ -35,9 +31,6 @@ t_array *init_array(Arena *arena, size_t size, t_array_type type) {
 }
 
 bool append_array(t_array *array, void *content) {
-    ASSERT_(array, "array can not be NULL");
-    ASSERT_(content, "content can not be NULL");
-
     errno = 0;
     if (array->len == array->cap) {
         if (!realloc_arr_(array)) {
@@ -51,10 +44,6 @@ bool append_array(t_array *array, void *content) {
 }
 
 bool insert_array(t_array *array, size_t index, void *content) {
-    ASSERT_(array, "array can not be NULL");
-    ASSERT_(content, "content can not be NULL");
-    ASSERT_(index <= array->len, "index out of bounds");
-
     errno = 0;
     if (array->len == array->cap) {
         if (!realloc_arr_(array)) {
@@ -74,9 +63,6 @@ bool insert_array(t_array *array, size_t index, void *content) {
 }
 
 void remove_elem_array(t_array *array, const void *content) {
-    ASSERT_(array, "array can not be NULL");
-    ASSERT_(content, "content can not be NULL");
-
     size_t index = 0;
     while (index < array->len) {
         if (array->data[index] == content) {
@@ -96,8 +82,6 @@ void remove_elem_array(t_array *array, const void *content) {
 }
 
 static bool realloc_arr_(t_array *array) {
-    ASSERT_(array, "array can not be NULL");
-
     errno = 0;
     size_t new_cap = array->cap * 2;
     if (new_cap < array->cap) {

@@ -28,7 +28,7 @@ D_LDFLAGS  := $(SANITIZERS)
 
 SRC_DIR := src
 
-SRC_FILES := ft_arena.c ft_array.c ft_assert.c ft_get_stats.c ft_helpers.c ft_ls.c ft_parser.c ft_print_list.c ft_printer.c ft_sort.c main.c
+SRC_FILES := ft_arena.c ft_array.c main.c
 
 UNAME_S := $(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
