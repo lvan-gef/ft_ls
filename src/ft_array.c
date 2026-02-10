@@ -11,10 +11,9 @@
 
 static bool realloc_arr_(t_array *array);
 
-t_array *init_array(Arena *arena, uint64_t size, t_array_type type) {
+t_array *init_array(Arena *arena, uint64_t size) {
     ASSERT_NOTNULL(arena);
     ASSERT_GT(size, 0);
-    ASSERT_TRUE((type == ARRAY_PATHS || type == ARRAY_FILES));
 
     t_array *array = ArenaPush(arena, sizeof(*array));
     if (!array) {
@@ -28,7 +27,6 @@ t_array *init_array(Arena *arena, uint64_t size, t_array_type type) {
 
     array->len = 0;
     array->cap = size;
-    array->type = type;
     array->arena = arena;
 
     ASSERT_NOTNULL(array);
@@ -74,7 +72,7 @@ bool insert_array(t_array *array, void *content, uint64_t index) {
 
 void remove_elem_array(t_array *array, const void *content) {
     ASSERT_NOTNULL(array);
-    ASSERT_NOTNULL(array);
+    ASSERT_NOTNULL(content);
 
     uint64_t index = 0;
     while (index < array->len) {
@@ -92,6 +90,19 @@ void remove_elem_array(t_array *array, const void *content) {
         }
         ++index;
     }
+}
+
+void *pop_array(t_array *array) {
+    ASSERT_NOTNULL(array);
+
+    if (!array->len) {
+        return NULL;
+    }
+
+    --array->len;
+    void *elem = array->data[array->len];
+    array->data[array->len] = NULL;
+    return elem;
 }
 
 static bool realloc_arr_(t_array *array) {

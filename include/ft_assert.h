@@ -33,48 +33,48 @@ void log_assert_(const char *file, int line, const char *func, const char *fmt,
 #else // !NDEBUG
 
 #define ASSERT_(condition, ...)                                                \
-  do {                                                                         \
-    if (!(condition)) {                                                        \
-      log_assert_(__FILE__, __LINE__, __func__, __VA_ARGS__);                  \
-      abort();                                                                 \
-    }                                                                          \
-  } while (0)
+    do {                                                                       \
+        if (!(condition)) {                                                    \
+            log_assert_(__FILE__, __LINE__, __func__, __VA_ARGS__);            \
+            abort();                                                           \
+        }                                                                      \
+    } while (0)
 
 #define ASSERT_NOTNULL(ptr)                                                    \
-  ASSERT_((ptr) != NULL, "Expected non-NULL pointer, but got NULL: " #ptr)
+    ASSERT_((ptr) != NULL, "Expected non-NULL pointer, but got NULL: " #ptr)
 
 #define ASSERT_NULL(ptr)                                                       \
-  ASSERT_((ptr) == NULL, "Expected NULL pointer, but got %p: " #ptr,           \
-          (void *)(ptr))
+    ASSERT_((ptr) == NULL, "Expected NULL pointer, but got %p: " #ptr,         \
+            (void *)(ptr))
 
 #define ASSERT_EQ(a, b)                                                        \
-  ASSERT_((a) == (b), "Expected " #a " == " #b ", but %lld != %lld",           \
-          (long long)(a), (long long)(b))
+    ASSERT_((a) == (b), "Expected " #a " == " #b ", but %lld != %lld",         \
+            (long long)(a), (long long)(b))
 
 #define ASSERT_NE(a, b)                                                        \
-  ASSERT_((a) != (b), "Expected " #a " != " #b ", but both are %lld",          \
-          (long long)(a))
+    ASSERT_((a) != (b), "Expected " #a " != " #b ", but both are %lld",        \
+            (long long)(a))
 
 #define ASSERT_LT(a, b)                                                        \
-  ASSERT_((a) < (b), "Expected " #a " < " #b ", but %lld >= %lld",             \
-          (long long)(a), (long long)(b))
+    ASSERT_((a) < (b), "Expected " #a " < " #b ", but %lld >= %lld",           \
+            (long long)(a), (long long)(b))
 
 #define ASSERT_LE(a, b)                                                        \
-  ASSERT_((a) <= (b), "Expected " #a " <= " #b ", but %lld > %lld",            \
-          (long long)(a), (long long)(b))
+    ASSERT_((a) <= (b), "Expected " #a " <= " #b ", but %lld > %lld",          \
+            (long long)(a), (long long)(b))
 
 #define ASSERT_GT(a, b)                                                        \
-  ASSERT_((a) > (b), "Expected " #a " > " #b ", but %lld <= %lld",             \
-          (long long)(a), (long long)(b))
+    ASSERT_((a) > (b), "Expected " #a " > " #b ", but %lld <= %lld",           \
+            (long long)(a), (long long)(b))
 
 #define ASSERT_GE(a, b)                                                        \
-  ASSERT_((a) >= (b), "Expected " #a " >= " #b ", but %lld < %lld",            \
-          (long long)(a), (long long)(b))
+    ASSERT_((a) >= (b), "Expected " #a " >= " #b ", but %lld < %lld",          \
+            (long long)(a), (long long)(b))
 
 #define ASSERT_TRUE(condition) ASSERT_(condition, "Expected true: " #condition)
 
 #define ASSERT_FALSE(condition)                                                \
-  ASSERT_(!(condition), "Expected false: " #condition)
+    ASSERT_(!(condition), "Expected false: " #condition)
 
 #endif // !NDEBUG
 
@@ -88,24 +88,24 @@ void log_assert_(const char *file, int line, const char *func, const char *fmt,
 
 void log_assert_(const char *file, int line, const char *func, const char *fmt,
                  ...) {
-  time_t now = time(NULL);
-  const struct tm *t = localtime(&now);
+    time_t now = time(NULL);
+    const struct tm *t = localtime(&now);
 
-  if (t == NULL) {
-    fprintf(stderr, "[ASSERT FAIL] 25:61:61 | %s:%d | %s() | ", file, line,
-            func);
-  } else {
-    fprintf(stderr, "[ASSERT FAIL] %02d:%02d:%02d | %s:%d | %s() | ",
-            t->tm_hour, t->tm_min, t->tm_sec, file, line, func);
-  }
+    if (t == NULL) {
+        fprintf(stderr, "[ASSERT FAIL] 25:61:61 | %s:%d | %s() | ", file, line,
+                func);
+    } else {
+        fprintf(stderr, "[ASSERT FAIL] %02d:%02d:%02d | %s:%d | %s() | ",
+                t->tm_hour, t->tm_min, t->tm_sec, file, line, func);
+    }
 
-  va_list args;
-  va_start(args, fmt);
-  vfprintf(stderr, fmt, args);
-  va_end(args);
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(stderr, fmt, args);
+    va_end(args);
 
-  fprintf(stderr, "\n");
-  fflush(stderr);
+    fprintf(stderr, "\n");
+    fflush(stderr);
 }
 
 #endif // !NDEBUG

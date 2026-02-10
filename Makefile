@@ -4,6 +4,7 @@ MAKEFLAGS += -j
 
 TERM_SIZE ?= 80
 
+CC        := cc
 CFLAGS    := -std=c11 -D_DEFAULT_SOURCE \
 			 -Wall -Wextra -Werror -Wshadow -Wpedantic \
 			 -Wconversion -Wsign-conversion -Wdouble-promotion \
@@ -11,33 +12,27 @@ CFLAGS    := -std=c11 -D_DEFAULT_SOURCE \
 			 -Wnull-dereference -Wcast-align -Wswitch-enum -Wundef \
 			 -Wstrict-prototypes -Wmissing-prototypes \
 			 -Wredundant-decls -Wwrite-strings \
-			 -Wimplicit-fallthrough \
+			 -Wimplicit-fallthrough -Wlogical-op \
+			 -Wduplicated-cond -Wduplicated-branches -Wcast-qual \
+			 -Wvla -Walloca -Wold-style-definition -Wtrampolines \
+			 -Wstack-usage=8192 \
 			 -DTERM_SIZE=$(TERM_SIZE)
 
 DEPSFLAGS := -MMD -MP
 
 # Release flags (with hardening)
-R_CFLAGS  := -DNDEBUG -D_FORTIFY_SOURCE=2 -O3 -march=native -fomit-frame-pointer -fPIE
-R_LDFLAGS := -Wl
+R_CFLAGS  := -DNDEBUG -O3 -march=native -fomit-frame-pointer -fPIE -fstack-clash-protection
+R_LDFLAGS := -pie -Wl,-z,relro,-z,now
 
 # Debug flags
-SANITIZERS := -fsanitize=address,undefined,null,integer-divide-by-zero,signed-integer-overflow
+SANITIZERS := -fsanitize=address,undefined,null,leak,integer-divide-by-zero,signed-integer-overflow
 # SANITIZERS :=
 D_CFLAGS   := -g3 -fno-omit-frame-pointer -fstack-protector-strong $(SANITIZERS)
 D_LDFLAGS  := $(SANITIZERS)
 
 SRC_DIR := src
 
-SRC_FILES := ft_arena.c ft_array.c main.c
-
-UNAME_S := $(shell uname -s)
-ifeq ($(UNAME_S),Darwin)
-SRC_FILES += ft_print_mac.c
-else ifeq ($(UNAME_S), Linux)
-SRC_FILES += ft_print_linux.c
-else
-$(error os is not supported)
-endif
+SRC_FILES := ft_arena.c ft_array.c ft_parse.c ft_str.c ft_walk.c main.c
 
 SRCS := $(addprefix $(SRC_DIR)/, $(SRC_FILES))
 

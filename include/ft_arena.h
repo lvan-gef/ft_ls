@@ -18,6 +18,10 @@ typedef struct {
     ArenaBlock *current;
 } Arena;
 
+#ifndef ARENA_SIZE
+#define ARENA_SIZE UINT64_C(4096)
+#endif // !ARENA_SIZE
+
 /**
  * @brief Creates a new arena with the specified capacity.
  * @param cap (uint64_t) Capacity in bytes.
@@ -84,8 +88,8 @@ void ArenaPopTo(Arena *arena, uint64_t pos);
 /**
  * @brief Pops a number of bytes from the end of the arena.
  * @param arena (Arena*) Pointer to the arena.
- * @param size (uint64_t) Number of bytes to pop. Resets to 0 if size exceeds current
- * position.
+ * @param size (uint64_t) Number of bytes to pop. Resets to 0 if size exceeds
+ * current position.
  * @note Only works within the current block. Use ArenaClear to reset across all
  * blocks.
  */

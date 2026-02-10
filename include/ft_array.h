@@ -7,22 +7,23 @@
 
 #include "./ft_arena.h"
 
-typedef enum {
-    ARRAY_PATHS,
-    ARRAY_FILES,
-} t_array_type;
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE UINT64_C(10)
+#endif // !ARRAY_SIZE
 
 typedef struct s_array {
-    t_array_type type;
+    // t_array_type type;
     uint64_t len;
     uint64_t cap;
     void **data;
     Arena *arena;
 } t_array;
 
-t_array *init_array(Arena *arena, uint64_t size, t_array_type type);
+// t_array *init_array(Arena *arena, uint64_t size, t_array_type type);
+t_array *init_array(Arena *arena, uint64_t size);
 bool append_array(t_array *array, void *content);
 bool insert_array(t_array *array, void *content, uint64_t index);
 void remove_elem_array(t_array *array, const void *content);
+void *pop_array(t_array *array);
 
 #endif // !FT_ARRAY_H
