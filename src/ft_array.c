@@ -105,6 +105,11 @@ void *pop_array(t_array *array) {
     return elem;
 }
 
+void clear_array(t_array *array) {
+    ASSERT_NOTNULL(array);
+    array->len = 0;
+}
+
 static bool realloc_arr_(t_array *array) {
     ASSERT_NOTNULL(array);
 
