@@ -7,9 +7,10 @@
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
 #include "../include/ft_path.h"
+#include "../include/ft_printer.h"
+#include "../include/ft_sort.h"
 #include "../include/ft_str.h"
 #include "../include/ft_walk.h"
-#include "../include/ft_sort.h"
 
 #include "../libft/include/ft_fprintf.h"
 
@@ -62,15 +63,11 @@ void process(t_args *args, t_array *array, int *exit_code) {
         goto failed;
     }
 
-    // sort & print file arguments
-    sort(array, args->recursive, args->time);
-    size_t index = 0;
-    ft_fprintf(STDOUT_FILENO, "voor loop: %d\n", files->len);
-    while (index < files->len) {
-        t_entry *entry = files->data[index];
-        ft_fprintf(STDOUT_FILENO, "%s\n", entry->name->str);
-        ++index;
+    if (files->len) {
+        printer(args, files);
     }
+    clear_array(files);
+    ArenaClear(files_arena);
 
     // Phase 3: process directories (works for both -R and non-R)
     // bool multiple = (files->len > 0) || (dirs->len > 0);
@@ -87,6 +84,7 @@ void process(t_args *args, t_array *array, int *exit_code) {
         }
 
         // print entrys
+        clear_array(files);
         ArenaClear(files_arena);
     }
 
@@ -95,7 +93,7 @@ void process(t_args *args, t_array *array, int *exit_code) {
     return;
 failed:
     if (err_msg) {
-        ft_fprintf(STDERR_FILENO, "%s\n", err_msg);
+        ft_fprintf(STDERR_FILENO, "Error: %s\n", err_msg);
     }
 
     if (dirs_arena) {
@@ -130,7 +128,7 @@ static bool process_args_(Arena *files_arena, t_array *array, t_array *dirs,
 
     return true;
 failed:
-    ft_fprintf(STDERR_FILENO, "%s\n", err_msg);
+    ft_fprintf(STDERR_FILENO, "Error: %s\n", err_msg);
     return false;
 }
 
@@ -156,9 +154,14 @@ static bool read_dir_(t_args *args, Arena *files_arena, Arena *dirs_arena,
         goto failed;
     }
 
+    t_array *files = init_array(files_arena, ARRAY_SIZE);
+    if (!files) {
+        goto failed;
+    }
+
     struct dirent *dp;
     while ((dp = readdir(d)) != NULL) {
-        if (!args->all && dp->d_name[0] == '.') {
+        if (!args->all && dp->d_name[0] == '.' && dp->d_name[1] != '/') {
             continue;
         }
 
@@ -172,41 +175,40 @@ static bool read_dir_(t_args *args, Arena *files_arena, Arena *dirs_arena,
             goto failed;
         }
 
-        t_str *fullname = join_paths(files_arena, path, entry->name);
-        if (!fullname) {
+        entry->path = join_paths(files_arena, path, entry->name);
+        if (!entry->path) {
             goto failed;
         }
 
-        entry->path = fullname;
-        if (args->list || args->time) {
-            if (lstat(fullname->str, &entry->st) == -1) {
-                *exit_code = 2;
-                continue;
+        if (lstat(entry->path->str, &entry->st) == -1) {
+            *exit_code = 2;
+            continue;
+        }
+
+        if (S_ISDIR(entry->st.st_mode)) {
+            if (!append_array(entries, entry)) {
+                goto failed;
             }
-        }
-
-        if (!append_array(entries, entry)) {
-            goto failed;
+        } else {
+            if (!append_array(files, entry)) {
+                goto failed;
+            }
         }
     }
     closedir(d);
     d = NULL;
 
-    sort(entries, args->recursive, args->time);
-    // TODO: Print entries
+    if (files->len) {
+        printer(args, files);
+    }
 
     if (args->recursive) {
-        uint64_t index = entries->len;
+        sort(entries, args->recursive, args->time);
+        size_t index = entries->len;
         while (index > 0) {
             --index;
-            t_entry *entry = entries->data[index];
+            t_entry *entry = pop_array(entries);
 
-            bool is_dir = S_ISDIR(entry->st.st_mode);
-            if (!is_dir) {
-                continue;
-            }
-
-            // Skip "." and ".."
             if (entry->name->str[0] == '.' &&
                 (entry->name->str[1] == '\0' ||
                  (entry->name->str[1] == '.' && entry->name->str[2] == '\0'))) {
@@ -273,30 +275,30 @@ failed:
     return err_msg;
 }
 
-static t_str *join_paths(Arena *files_arena, t_str *lhs, t_str *rhs) {
-    const uint64_t arena_pos = ArenaPos(files_arena);
-    t_str *slash = create_str(files_arena, "/");
-    if (!slash) {
+static t_str *join_paths(Arena *arena, t_str *lhs, t_str *rhs) {
+    const size_t new_len = lhs->len + 1 + rhs->len + 1;
+    t_str *fullname = init_str(arena, new_len);
+    if (!fullname) {
         return NULL;
     }
 
-    const size_t new_len = lhs->len + 1 + rhs->len + 1;
-    t_str *fullname = init_str(files_arena, new_len);
-    if (!fullname) {
+    const uint64_t arena_pos = ArenaPos(arena);
+    t_str *slash = create_str(arena, "/");
+    if (!slash) {
         goto failed;
     }
 
     uint64_t len = cat_str(fullname, lhs);
-    if (fullname->str[fullname->len] != '\0') {
+    if (fullname->str[fullname->len - 1] != '/') {
         len += cat_str(fullname, slash);
     }
     len += cat_str(fullname, rhs);
     ASSERT_EQ(fullname->len, len);
 
-    ArenaPopTo(files_arena, arena_pos);
+    ArenaPopTo(arena, arena_pos);
     return fullname;
 
 failed:
-    ArenaPopTo(files_arena, arena_pos);
+    ArenaPopTo(arena, arena_pos);
     return NULL;
 }
