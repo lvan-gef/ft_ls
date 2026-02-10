@@ -83,9 +83,9 @@ t_str *dup_str(Arena *arena, const t_str *str) {
         return NULL;
     }
 
-    ft_memcpy(new_str->str, str->str, str->len);
-    new_str->str[new_str->len] = '\0';
-    new_str->len = str->len;
+    uint64_t len = strlcpy_(new_str, str, str->len + 1);
+    ASSERT_EQ(len, str->len);
+    new_str->len = len;
 
     ASSERT_NOTNULL(new_str);
     ASSERT_EQ(new_str->cap, str->cap);
@@ -106,7 +106,7 @@ uint64_t cat_str(t_str *dst, const t_str *src) {
         return 0;
     }
 
-    uint64_t cur_pos = dst->len;
+    uint64_t cur_pos = dst->pos;
     dst->pos = dst->len;
     size_t len = strlcpy_(dst, src, dst->cap - dst->len + 1);
     dst->len += len;
