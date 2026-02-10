@@ -455,11 +455,11 @@ def compare_output(flags: str, path: str, cols: int = 80) -> None:
         seqm = difflib.SequenceMatcher(None, ft_output, ls_output)
         for opcode, a0, a1, b0, b1 in seqm.get_opcodes():
             if opcode == 'replace':
-                print(f"Replace:\n{ft_output[a0:a1]}\nWith:\n{ls_output[b0:b1]}", file=sys.stderr)
+                print(f"Replace:\n'{ft_output[a0:a1]}'\nWith:\n'{ls_output[b0:b1]}'", file=sys.stderr)
             elif opcode == 'insert':
-                print(f"Insert:\n{ls_output[b0:b1]}", file=sys.stderr)
+                print(f"Insert:\n'{ls_output[b0:b1]}'", file=sys.stderr)
             elif opcode == 'delete':
-                print(f"Delete:\n{ft_output[a0:a1]}", file=sys.stderr)
+                print(f"Delete:\n'{ft_output[a0:a1]}'", file=sys.stderr)
 
         raise AssertionError(f'Output mismatch for: {" ".join(ft_cmd)}')
 
