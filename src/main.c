@@ -16,6 +16,7 @@ int main(int argc, char *argv[]) {
     if (!arena) {
         return EXIT_FAILURE;
     }
+    ArenaSetAutoAlign(arena, 8);
 
     t_array *inputs = parse_args(arena, argc, argv, &args);
     if (!inputs) {
