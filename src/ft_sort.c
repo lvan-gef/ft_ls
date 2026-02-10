@@ -10,7 +10,7 @@
 
 static void sort_time_(t_array *array);
 static void sort_name_(t_array *array);
-static int compare_(const char *a, const char *b);
+static int compare_(const t_str *a, const t_str *b);
 static int compare_time_(const struct timespec *a, const struct timespec *b);
 static void reverse_(t_array *array);
 
@@ -43,13 +43,13 @@ static void sort_time_(t_array *array) {
             t_entry *entry_b = array->data[index + 1];
 
 #if defined (__linux__)
-            int cmp = compare_time_(&path_a->st->mtime, &path_b->st->mtime);
+            int cmp = compare_time_(&entry_a->st.st_mtim, &entry_b->st.st_mtim);
 #else
             int cmp = compare_time_(&entry_a->st.st_mtimespec, &entry_b->st.st_mtimespec);
 #endif
             bool should_swap = false;
             if (cmp == 0) {
-                should_swap = compare_(entry_a->name->str, entry_b->name->str) > 0;
+                should_swap = compare_(entry_a->name, entry_b->name) > 0;
             } else {
                 should_swap = cmp < 0;
             }
@@ -80,7 +80,7 @@ static void sort_name_(t_array *array) {
         while (sub_index < array->len) {
             t_entry *entry_a = (t_entry *)array->data[index];
             t_entry *entry_b = (t_entry *)array->data[sub_index];
-            int result = compare_(entry_a->name->str, entry_b->name->str);
+            int result = compare_(entry_a->name, entry_b->name);
             if (result > 0) {
                 array->data[sub_index] = entry_a;
                 array->data[index] = entry_b;
@@ -91,10 +91,16 @@ static void sort_name_(t_array *array) {
     }
 }
 
-static int compare_(const char *a, const char *b) {
-    ASSERT_NOTNULL(a);
-    ASSERT_NOTNULL(b);
+static int compare_(const t_str *lhs, const t_str *rhs) {
+    ASSERT_NOTNULL(lhs);
+    ASSERT_NOTNULL(rhs);
 
+    if (lhs->len > rhs->len) {
+        return 1;
+    }
+
+    const char *a = lhs->str;
+    const char *b = rhs->str;
     if (*a == '\'' || *a == '"') {
         ++a;
     }
