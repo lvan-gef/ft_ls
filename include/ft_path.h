@@ -8,6 +8,7 @@
 typedef struct {
     t_str *name;
     t_str *path;
+    t_str *quoted;
     struct stat st;
 } t_entry;
 

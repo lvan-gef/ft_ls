@@ -180,6 +180,11 @@ static bool read_dir_(t_args *args, Arena *files_arena, Arena *dirs_arena,
             goto failed;
         }
 
+        entry->quoted = create_str(files_arena, "");
+        if (!entry->quoted) {
+            goto failed;
+        }
+
         if (lstat(entry->path->str, &entry->st) == -1) {
             *exit_code = 2;
             continue;
@@ -260,6 +265,11 @@ static const char *check_input_(Arena *files_arena, t_array *dirs,
             goto failed;
         }
 
+        entry->quoted = create_str(files_arena, "");
+        if (!entry->quoted) {
+            err_msg = "Failed to create a quoted str";
+            goto failed;
+        }
         entry->name = str;
         entry->path = str;
         entry->st = st;
