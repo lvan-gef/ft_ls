@@ -13,14 +13,22 @@
 #include "../include/ft_walk.h"
 
 #include "../libft/include/ft_fprintf.h"
+#include "ft_printf.h"
 
 static bool read_dir_(t_args *args, Arena *files_arena, Arena *dirs_arena,
-                      t_str *path, t_array *dirs, int *exit_code);
+                      t_str *path, t_array *dirs, t_array *files, int *exit_code);
 static bool process_args_(Arena *files_arena, t_array *array, t_array *dirs,
                           t_array *files, int *exit_code);
 static const char *check_input_(Arena *files_arena, t_array *dirs,
                                 t_array *files, t_str *str, int *exit_code);
-static t_str *join_paths(Arena *files_arena, t_str *lhs, t_str *rhs);
+static t_str *join_paths_(Arena *files_arena, t_str *lhs, t_str *rhs);
+static t_str *need_quote_(Arena *arena, t_str *str);
+
+typedef enum {
+    SINGLE_QUOTE = '\'',
+    DOUBLE_QUOTE = '\"',
+    SPACE = ' '
+} t_quote;
 
 void process(t_args *args, t_array *array, int *exit_code) {
     ASSERT_NOTNULL(args);
@@ -65,26 +73,22 @@ void process(t_args *args, t_array *array, int *exit_code) {
 
     if (files->len) {
         printer(args, files);
+        clear_array(files);
     }
-    clear_array(files);
     ArenaClear(files_arena);
 
-    // Phase 3: process directories (works for both -R and non-R)
-    // bool multiple = (files->len > 0) || (dirs->len > 0);
     while (dirs->len > 0) {
         t_str *dir_path = pop_array(dirs);
 
-        // if (multiple) {
-        //     ft_fprintf(STDOUT_FILENO, "\n%s:\n", dir_path->str);
-        // }
-
-        if (!read_dir_(args, files_arena, dirs_arena, dir_path, dirs,
+        if (!read_dir_(args, files_arena, dirs_arena, dir_path, dirs, files,
                        exit_code)) {
             *exit_code = 2;
         }
 
-        // print entrys
-        clear_array(files);
+        if (files->len) {
+            ft_fprintf(STDERR_FILENO, "in de loop\n");
+            clear_array(files);
+        }
         ArenaClear(files_arena);
     }
 
@@ -133,7 +137,7 @@ failed:
 }
 
 static bool read_dir_(t_args *args, Arena *files_arena, Arena *dirs_arena,
-                      t_str *path, t_array *dirs, int *exit_code) {
+                      t_str *path, t_array *dirs, t_array *files, int *exit_code) {
     ASSERT_NOTNULL(args);
     ASSERT_NOTNULL(files_arena);
     ASSERT_NOTNULL(dirs_arena);
@@ -154,11 +158,6 @@ static bool read_dir_(t_args *args, Arena *files_arena, Arena *dirs_arena,
         goto failed;
     }
 
-    t_array *files = init_array(files_arena, ARRAY_SIZE);
-    if (!files) {
-        goto failed;
-    }
-
     struct dirent *dp;
     while ((dp = readdir(d)) != NULL) {
         if (!args->all && dp->d_name[0] == '.' && dp->d_name[1] != '/') {
@@ -175,12 +174,12 @@ static bool read_dir_(t_args *args, Arena *files_arena, Arena *dirs_arena,
             goto failed;
         }
 
-        entry->path = join_paths(files_arena, path, entry->name);
+        entry->path = join_paths_(files_arena, path, entry->name);
         if (!entry->path) {
             goto failed;
         }
 
-        entry->quoted = create_str(files_arena, "");
+        entry->quoted = need_quote_(files_arena, entry->name);
         if (!entry->quoted) {
             goto failed;
         }
@@ -190,7 +189,7 @@ static bool read_dir_(t_args *args, Arena *files_arena, Arena *dirs_arena,
             continue;
         }
 
-        if (S_ISDIR(entry->st.st_mode)) {
+        if (S_ISDIR(entry->st.st_mode) && args->recursive) {
             if (!append_array(entries, entry)) {
                 goto failed;
             }
@@ -205,6 +204,7 @@ static bool read_dir_(t_args *args, Arena *files_arena, Arena *dirs_arena,
 
     if (files->len) {
         printer(args, files);
+        clear_array(files);
     }
 
     if (args->recursive) {
@@ -265,7 +265,7 @@ static const char *check_input_(Arena *files_arena, t_array *dirs,
             goto failed;
         }
 
-        entry->quoted = create_str(files_arena, "");
+        entry->quoted = need_quote_(files_arena, str);
         if (!entry->quoted) {
             err_msg = "Failed to create a quoted str";
             goto failed;
@@ -285,7 +285,7 @@ failed:
     return err_msg;
 }
 
-static t_str *join_paths(Arena *arena, t_str *lhs, t_str *rhs) {
+static t_str *join_paths_(Arena *arena, t_str *lhs, t_str *rhs) {
     const size_t new_len = lhs->len + 1 + rhs->len + 1;
     t_str *fullname = init_str(arena, new_len);
     if (!fullname) {
@@ -311,4 +311,28 @@ static t_str *join_paths(Arena *arena, t_str *lhs, t_str *rhs) {
 failed:
     ArenaPopTo(arena, arena_pos);
     return NULL;
+}
+
+static t_str *need_quote_(Arena *arena, t_str *str) {
+    uint64_t index = 0;
+    while (index < str->len) {
+        switch (str->str[index]) {
+            case SINGLE_QUOTE:
+                return create_str(arena, "\"");
+            case DOUBLE_QUOTE:
+            case SPACE:
+                return create_str(arena, "'");
+            default:
+                break;
+
+        }
+        ++index;
+    }
+
+    t_str *quote = create_str(arena, " ");
+    if (quote) {
+        quote->len = 0;
+    }
+
+    return quote;
 }

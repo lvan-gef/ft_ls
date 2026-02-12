@@ -23,21 +23,26 @@ static uint64_t calc_layout_width_(t_array *array, uint64_t num_cols,
 static uint64_t max_(t_array *array);
 static bool check_quoted_(t_array *array);
 
-void printer(t_args *args, t_array *files) {
+void printer(t_args *args, t_array *array) {
     ASSERT_NOTNULL(args);
-    ASSERT_NOTNULL(files);
-    ASSERT_GT(files->len, 0);
-    ASSERT_NOTNULL(files->data[0]);
+    ASSERT_NOTNULL(array);
+    ASSERT_GT(array->len, 0);
+    ASSERT_NOTNULL(array->data[0]);
 
-    sort(files, args->reverse, args->time);
+    sort(array, args->reverse, args->time);
     if (args->list) {
 
     } else {
-        print_row_(files);
+        print_row_(array);
     }
+
 }
 
 static void print_row_(t_array *array) {
+    ASSERT_NOTNULL(array);
+    ASSERT_GE(array->len, 1);
+    ASSERT_NOTNULL(array->data[0]);
+
     size_t max_cols = max_(array);
     t_map map = {.cols = 1, .rows = max_cols, .max = max_cols};
     bool have_a_quoted = check_quoted_(array);
@@ -53,8 +58,8 @@ static void print_row_(t_array *array) {
         return;
     }
 
-    size_t *col_starts = ArenaPush(arena, (map.cols + 1) * sizeof(*col_starts));
-    if (!col_starts) {
+    size_t *col_starts = ArenaPush(arena, (map.cols + 1) *
+    sizeof(*col_starts)); if (!col_starts) {
         ft_fprintf(STDERR_FILENO, "Failed to alloc memory in arena\n");
         ArenaRelease(arena);
         return;
@@ -88,7 +93,6 @@ static void print_row_(t_array *array) {
             bool is_last_col = (col == map.cols - 1) ||
                                (row + (col + 1) * map.rows >= files_len);
 
-            // alleen als er iemand quoted heeft
             if (!have_a_quoted && !entry->quoted->len) {
                 buf[buf_len] = ' ';
                 ++buf_len;
@@ -100,7 +104,8 @@ static void print_row_(t_array *array) {
             }
 
             buf_len +=
-                ft_strlcpy(buf + buf_len, entry->name->str, buf_size - buf_len);
+                ft_strlcpy(buf + buf_len, entry->name->str, buf_size -
+                buf_len);
             cur_pos += entry->name->len;
 
             if (have_a_quoted && entry->quoted->len) {
@@ -162,6 +167,12 @@ static void print_row_(t_array *array) {
 }
 
 static uint64_t *calc_cols_(Arena *arena, t_array *array, t_map *map) {
+    ASSERT_NOTNULL(arena);
+    ASSERT_NOTNULL(array);
+    ASSERT_GE(array->len, 1);
+    ASSERT_NOTNULL(array->data[0]);
+    ASSERT_NOTNULL(map);
+
     const uint64_t max_len = map->max;
     if (map->max > TERM_SIZE / 2) {
         map->max = TERM_SIZE / 2;
@@ -205,7 +216,8 @@ static uint64_t calc_layout_width_(t_array *array, uint64_t num_cols,
         uint64_t row = 0;
         while (row < num_rows) {
             index = row + col * num_rows;
-            if (index >= max_len) {
+            // if (index >= max_len) {
+            if (index >= array->len) {
                 break;
             }
 
@@ -214,7 +226,7 @@ static uint64_t calc_layout_width_(t_array *array, uint64_t num_cols,
             ASSERT_GT(entry->name->len, 0);
 
             size_t len = entry->name->len;
-            if (entry->quoted) {
+            if (entry->quoted->len) {
                 ASSERT_(len + 1 > len, "len did overflow");
                 len += 1;
             }
@@ -228,12 +240,15 @@ static uint64_t calc_layout_width_(t_array *array, uint64_t num_cols,
     }
 
     size_t total = 0;
-    for (size_t c = 0; c < num_cols; ++c) {
-        total += col_widths[c];
-        if (c < num_cols - 1) {
+    index = 0;
+    while (index < num_cols) {
+        total += col_widths[index];
+        if (index < num_cols - 1) {
             ASSERT_(total + 2 > total, "total did overflow");
             total += 2;
         }
+
+        ++index;
     }
 
     return total;
@@ -260,7 +275,7 @@ static bool check_quoted_(t_array *array) {
 
     while (index < array->len) {
         t_entry *entry = array->data[index];
-        if (entry->quoted) {
+        if (entry->quoted->len) {
             return true;
         }
 
