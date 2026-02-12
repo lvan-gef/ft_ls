@@ -11,7 +11,7 @@
 
 static void print_error_(const char *flag);
 
-t_array *parse_args(Arena *arena, int argc, char **argv, t_args *args) {
+t_array *parse_args(Arena *arena, uint64_t argc, char **argv, t_args *args) {
     ASSERT_GE(argc, 1);
     ASSERT_NOTNULL(argv);
     ASSERT_NOTNULL(*argv);
@@ -23,42 +23,15 @@ t_array *parse_args(Arena *arena, int argc, char **argv, t_args *args) {
         return NULL;
     }
 
-    uint64_t index = 1;
     bool is_flag = true;
-    while (index < (uint64_t)argc) {
+    for (uint64_t index = 1; index < argc; ++index) {
         const size_t len = ft_strlen(argv[index]);
         if (!ft_strncmp("--", argv[index], len)) {
             is_flag = false;
-            ++index;
             continue;
         }
 
-        if (is_flag && *argv[index] == '-') {
-            size_t sub_index = 1;
-            while (sub_index < len) {
-                switch (argv[index][sub_index]) {
-                    case 'R':
-                        args->recursive = true;
-                        break;
-                    case 'a':
-                        args->all = true;
-                        break;
-                    case 'l':
-                        args->list = true;
-                        break;
-                    case 'r':
-                        args->reverse = true;
-                        break;
-                    case 't':
-                        args->time = true;
-                        break;
-                    default:
-                        print_error_(argv[index]);
-                        return NULL;
-                }
-                ++sub_index;
-            }
-        } else {
+        if (!is_flag && *argv[index] != '-') {
             t_str *str = create_str(arena, argv[index]);
             if (!str) {
                 return NULL;
@@ -67,9 +40,19 @@ t_array *parse_args(Arena *arena, int argc, char **argv, t_args *args) {
             if (!append_array(inputs, (void *)str)) {
                 return NULL;
             }
+            continue;
         }
 
-        ++index;
+        for (uint64_t sub_index = 1; sub_index < len; ++sub_index) {
+            switch (argv[index][sub_index]) {
+                case 'R': args->recursive = true; break;
+                case 'a': args->all = true; break;
+                case 'l': args->list = true; break;
+                case 'r': args->reverse = true; break;
+                case 't': args->time = true; break;
+                default: print_error_(argv[index]); return NULL;
+            }
+        }
     }
 
     if (!inputs->len) {

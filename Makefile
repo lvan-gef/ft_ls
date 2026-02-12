@@ -12,10 +12,10 @@ CFLAGS    := -std=c11 -D_DEFAULT_SOURCE \
 			 -Wnull-dereference -Wcast-align -Wswitch-enum -Wundef \
 			 -Wstrict-prototypes -Wmissing-prototypes \
 			 -Wredundant-decls -Wwrite-strings \
-			 -Wimplicit-fallthrough -Wlogical-op \
-			 -Wduplicated-cond -Wduplicated-branches -Wcast-qual \
-			 -Wvla -Walloca -Wold-style-definition -Wtrampolines \
-			 -Wstack-usage=8192 \
+			 -Wimplicit-fallthrough \
+			 -Wcast-qual \
+			 -Wvla -Walloca -Wold-style-definition \
+			 -Wimplicit-fallthrough \
 			 -DTERM_SIZE=$(TERM_SIZE)
 
 DEPSFLAGS := -MMD -MP
@@ -28,11 +28,11 @@ R_LDFLAGS := -pie -Wl,-z,relro,-z,now
 SANITIZERS := -fsanitize=address,undefined,null,leak,integer-divide-by-zero,signed-integer-overflow
 # SANITIZERS :=
 D_CFLAGS   := -g3 -fno-omit-frame-pointer -fstack-protector-strong $(SANITIZERS)
-D_LDFLAGS  := $(SANITIZERS)
+D_LDFLAGS  := $(SANITIZERS) -rdynamic
 
 SRC_DIR := src
 
-SRC_FILES := ft_arena.c ft_array.c ft_parse.c ft_str.c ft_walk.c main.c
+SRC_FILES := ft_arena.c ft_array.c ft_parse.c ft_printer.c ft_sort.c ft_str.c ft_walk.c main.c
 
 SRCS := $(addprefix $(SRC_DIR)/, $(SRC_FILES))
 

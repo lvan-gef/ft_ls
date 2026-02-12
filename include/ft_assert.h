@@ -86,17 +86,21 @@ void log_assert_(const char *file, int line, const char *func, const char *fmt,
 #include <stdio.h>
 #include <time.h>
 
+/* POSIX stack trace */
+#include <execinfo.h>
+
 void log_assert_(const char *file, int line, const char *func, const char *fmt,
                  ...) {
     time_t now = time(NULL);
     const struct tm *t = localtime(&now);
 
     if (t == NULL) {
-        fprintf(stderr, "[ASSERT FAIL] 25:61:61 | %s:%d | %s() | ", file, line,
-                func);
+        fprintf(stderr, "[ASSERT FAIL] 25:61:61 | %s:%d | %s() | ",
+                file, line, func);
     } else {
         fprintf(stderr, "[ASSERT FAIL] %02d:%02d:%02d | %s:%d | %s() | ",
-                t->tm_hour, t->tm_min, t->tm_sec, file, line, func);
+                t->tm_hour, t->tm_min, t->tm_sec,
+                file, line, func);
     }
 
     va_list args;
@@ -105,6 +109,16 @@ void log_assert_(const char *file, int line, const char *func, const char *fmt,
     va_end(args);
 
     fprintf(stderr, "\n");
+
+    /* ---- Print stack trace (caller info) ---- */
+    {
+        void *buffer[16];
+        int nptrs = backtrace(buffer, 16);
+
+        /* prints like: binary(function+0x..) [0x..] */
+        backtrace_symbols_fd(buffer, nptrs, fileno(stderr));
+    }
+
     fflush(stderr);
 }
 

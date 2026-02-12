@@ -1,14 +1,16 @@
 #include <stdint.h>
 
+#include "../include/ft_arena.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
 #include "../include/ft_parse.h"
 #include "../include/ft_path.h"
 #include "../include/ft_printer.h"
 #include "../include/ft_sort.h"
-#include "ft_arena.h"
-#include "ft_fprintf.h"
-#include "libft.h"
+
+#include "../libft/include/ft_fprintf.h"
+#include "../libft/include/libft.h"
+#include "ft_str.h"
 
 typedef struct {
     uint64_t rows;
@@ -35,7 +37,6 @@ void printer(t_args *args, t_array *array) {
     } else {
         print_row_(array);
     }
-
 }
 
 static void print_row_(t_array *array) {
@@ -51,6 +52,7 @@ static void print_row_(t_array *array) {
     if (!arena) {
         return;
     }
+    ArenaSetAutoAlign(arena, 8);
 
     uint64_t *col_widths = calc_cols_(arena, array, &map);
     if (!col_widths) {
@@ -58,31 +60,48 @@ static void print_row_(t_array *array) {
         return;
     }
 
-    size_t *col_starts = ArenaPush(arena, (map.cols + 1) *
-    sizeof(*col_starts)); if (!col_starts) {
+    size_t *col_starts = ArenaPushNoZero(arena, map.cols * sizeof(*col_starts));
+    if (!col_starts) {
         ft_fprintf(STDERR_FILENO, "Failed to alloc memory in arena\n");
         ArenaRelease(arena);
         return;
     }
 
     col_starts[0] = 0;
-    for (size_t c = 0; c < map.cols; ++c) {
-        col_starts[c + 1] = col_starts[c] + col_widths[c] + 2;
+    size_t index = 0;
+    while (index < map.cols) {
+        col_starts[index + 1] = col_starts[index] + col_widths[index] + 2;
+        ++index;
     }
 
     size_t buf_size = TERM_SIZE + 16;
-    char *buf = ArenaPush(arena, buf_size);
+    t_str *buf = init_str(arena, buf_size);
     if (!buf) {
         ft_fprintf(STDERR_FILENO, "Failed to alloc memory in arena\n");
         ArenaRelease(arena);
         return;
     }
 
+    t_str *space = create_str(arena, " ");
+    if (!space) {
+        ArenaRelease(arena);
+        return;
+    }
+
+    t_str *tab = create_str(arena, "\t");
+    if (!tab) {
+        ArenaRelease(arena);
+        return;
+    }
+
+    t_str *new_line = create_str(arena, "\n");
+    if (!new_line) {
+        ArenaRelease(arena);
+        return;
+    }
+
     const size_t files_len = array->len;
     for (size_t row = 0; row < map.rows; ++row) {
-        size_t buf_len = 0;
-        size_t cur_pos = 0;
-
         for (size_t col = 0; col < map.cols; ++col) {
             size_t idx = row + col * map.rows;
             if (idx >= files_len) {
@@ -94,31 +113,22 @@ static void print_row_(t_array *array) {
                                (row + (col + 1) * map.rows >= files_len);
 
             if (!have_a_quoted && !entry->quoted->len) {
-                buf[buf_len] = ' ';
-                ++buf_len;
-                ++cur_pos;
-            } else if (have_a_quoted && entry->quoted) {
-                buf_len += ft_strlcpy(buf + buf_len, entry->quoted->str,
-                                      buf_size - buf_len);
-                ++cur_pos;
+                cat_l_str(buf, space, buf_size - buf->len);
+            } else if (have_a_quoted && entry->quoted->len) {
+                cat_l_str(buf, entry->quoted, buf_size - buf->len);
             }
 
-            buf_len +=
-                ft_strlcpy(buf + buf_len, entry->name->str, buf_size -
-                buf_len);
-            cur_pos += entry->name->len;
+            cat_l_str(buf, entry->name, buf_size - buf->len);
 
             if (have_a_quoted && entry->quoted->len) {
-                buf_len += ft_strlcpy(buf + buf_len, entry->quoted->str,
-                                      buf_size - buf_len);
-                ++cur_pos;
+                cat_l_str(buf, entry->quoted, buf_size - buf->len);
             }
 
             if (!is_last_col) {
                 size_t target_pos = col_starts[col + 1];
-                size_t gap = target_pos - cur_pos;
+                size_t gap = target_pos - buf->len;
 
-                size_t test_pos = cur_pos;
+                size_t test_pos = buf->len;
                 size_t num_tabs = 0;
                 while (test_pos < target_pos) {
                     size_t next_tab = ((test_pos / 8) + 1) * 8;
@@ -133,35 +143,26 @@ static void print_row_(t_array *array) {
                 size_t spaces_after_tabs = target_pos - test_pos;
                 size_t chars_with_tabs = num_tabs + spaces_after_tabs;
                 if (num_tabs > 0 && chars_with_tabs < gap) {
-                    while (cur_pos < target_pos) {
-                        size_t next_tab = ((cur_pos / 8) + 1) * 8;
+                    while (buf->len < target_pos) {
+                        size_t next_tab = ((buf->len / 8) + 1) * 8;
                         if (next_tab <= target_pos) {
-                            buf[buf_len] = '\t';
-                            ++buf_len;
-                            cur_pos = next_tab;
+                            cat_l_str(buf, tab, buf_size - buf->len);
                         } else {
-                            buf[buf_len] = ' ';
-                            ++buf_len;
-                            ++cur_pos;
+                            cat_l_str(buf, space, buf_size - buf->len);
                         }
                     }
                 } else {
-                    while (cur_pos < target_pos) {
-                        buf[buf_len] = ' ';
-                        ++buf_len;
-                        ++cur_pos;
+                    while (buf->len < target_pos) {
+                        cat_l_str(buf, space, buf_size - buf->len);
                     }
                 }
             }
         }
 
-        buf[buf_len] = '\n';
-        ++buf_len;
-        if (write(STDOUT_FILENO, buf, buf_len) < 0) {
-            break;
-        }
+        cat_l_str(buf, new_line, buf_size - buf->len);
     }
 
+    (void)write(STDOUT_FILENO, buf->str, buf->len);
     ArenaRelease(arena);
     return;
 }
@@ -180,7 +181,7 @@ static uint64_t *calc_cols_(Arena *arena, t_array *array, t_map *map) {
 
     uint64_t *col_widths =
         ArenaPushNoZero(arena, map->max * sizeof(*col_widths));
-    if (!*col_widths) {
+    if (!col_widths) {
         return NULL;
     }
 
@@ -206,10 +207,11 @@ static uint64_t calc_layout_width_(t_array *array, uint64_t num_cols,
     uint64_t num_rows = (max_len + num_cols - 1) / num_cols;
     uint64_t index = 0;
 
-    while (index < num_cols) {
-        col_widths[index] = 0;
-        ++index;
-    }
+    ft_memset(col_widths, 0, num_cols * sizeof(*col_widths));
+    // while (index < num_cols) {
+    //     col_widths[index] = 0;
+    //     ++index;
+    // }
 
     uint64_t col = 0;
     while (col < num_cols) {

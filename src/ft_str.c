@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "../include/ft_assert.h"
@@ -132,7 +133,7 @@ uint64_t cat_l_str(t_str *dst, const t_str *src, uint64_t size) {
         size = cap;
     }
 
-    uint64_t cur_pos = dst->len;
+    uint64_t cur_pos = dst->pos;
     dst->pos = dst->len;
     size_t len = strlcpy_(dst, src, size + 1);
     dst->len += len;
@@ -164,6 +165,24 @@ uint64_t cpy_l_str(t_str *dst, const t_str *src, uint64_t size) {
     ASSERT_(*src->str, "%c can not be '\\0'", *src->str);
 
     return strlcpy_(dst, src, size);
+}
+
+bool has_next_str(t_str *s) {
+    ASSERT_NOTNULL(s);
+
+    return s->pos < s->len;
+}
+
+char peek_str(t_str *s) {
+    ASSERT_NOTNULL(s);
+
+    return s->str[s->pos];
+}
+
+char next_str(t_str *s) {
+    ASSERT_NOTNULL(s);
+
+    return s->str[s->pos++];
 }
 
 static uint64_t strlcpy_(t_str *dst, const t_str *src, uint64_t dstsize) {
