@@ -121,6 +121,7 @@ uint64_t cat_l_str(t_str *dst, const t_str *src, uint64_t size) {
     ASSERT_NOTNULL(src);
     ASSERT_GE(src->cap, 2);
     ASSERT_GE(src->len, 1);
+    ASSERT_LT(src->pos, src->len);
     ASSERT_(*src->str, "%c can not be '\\0'", *src->str);
     ASSERT_GT(size, 0);
 
@@ -135,7 +136,8 @@ uint64_t cat_l_str(t_str *dst, const t_str *src, uint64_t size) {
 
     uint64_t cur_pos = dst->pos;
     dst->pos = dst->len;
-    size_t len = strlcpy_(dst, src, size + 1);
+
+    uint64_t len = strlcpy_(dst, src, size + 1);
     dst->len += len;
     dst->pos = cur_pos;
     return len;
@@ -149,6 +151,7 @@ uint64_t cpy_str(t_str *dst, const t_str *src) {
     ASSERT_NOTNULL(src);
     ASSERT_GE(src->cap, 2);
     ASSERT_GE(src->len, 1);
+    ASSERT_LT(src->pos, src->len);
     ASSERT_(*src->str, "%c can not be '\\0'", *src->str);
     ASSERT_EQ(dst->cap, src->cap);
 
@@ -186,6 +189,8 @@ char next_str(t_str *s) {
 }
 
 static uint64_t strlcpy_(t_str *dst, const t_str *src, uint64_t dstsize) {
+    ASSERT_LT(src->pos, src->cap);
+
     if (!dstsize) {
         return (src->len);
     }

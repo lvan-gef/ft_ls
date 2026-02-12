@@ -7,10 +7,10 @@
 #include "../include/ft_path.h"
 #include "../include/ft_printer.h"
 #include "../include/ft_sort.h"
+#include "../include/ft_str.h"
 
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
-#include "ft_str.h"
 
 typedef struct {
     uint64_t rows;
@@ -74,7 +74,7 @@ static void print_row_(t_array *array) {
         ++index;
     }
 
-    size_t buf_size = TERM_SIZE + 16;
+    uint64_t buf_size = (TERM_SIZE * map.rows) + map.rows + 1;
     t_str *buf = init_str(arena, buf_size);
     if (!buf) {
         ft_fprintf(STDERR_FILENO, "Failed to alloc memory in arena\n");
@@ -208,17 +208,12 @@ static uint64_t calc_layout_width_(t_array *array, uint64_t num_cols,
     uint64_t index = 0;
 
     ft_memset(col_widths, 0, num_cols * sizeof(*col_widths));
-    // while (index < num_cols) {
-    //     col_widths[index] = 0;
-    //     ++index;
-    // }
 
     uint64_t col = 0;
     while (col < num_cols) {
         uint64_t row = 0;
         while (row < num_rows) {
             index = row + col * num_rows;
-            // if (index >= max_len) {
             if (index >= array->len) {
                 break;
             }
@@ -229,8 +224,8 @@ static uint64_t calc_layout_width_(t_array *array, uint64_t num_cols,
 
             size_t len = entry->name->len;
             if (entry->quoted->len) {
-                ASSERT_(len + 1 > len, "len did overflow");
-                len += 1;
+                ASSERT_(len + 2 > len, "len did overflow");
+                len += 2;
             }
 
             if (len > col_widths[col]) {

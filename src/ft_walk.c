@@ -304,6 +304,7 @@ static t_str *need_quote_(Arena *arena, t_str *str) {
         return NULL;
     }
 
+    const uint64_t cur_pos = str->pos;
     while (has_next_str(str)) {
         const char lttr = next_str(str);
         switch (lttr) {
@@ -314,7 +315,8 @@ static t_str *need_quote_(Arena *arena, t_str *str) {
         }
     }
 
-    if (quote) {
+    str->pos = cur_pos;
+    if (peek_str(quote) == ' ') {
         quote->len = 0;
     }
 
