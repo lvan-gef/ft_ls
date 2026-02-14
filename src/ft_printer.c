@@ -147,11 +147,13 @@ static void print_row_(t_array *array, t_str *buf, t_map *map,
                 cat_l_str(buf, entry->quoted, buf_size - buf->len);
             }
 
-            if (!is_last_col) {
-                uint64_t target_pos = row_start + col_starts[col + 1];
-                while (buf->len < target_pos) {
-                    cat_l_str(buf, spacing->space, buf_size - buf->len);
-                }
+            if (is_last_col) {
+                break;
+            }
+
+            uint64_t target_pos = row_start + col_starts[col + 1];
+            while (buf->len < target_pos) {
+                cat_l_str(buf, spacing->space, buf_size - buf->len);
             }
         }
 
