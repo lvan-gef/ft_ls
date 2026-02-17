@@ -95,12 +95,9 @@ static int compare_(const t_str *lhs, const t_str *rhs) {
     ASSERT_NOTNULL(lhs);
     ASSERT_NOTNULL(rhs);
 
-    if (lhs->len > rhs->len) {
-        return 1;
-    }
-
     const char *a = lhs->str;
     const char *b = rhs->str;
+
     if (*a == '\'' || *a == '"') {
         ++a;
     }
@@ -147,6 +144,7 @@ static int compare_(const t_str *lhs, const t_str *rhs) {
     while (*a && !ft_isalpha(*a) && !ft_isdigit(*a)) {
         ++a;
     }
+
     while (*b && !ft_isalpha(*b) && !ft_isdigit(*b)) {
         ++b;
     }
