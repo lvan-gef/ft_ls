@@ -12,6 +12,14 @@
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
 
+#ifndef TABSIZE
+#define TABSIZE UINT64_C(8)
+#endif // ifndef TABSIZE //
+
+#ifndef DEFAULT_SPACING
+#define DEFAULT_SPACING UINT64_C(2)
+#endif /* ifndef DEFAULT_SPACING */
+
 typedef struct {
     uint64_t rows;
     uint64_t cols;
@@ -30,8 +38,7 @@ static void print_row_(t_array *array, t_str *buf, t_map *map,
 static uint64_t *calc_cols_(Arena *arena, t_array *array, t_map *map,
                             bool quoted);
 static uint64_t calc_layout_width_(t_array *array, uint64_t num_cols,
-                                   uint64_t *col_widths,
-                                   bool have_a_quoted_global);
+                                   uint64_t *col_widths, bool quoted);
 static uint64_t max_(t_array *array);
 static bool check_quoted_(t_array *array);
 
@@ -55,7 +62,7 @@ static void init_print_row_(t_array *array) {
     ASSERT_NOTNULL(array->data[0]);
 
     uint64_t max_name = max_(array);
-    uint64_t max_possible_cols = TERM_SIZE / (max_name + 2);
+    uint64_t max_possible_cols = TERM_SIZE / (max_name + DEFAULT_SPACING);
     if (max_possible_cols < 1) {
         max_possible_cols = 1;
     }
@@ -89,7 +96,8 @@ static void init_print_row_(t_array *array) {
 
     col_starts[0] = 0;
     for (uint64_t index = 0; index < map.cols; ++index) {
-        col_starts[index + 1] = col_starts[index] + col_widths[index] + 2;
+        col_starts[index + 1] =
+            col_starts[index] + col_widths[index] + DEFAULT_SPACING;
     }
 
     uint64_t buf_size = (TERM_SIZE * map.rows) + map.rows + 1;
@@ -123,7 +131,6 @@ static void print_row_(t_array *array, t_str *buf, t_map *map,
                        t_spacing *spacing, bool quoted, uint64_t *col_starts) {
     const uint64_t files_len = array->len;
     const uint64_t buf_size = buf->cap - 1;
-    const uint64_t tab_size = 8;
 
     for (uint64_t row = 0; row < map->rows; ++row) {
         uint64_t curr_pos = 0;
@@ -163,7 +170,7 @@ static void print_row_(t_array *array, t_str *buf, t_map *map,
             uint64_t num_tabs = 0;
 
             while (test_pos < target_pos) {
-                uint64_t next_tab = ((test_pos / tab_size) + 1) * tab_size;
+                uint64_t next_tab = ((test_pos / TABSIZE) + 1) * TABSIZE;
                 if (next_tab > target_pos) {
                     break;
                 }
@@ -177,7 +184,7 @@ static void print_row_(t_array *array, t_str *buf, t_map *map,
             bool use_tabs = (num_tabs > 0) && (chars_with_tabs < gap);
 
             while (curr_pos < target_pos) {
-                uint64_t next_tab = ((curr_pos / tab_size) + 1) * tab_size;
+                uint64_t next_tab = ((curr_pos / TABSIZE) + 1) * TABSIZE;
                 if (use_tabs && next_tab <= target_pos) {
                     cat_l_str(buf, spacing->tab, buf_size - buf->len);
                     curr_pos = next_tab;
@@ -205,6 +212,7 @@ static uint64_t *calc_cols_(Arena *arena, t_array *array, t_map *map,
     if (map->max > TERM_SIZE / 2) {
         map->max = TERM_SIZE / 2;
     }
+
     uint64_t *col_widths =
         ArenaPushNoZero(arena, map->max * sizeof(*col_widths));
     if (!col_widths) {
@@ -259,12 +267,14 @@ static uint64_t calc_layout_width_(t_array *array, uint64_t num_cols,
     }
 
     uint64_t total = 0;
-    for (index = 0; index < num_cols; ++index) {
-        total += col_widths[index];
-        if (index < num_cols - 1) {
-            ASSERT_(total + 2 > total, "total did overflow");
-            total += 2;
-        }
+    // for (index = 0; index < num_cols; ++index) {
+    for (index = 0; index < num_cols - 1; ++index) {
+        total += col_widths[index] + DEFAULT_SPACING;
+        // total += col_widths[index];
+        // if (index < num_cols - 1) {
+        //     ASSERT_(total + 2 > total, "total did overflow");
+        //     total += 2;
+        // }
     }
 
     return total;
