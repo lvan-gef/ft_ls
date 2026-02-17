@@ -32,21 +32,15 @@ static void sort_time_(t_array *array) {
     ASSERT_NOTNULL(array);
     ASSERT_GT(array->len, 0);
 
-    size_t size = array->len - 1;
-
+    uint64_t size = array->len - 1;
     while (true) {
         bool changed = false;
-        size_t index = 0;
 
-        while (index < size) {
+        for (uint64_t index = 0; index < size; ++index) {
             t_entry *entry_a = array->data[index];
             t_entry *entry_b = array->data[index + 1];
 
-#if defined (__linux__)
             int cmp = compare_time_(&entry_a->st.st_mtim, &entry_b->st.st_mtim);
-#else
-            int cmp = compare_time_(&entry_a->st.st_mtimespec, &entry_b->st.st_mtimespec);
-#endif
             bool should_swap = false;
             if (cmp == 0) {
                 should_swap = compare_(entry_a->name, entry_b->name) > 0;
@@ -59,8 +53,6 @@ static void sort_time_(t_array *array) {
                 array->data[index + 1] = entry_a;
                 changed = true;
             }
-
-            ++index;
         }
 
         if (!changed) {
@@ -73,21 +65,29 @@ static void sort_time_(t_array *array) {
 
 static void sort_name_(t_array *array) {
     ASSERT_NOTNULL(array);
+    ASSERT_GT(array->len, 0);
 
-    uint64_t index = 0;
-    while (index < array->len) {
-        size_t sub_index = index + 1;
-        while (sub_index < array->len) {
+    size_t size = array->len - 1;
+    while (true) {
+        bool changed = false;
+
+        for (uint64_t index = 0; index < size; ++index) {
             t_entry *entry_a = (t_entry *)array->data[index];
-            t_entry *entry_b = (t_entry *)array->data[sub_index];
+            t_entry *entry_b = (t_entry *)array->data[index + 1];
+
             int result = compare_(entry_a->name, entry_b->name);
             if (result > 0) {
-                array->data[sub_index] = entry_a;
                 array->data[index] = entry_b;
+                array->data[index + 1] = entry_a;
+                changed = true;
             }
-            ++sub_index;
         }
-        ++index;
+
+        if (!changed) {
+            break;
+        }
+
+        --size;
     }
 }
 
@@ -95,8 +95,8 @@ static int compare_(const t_str *lhs, const t_str *rhs) {
     ASSERT_NOTNULL(lhs);
     ASSERT_NOTNULL(rhs);
 
-    const char *a = lhs->str;
-    const char *b = rhs->str;
+    const unsigned char *a = (const unsigned char *)lhs->str;
+    const unsigned char *b = (const unsigned char *)rhs->str;
 
     if (*a == '\'' || *a == '"') {
         ++a;
