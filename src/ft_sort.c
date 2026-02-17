@@ -106,69 +106,16 @@ static int compare_(const t_str *lhs, const t_str *rhs) {
         ++b;
     }
 
-    const char *a_start = a;
-    const char *b_start = b;
-    while (*a || *b) {
-        while (*a && !ft_isalpha(*a) && !ft_isdigit(*a)) {
-            ++a;
-        }
-        while (*b && !ft_isalpha(*b) && !ft_isdigit(*b)) {
-            ++b;
-        }
-
-        if (!*a || !*b) {
-            break;
-        }
-
-        int va;
-        int vb;
-        if (ft_isdigit(*a)) {
-            va = *a - '0';
-        } else {
-            va = ft_tolower(*a) - 'a' + 10;
-        }
-        if (ft_isdigit(*b)) {
-            vb = *b - '0';
-        } else {
-            vb = ft_tolower(*b) - 'a' + 10;
-        }
-
-        if (va != vb) {
-            return va - vb;
-        }
-
-        ++a;
-        ++b;
-    }
-
-    while (*a && !ft_isalpha(*a) && !ft_isdigit(*a)) {
-        ++a;
-    }
-
-    while (*b && !ft_isalpha(*b) && !ft_isdigit(*b)) {
-        ++b;
-    }
-
-    if (*a || *b) {
-        return *a ? 1 : -1;
-    }
-
-    a = a_start;
-    b = b_start;
     while (*a && *b) {
         if (*a != *b) {
-            if (ft_isalpha(*a) && ft_isalpha(*b) &&
-                ft_tolower(*a) == ft_tolower(*b)) {
-                int a_lower = (*a >= 'a' && *a <= 'z');
-                int b_lower = (*b >= 'a' && *b <= 'z');
-                return b_lower - a_lower;
-            }
-            return (unsigned char)*a - (unsigned char)*b;
+            return (int)*a - (int)*b;
         }
+
         ++a;
         ++b;
     }
-    return (unsigned char)*a - (unsigned char)*b;
+
+    return (int)*a - (int)*b;
 }
 
 static int compare_time_(const struct timespec *a, const struct timespec *b) {
