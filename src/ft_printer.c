@@ -80,7 +80,8 @@ static void init_print_row_(t_array *array) {
         goto done;
     }
 
-    uint64_t *col_starts = ArenaPushNoZero(arena, map.cols * sizeof(*col_starts));
+    uint64_t *col_starts =
+        ArenaPushNoZero(arena, (map.cols + 1) * sizeof(*col_starts));
     if (!col_starts) {
         err_msg = "Failed to alloc from arena";
         goto done;
@@ -122,9 +123,10 @@ static void print_row_(t_array *array, t_str *buf, t_map *map,
                        t_spacing *spacing, bool quoted, uint64_t *col_starts) {
     const uint64_t files_len = array->len;
     const uint64_t buf_size = buf->cap - 1;
+    const uint64_t tab_size = 8;
 
     for (uint64_t row = 0; row < map->rows; ++row) {
-        uint64_t row_start = buf->len;
+        uint64_t curr_pos = 0;
         for (uint64_t col = 0; col < map->cols; ++col) {
             uint64_t idx = row + col * map->rows;
             if (idx >= files_len) {
@@ -137,23 +139,52 @@ static void print_row_(t_array *array, t_str *buf, t_map *map,
 
             if (entry->quoted->len) {
                 cat_l_str(buf, entry->quoted, buf_size - buf->len);
+                curr_pos += entry->quoted->len;
             } else if (quoted) {
                 cat_l_str(buf, spacing->space, buf_size - buf->len);
+                curr_pos += 1;
             }
 
             cat_l_str(buf, entry->name, buf_size - buf->len);
+            curr_pos += entry->name->len;
 
             if (quoted && entry->quoted->len) {
                 cat_l_str(buf, entry->quoted, buf_size - buf->len);
+                curr_pos += entry->quoted->len;
             }
 
             if (is_last_col) {
                 break;
             }
 
-            uint64_t target_pos = row_start + col_starts[col + 1];
-            while (buf->len < target_pos) {
-                cat_l_str(buf, spacing->space, buf_size - buf->len);
+            uint64_t target_pos = col_starts[col + 1];
+            uint64_t gap = target_pos - curr_pos;
+            uint64_t test_pos = curr_pos;
+            uint64_t num_tabs = 0;
+
+            while (test_pos < target_pos) {
+                uint64_t next_tab = ((test_pos / tab_size) + 1) * tab_size;
+                if (next_tab > target_pos) {
+                    break;
+                }
+
+                test_pos = next_tab;
+                ++num_tabs;
+            }
+
+            uint64_t spaces_after_tabs = target_pos - test_pos;
+            uint64_t chars_with_tabs = num_tabs + spaces_after_tabs;
+            bool use_tabs = (num_tabs > 0) && (chars_with_tabs < gap);
+
+            while (curr_pos < target_pos) {
+                uint64_t next_tab = ((curr_pos / tab_size) + 1) * tab_size;
+                if (use_tabs && next_tab <= target_pos) {
+                    cat_l_str(buf, spacing->tab, buf_size - buf->len);
+                    curr_pos = next_tab;
+                } else {
+                    cat_l_str(buf, spacing->space, buf_size - buf->len);
+                    curr_pos++;
+                }
             }
         }
 
