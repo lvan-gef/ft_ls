@@ -85,8 +85,6 @@ void log_assert_(const char *file, int line, const char *func, const char *fmt,
 #include <stdarg.h>
 #include <stdio.h>
 #include <time.h>
-
-/* POSIX stack trace */
 #include <execinfo.h>
 
 void log_assert_(const char *file, int line, const char *func, const char *fmt,
@@ -109,13 +107,9 @@ void log_assert_(const char *file, int line, const char *func, const char *fmt,
     va_end(args);
 
     fprintf(stderr, "\n");
-
-    /* ---- Print stack trace (caller info) ---- */
     {
         void *buffer[16];
         int nptrs = backtrace(buffer, 16);
-
-        /* prints like: binary(function+0x..) [0x..] */
         backtrace_symbols_fd(buffer, nptrs, fileno(stderr));
     }
 
