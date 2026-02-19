@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <unistd.h>
 
 #include "../include/ft_arena.h"
 #include "../include/ft_array.h"
@@ -16,9 +17,9 @@
 #define TABSIZE UINT64_C(8)
 #endif // ifndef TABSIZE //
 
-#ifndef DEFAULT_SPACING
-#define DEFAULT_SPACING UINT64_C(2)
-#endif /* ifndef DEFAULT_SPACING */
+#ifndef SPACE_GAP
+#define SPACE_GAP UINT64_C(2)
+#endif /* ifndef SPACE_GAP */
 
 typedef struct {
     uint64_t rows;
@@ -30,47 +31,46 @@ typedef struct {
     t_str *space;
     t_str *tab;
     t_str *new_line;
+    t_str *dubble_colon;
 } t_spacing;
 
-static void init_print_row_(t_array *array);
+static void init_print_row_(t_args *args, t_array *array, uint64_t dirs);
 static void print_row_(t_array *array, t_str *buf, t_map *map,
                        t_spacing *spacing, bool quoted, uint64_t *col_starts);
 static uint64_t *calc_cols_(Arena *arena, t_array *array, t_map *map,
                             bool quoted);
 static uint64_t calc_layout_width_(t_array *array, uint64_t num_cols,
                                    uint64_t *col_widths, bool quoted);
-static uint64_t max_(t_array *array);
 static bool check_quoted_(t_array *array);
 
-void printer(t_args *args, t_array *array) {
+void printer(t_args *args, t_array *array, uint64_t dirs) {
     ASSERT_NOTNULL(args);
     ASSERT_NOTNULL(array);
-    ASSERT_GT(array->len, 0);
-    ASSERT_NOTNULL(array->data[0]);
 
-    sort(array, args->reverse, args->time);
+    if (array->len) {
+        sort(array, args->reverse, args->time);
+    }
+
     if (args->list) {
 
     } else {
-        init_print_row_(array);
+        init_print_row_(args, array, dirs);
     }
 }
 
-static void init_print_row_(t_array *array) {
+static void init_print_row_(t_args *args, t_array *array, uint64_t dirs) {
+    ASSERT_NOTNULL(args);
     ASSERT_NOTNULL(array);
-    ASSERT_GE(array->len, 1);
-    ASSERT_NOTNULL(array->data[0]);
 
-    uint64_t max_name = max_(array);
-    uint64_t max_possible_cols = TERM_SIZE / (max_name + DEFAULT_SPACING);
-    if (max_possible_cols < 1) {
-        max_possible_cols = 1;
+    uint64_t max_cols = (TERM_SIZE + SPACE_GAP) / (1 + SPACE_GAP);
+    if (max_cols < 1) {
+        max_cols = 1;
     }
 
     t_map map = {.cols = 1,
                  .rows = array->len,
-                 .max = array->len < max_possible_cols ? array->len
-                                                       : max_possible_cols};
+                 .max = array->len < max_cols ? array->len : max_cols};
+
     bool quoted = check_quoted_(array);
     const char *err_msg = NULL;
 
@@ -83,7 +83,7 @@ static void init_print_row_(t_array *array) {
 
     uint64_t *col_widths = calc_cols_(arena, array, &map, quoted);
     if (!col_widths) {
-        err_msg = "Failed to calc column leng";
+        // err_msg = "Failed to calc column leng";
         goto done;
     }
 
@@ -97,10 +97,20 @@ static void init_print_row_(t_array *array) {
     col_starts[0] = 0;
     for (uint64_t index = 0; index < map.cols; ++index) {
         col_starts[index + 1] =
-            col_starts[index] + col_widths[index] + DEFAULT_SPACING;
+            col_starts[index] + col_widths[index] + SPACE_GAP;
     }
 
     uint64_t buf_size = (TERM_SIZE * map.rows) + map.rows + 1;
+    t_str *path = get_path_entry(arena, array->data[0]);
+    if (!path) {
+        err_msg = "Failed to get the path of the file";
+        goto done;
+    }
+
+    if (args->recursive) {
+        buf_size += path->len + 3;
+    }
+
     t_str *buf = init_str(arena, buf_size);
     if (!buf) {
         err_msg = "Failed to init t_str for buffer";
@@ -109,13 +119,24 @@ static void init_print_row_(t_array *array) {
 
     t_spacing spacing = {.space = create_str(arena, " "),
                          .tab = create_str(arena, "\t"),
-                         .new_line = create_str(arena, "\n")};
-    if (!spacing.space || !spacing.tab || !spacing.new_line) {
+                         .new_line = create_str(arena, "\n"),
+                         .dubble_colon = create_str(arena, ":")};
+    if (!spacing.space || !spacing.tab || !spacing.new_line ||
+        !spacing.dubble_colon) {
         err_msg = "Failed to create spacing struct";
         goto done;
     }
 
+    if (args->recursive) {
+        cat_l_str(buf, path, buf->cap - buf->len);
+        cat_l_str(buf, spacing.dubble_colon, buf->cap - buf->len);
+        cat_l_str(buf, spacing.new_line, buf->cap - buf->len);
+    }
+
     print_row_(array, buf, &map, &spacing, quoted, col_starts);
+    if (args->recursive && dirs) {
+        write(STDOUT_FILENO, "\n", 1);
+    }
 
 done:
     if (err_msg) {
@@ -193,6 +214,7 @@ static void print_row_(t_array *array, t_str *buf, t_map *map,
                     curr_pos++;
                 }
             }
+
         }
 
         cat_l_str(buf, spacing->new_line, buf_size - buf->len);
@@ -205,9 +227,11 @@ static uint64_t *calc_cols_(Arena *arena, t_array *array, t_map *map,
                             bool quoted) {
     ASSERT_NOTNULL(arena);
     ASSERT_NOTNULL(array);
-    ASSERT_GE(array->len, 1);
-    ASSERT_NOTNULL(array->data[0]);
     ASSERT_NOTNULL(map);
+
+    if (!map->rows) {
+        return 0;
+    }
 
     if (map->max > TERM_SIZE / 2) {
         map->max = TERM_SIZE / 2;
@@ -267,30 +291,15 @@ static uint64_t calc_layout_width_(t_array *array, uint64_t num_cols,
     }
 
     uint64_t total = 0;
-    // for (index = 0; index < num_cols; ++index) {
-    for (index = 0; index < num_cols - 1; ++index) {
-        total += col_widths[index] + DEFAULT_SPACING;
-        // total += col_widths[index];
-        // if (index < num_cols - 1) {
-        //     ASSERT_(total + 2 > total, "total did overflow");
-        //     total += 2;
-        // }
-    }
-
-    return total;
-}
-
-static uint64_t max_(t_array *array) {
-    uint64_t len = 0;
-
-    for (uint64_t index = 0; index < array->len; ++index) {
-        t_entry *entry = array->data[index];
-        if (entry->name->len > len) {
-            len = entry->name->len;
+    for (index = 0; index < num_cols; ++index) {
+        total += col_widths[index];
+        if (index < num_cols - 1) {
+            ASSERT_(total + SPACE_GAP > total, "total did overflow");
+            total += SPACE_GAP;
         }
     }
 
-    return len;
+    return total;
 }
 
 static bool check_quoted_(t_array *array) {
