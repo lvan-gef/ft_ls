@@ -12,4 +12,6 @@ typedef struct {
     struct stat st;
 } t_entry;
 
+t_str *get_path_entry(Arena *arena, t_entry *entry);
+
 #endif // !FT_PATH_H
