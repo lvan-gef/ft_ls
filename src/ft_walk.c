@@ -69,11 +69,9 @@ void process(t_args *args, t_array *array, int *exit_code) {
         goto failed;
     }
 
-    if (params.files->len) {
-        printer(args, params.files);
+        printer(args, params.files, params.dirs->len);
         clear_array(params.files);
-    }
-    ArenaClear(params.files_arena);
+    // ArenaClear(params.files_arena);
 
     while (params.dirs->len > 0) {
         t_str *dir_path = pop_array(params.dirs);
@@ -82,11 +80,9 @@ void process(t_args *args, t_array *array, int *exit_code) {
             *exit_code = 2;
         }
 
-        if (params.files->len) {
-            printer(args, params.files);
+            printer(args, params.files, params.dirs->len);
             clear_array(params.files);
-        }
-        ArenaClear(params.files_arena);
+        // ArenaClear(params.files_arena);
     }
 
     clean_up_(&params);
@@ -218,26 +214,27 @@ static bool read_dir_(t_params *params, t_str *path, int *exit_code) {
             if (!append_array(entries, entry)) {
                 goto failed;
             }
-        } else {
-            if (!append_array(params->files, entry)) {
-                goto failed;
-            }
+        }
+
+        if (!append_array(params->files, entry)) {
+            goto failed;
         }
     }
     closedir(d);
     d = NULL;
 
-    if (params->files->len) {
-        printer(params->args, params->files);
+        printer(params->args, params->files, params->dirs->len);
         clear_array(params->files);
-    }
 
-    if (params->args->recursive) {
-        sort(entries, params->args->recursive, params->args->time);
+    if (params->args->recursive && entries->len) {
+        sort(entries, params->args->reverse, params->args->time);
         size_t index = entries->len;
         while (index > 0) {
             --index;
             t_entry *entry = pop_array(entries);
+            if (!entry->name) {
+                continue;
+            }
 
             if (entry->name->str[0] == '.' &&
                 (entry->name->str[1] == '\0' ||
@@ -251,7 +248,7 @@ static bool read_dir_(t_params *params, t_str *path, int *exit_code) {
             }
 
             if (!append_array(params->dirs, dir_path)) {
-                return false;
+                goto failed;
             }
         }
     }
