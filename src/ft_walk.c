@@ -18,8 +18,10 @@ typedef struct {
     t_args *args;
     Arena *dirs_arena;
     Arena *files_arena;
+    Arena *entries_arena;
     t_array *dirs;
     t_array *files;
+    t_array *entries;
 } t_params;
 
 static bool read_dir_(t_params *params, t_str *path, int *exit_code);
@@ -40,7 +42,8 @@ void process(t_args *args, t_array *array, int *exit_code) {
     const char *err_msg = NULL;
     t_params params = {.args = args,
                        .dirs_arena = ArenaAlloc(ARENA_SIZE),
-                       .files_arena = ArenaAlloc(ARENA_SIZE)};
+                       .files_arena = ArenaAlloc(ARENA_SIZE),
+                       .entries_arena = ArenaAlloc(ARENA_SIZE)};
     if (!params.dirs_arena) {
         err_msg = "Failed to alloc arena for dirs";
         goto failed;
@@ -50,8 +53,15 @@ void process(t_args *args, t_array *array, int *exit_code) {
         err_msg = "Failed to alloc arena for files";
         goto failed;
     }
+
+    if (!params.entries_arena) {
+        err_msg = "Failed to alloc arena for entries";
+        goto failed;
+    }
+
     ArenaSetAutoAlign(params.dirs_arena, 8);
     ArenaSetAutoAlign(params.files_arena, 8);
+    ArenaSetAutoAlign(params.entries_arena, 8);
 
     params.dirs = init_array(params.dirs_arena, ARRAY_SIZE);
     if (!params.dirs) {
@@ -65,24 +75,40 @@ void process(t_args *args, t_array *array, int *exit_code) {
         goto failed;
     }
 
+    params.entries = init_array(params.entries_arena, ARRAY_SIZE);
+    if (!params.entries) {
+        goto failed;
+    }
+
     if (!process_args_(&params, array, exit_code)) {
         goto failed;
     }
 
-        printer(args, params.files, params.dirs->len);
-        clear_array(params.files);
-    // ArenaClear(params.files_arena);
+    bool printed_section = false;
+    const bool print_dir_path = args->recursive || array->len > 1;
 
-    while (params.dirs->len > 0) {
+    if (params.files->len) {
+        printer(args, params.files, NULL);
+        printed_section = true;
+        clear_array(params.files);
+        ArenaClear(params.files_arena);
+    }
+
+    while (params.dirs->len) {
         t_str *dir_path = pop_array(params.dirs);
+
+        if (printed_section) {
+            write(STDOUT_FILENO, "\n", 1);
+        }
 
         if (!read_dir_(&params, dir_path, exit_code)) {
             *exit_code = 2;
         }
 
-            printer(args, params.files, params.dirs->len);
-            clear_array(params.files);
-        // ArenaClear(params.files_arena);
+        printer(args, params.files, print_dir_path ? dir_path : NULL);
+        printed_section = true;
+        clear_array(params.files);
+        ArenaClear(params.files_arena);
     }
 
     clean_up_(&params);
@@ -173,11 +199,6 @@ static bool read_dir_(t_params *params, t_str *path, int *exit_code) {
         return false;
     }
 
-    t_array *entries = init_array(params->files_arena, ARRAY_SIZE);
-    if (!entries) {
-        goto failed;
-    }
-
     struct dirent *dp;
     while ((dp = readdir(d)) != NULL) {
         if (!params->args->all && dp->d_name[0] == '.' &&
@@ -185,22 +206,22 @@ static bool read_dir_(t_params *params, t_str *path, int *exit_code) {
             continue;
         }
 
-        t_entry *entry = ArenaPush(params->files_arena, sizeof(*entry));
+        t_entry *entry = ArenaPush(params->entries_arena, sizeof(*entry));
         if (!entry) {
             goto failed;
         }
 
-        entry->name = create_str(params->files_arena, dp->d_name);
+        entry->name = create_str(params->entries_arena, dp->d_name);
         if (!entry->name) {
             goto failed;
         }
 
-        entry->path = join_paths_(params->files_arena, path, entry->name);
+        entry->path = join_paths_(params->entries_arena, path, entry->name);
         if (!entry->path) {
             goto failed;
         }
 
-        entry->quoted = need_quote_(params->files_arena, entry->name);
+        entry->quoted = need_quote_(params->entries_arena, entry->name);
         if (!entry->quoted) {
             goto failed;
         }
@@ -211,7 +232,7 @@ static bool read_dir_(t_params *params, t_str *path, int *exit_code) {
         }
 
         if (S_ISDIR(entry->st.st_mode) && params->args->recursive) {
-            if (!append_array(entries, entry)) {
+            if (!append_array(params->entries, entry)) {
                 goto failed;
             }
         }
@@ -223,15 +244,12 @@ static bool read_dir_(t_params *params, t_str *path, int *exit_code) {
     closedir(d);
     d = NULL;
 
-        printer(params->args, params->files, params->dirs->len);
-        clear_array(params->files);
-
-    if (params->args->recursive && entries->len) {
-        sort(entries, params->args->reverse, params->args->time);
-        size_t index = entries->len;
+    if (params->args->recursive && params->entries->len) {
+        sort(params->entries, params->args->reverse, params->args->time);
+        size_t index = params->entries->len;
         while (index > 0) {
             --index;
-            t_entry *entry = pop_array(entries);
+            t_entry *entry = pop_array(params->entries);
             if (!entry->name) {
                 continue;
             }
@@ -327,5 +345,9 @@ static void clean_up_(t_params *params) {
 
     if (params->files_arena) {
         ArenaRelease(params->files_arena);
+    }
+
+    if (params->entries_arena) {
+        ArenaRelease(params->entries_arena);
     }
 }
