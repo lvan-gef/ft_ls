@@ -168,6 +168,11 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
         entry->name = str;
         entry->path = str;
         entry->st = st;
+        if (params->args->list) {
+            if (!get_file_info(params->files_arena, entry)) {
+                goto failed;
+            }
+        }
 
         if (!append_array(params->files, entry)) {
             err_msg = "Failed to append file entry";
@@ -237,6 +242,11 @@ static bool read_dir_(t_params *params, t_str *path, int *exit_code) {
             }
         }
 
+        if (params->args->list) {
+            if (!get_file_info(params->files_arena, entry)) {
+                goto failed;
+            }
+        }
         if (!append_array(params->files, entry)) {
             goto failed;
         }
