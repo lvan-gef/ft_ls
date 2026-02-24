@@ -9,7 +9,7 @@
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE UINT64_C(10)
-#endif // !ARRAY_SIZE
+#endif // ifndef ARRAY_SIZE //
 
 typedef struct s_array {
     uint64_t len;
