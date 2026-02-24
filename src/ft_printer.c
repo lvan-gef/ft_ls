@@ -34,7 +34,7 @@ typedef struct {
     t_str *dubble_colon;
 } t_spacing;
 
-static void init_print_row_(t_args *args, t_array *array, uint64_t dirs);
+static void init_print_row_(t_args *args, t_array *array, t_str *dir_path);
 static void print_row_(t_array *array, t_str *buf, t_map *map,
                        t_spacing *spacing, bool quoted, uint64_t *col_starts);
 static uint64_t *calc_cols_(Arena *arena, t_array *array, t_map *map,
@@ -43,7 +43,7 @@ static uint64_t calc_layout_width_(t_array *array, uint64_t num_cols,
                                    uint64_t *col_widths, bool quoted);
 static bool check_quoted_(t_array *array);
 
-void printer(t_args *args, t_array *array, uint64_t dirs) {
+void printer(t_args *args, t_array *array, t_str *dir_path) {
     ASSERT_NOTNULL(args);
     ASSERT_NOTNULL(array);
 
@@ -54,11 +54,11 @@ void printer(t_args *args, t_array *array, uint64_t dirs) {
     if (args->list) {
 
     } else {
-        init_print_row_(args, array, dirs);
+        init_print_row_(args, array, dir_path);
     }
 }
 
-static void init_print_row_(t_args *args, t_array *array, uint64_t dirs) {
+static void init_print_row_(t_args *args, t_array *array, t_str *dir_path) {
     ASSERT_NOTNULL(args);
     ASSERT_NOTNULL(array);
 
@@ -83,7 +83,7 @@ static void init_print_row_(t_args *args, t_array *array, uint64_t dirs) {
 
     uint64_t *col_widths = calc_cols_(arena, array, &map, quoted);
     if (!col_widths) {
-        // err_msg = "Failed to calc column leng";
+        err_msg = "Failed to calc column leng";
         goto done;
     }
 
@@ -101,14 +101,9 @@ static void init_print_row_(t_args *args, t_array *array, uint64_t dirs) {
     }
 
     uint64_t buf_size = (TERM_SIZE * map.rows) + map.rows + 1;
-    t_str *path = get_path_entry(arena, array->data[0]);
-    if (!path) {
-        err_msg = "Failed to get the path of the file";
-        goto done;
-    }
 
-    if (args->recursive) {
-        buf_size += path->len + 3;
+    if (dir_path) {
+        buf_size += dir_path->len + 3;
     }
 
     t_str *buf = init_str(arena, buf_size);
@@ -127,16 +122,16 @@ static void init_print_row_(t_args *args, t_array *array, uint64_t dirs) {
         goto done;
     }
 
-    if (args->recursive) {
-        cat_l_str(buf, path, buf->cap - buf->len);
+    if (dir_path) {
+        cat_l_str(buf, dir_path, buf->cap - buf->len);
         cat_l_str(buf, spacing.dubble_colon, buf->cap - buf->len);
         cat_l_str(buf, spacing.new_line, buf->cap - buf->len);
     }
 
     print_row_(array, buf, &map, &spacing, quoted, col_starts);
-    if (args->recursive && dirs) {
-        write(STDOUT_FILENO, "\n", 1);
-    }
+    // if (args->recursive) {
+    //     write(STDOUT_FILENO, "\n", 1);
+    // }
 
 done:
     if (err_msg) {
@@ -214,7 +209,6 @@ static void print_row_(t_array *array, t_str *buf, t_map *map,
                     curr_pos++;
                 }
             }
-
         }
 
         cat_l_str(buf, spacing->new_line, buf_size - buf->len);
@@ -229,16 +223,16 @@ static uint64_t *calc_cols_(Arena *arena, t_array *array, t_map *map,
     ASSERT_NOTNULL(array);
     ASSERT_NOTNULL(map);
 
-    if (!map->rows) {
-        return 0;
-    }
+    // if (!map->rows) {
+    //     return NULL;
+    // }
 
     if (map->max > TERM_SIZE / 2) {
         map->max = TERM_SIZE / 2;
     }
 
     uint64_t *col_widths =
-        ArenaPushNoZero(arena, map->max * sizeof(*col_widths));
+        ArenaPushNoZero(arena, (map->max + 1) * sizeof(*col_widths));
     if (!col_widths) {
         return NULL;
     }
