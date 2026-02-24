@@ -5,9 +5,11 @@
 #include "../include/ft_str.h"
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
+#include "ft_arena.h"
 
 // TODO: replace all ft_strlcpy it use strlen...
 static uint64_t strlcpy_(t_str *dst, const t_str *src, uint64_t dstsize);
+static uint64_t len_of_nbr_(uint64_t nbr);
 
 t_str *init_str(Arena *arena, uint64_t cap) {
     ASSERT_NOTNULL(arena);
@@ -170,6 +172,35 @@ uint64_t cpy_l_str(t_str *dst, const t_str *src, uint64_t size) {
     return strlcpy_(dst, src, size);
 }
 
+t_str *uint_to_str(Arena *arena, uint64_t nbr) {
+    uint64_t len = len_of_nbr_(nbr);
+
+    t_str *str = init_str(arena, len);
+    if (!str) {
+        return NULL;
+    }
+
+    str->str[str->cap] = '\0';
+    str->pos = str->cap;
+
+    while (str->pos) {
+        --str->pos;
+        str->str[str->pos] = (char)((nbr % 10) + '0');
+        nbr /= 10;
+    }
+
+    return str;
+}
+
+uint64_t append_chars_str(Arena *arena, t_str *dst, const char *src) {
+    t_str *new_str = create_str(arena, src);
+    if (!new_str) {
+        return 0;
+    }
+
+    return cat_str(dst, new_str);
+}
+
 bool has_next_str(t_str *s) {
     ASSERT_NOTNULL(s);
 
@@ -205,4 +236,15 @@ static uint64_t strlcpy_(t_str *dst, const t_str *src, uint64_t dstsize) {
 
     dst->str[dst->pos + index] = '\0';
     return src->len;
+}
+
+static uint64_t len_of_nbr_(uint64_t nbr) {
+    uint64_t len = 0;
+
+    while (nbr) {
+        ++len;
+        nbr /= 10;
+    }
+
+    return len;
 }
