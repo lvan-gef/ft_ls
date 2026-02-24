@@ -84,6 +84,9 @@ void *ArenaPushNoZero(Arena *arena, uint64_t size) {
             cap = size;
         }
 
+#ifndef NDEBUG
+        ft_fprintf(STDERR_FILENO, "No room left\n", cap);
+#endif // NDEBUG
         ArenaBlock *block = new_block_(cap);
         if (!block) {
             return NULL;
