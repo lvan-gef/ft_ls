@@ -12,6 +12,7 @@
 
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
+#include "ft_print_list.h"
 
 #ifndef TABSIZE
 #define TABSIZE UINT64_C(8)
@@ -34,7 +35,7 @@ typedef struct {
     t_str *dubble_colon;
 } t_spacing;
 
-static void init_print_row_(t_args *args, t_array *array, t_str *dir_path);
+static void init_print_row_(t_array *array, t_str *dir_path);
 static void print_row_(t_array *array, t_str *buf, t_map *map,
                        t_spacing *spacing, bool quoted, uint64_t *col_starts);
 static uint64_t *calc_cols_(Arena *arena, t_array *array, t_map *map,
@@ -52,14 +53,13 @@ void printer(t_args *args, t_array *array, t_str *dir_path) {
     }
 
     if (args->list) {
-
+        print_list(array);
     } else {
-        init_print_row_(args, array, dir_path);
+        init_print_row_(array, dir_path);
     }
 }
 
-static void init_print_row_(t_args *args, t_array *array, t_str *dir_path) {
-    ASSERT_NOTNULL(args);
+static void init_print_row_(t_array *array, t_str *dir_path) {
     ASSERT_NOTNULL(array);
 
     uint64_t max_cols = (TERM_SIZE + SPACE_GAP) / (1 + SPACE_GAP);
@@ -129,10 +129,6 @@ static void init_print_row_(t_args *args, t_array *array, t_str *dir_path) {
     }
 
     print_row_(array, buf, &map, &spacing, quoted, col_starts);
-    // if (args->recursive) {
-    //     write(STDOUT_FILENO, "\n", 1);
-    // }
-
 done:
     if (err_msg) {
         ft_fprintf(STDERR_FILENO, "%s\n", err_msg);
