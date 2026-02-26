@@ -9,10 +9,10 @@
 #include "../include/ft_printer.h"
 #include "../include/ft_sort.h"
 #include "../include/ft_str.h"
+#include "../include/ft_print_list.h"
 
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
-#include "ft_print_list.h"
 
 #ifndef TABSIZE
 #define TABSIZE UINT64_C(8)
@@ -44,7 +44,7 @@ static uint64_t calc_layout_width_(t_array *array, uint64_t num_cols,
                                    uint64_t *col_widths, bool quoted);
 static bool check_quoted_(t_array *array);
 
-void printer(t_args *args, t_array *array, t_str *dir_path) {
+void printer(t_args *args, t_array *array, t_str *dir_path, bool print_total) {
     ASSERT_NOTNULL(args);
     ASSERT_NOTNULL(array);
 
@@ -53,7 +53,7 @@ void printer(t_args *args, t_array *array, t_str *dir_path) {
     }
 
     if (args->list) {
-        print_list(array);
+        print_list(array, dir_path, print_total);
     } else {
         init_print_row_(array, dir_path);
     }
@@ -218,10 +218,6 @@ static uint64_t *calc_cols_(Arena *arena, t_array *array, t_map *map,
     ASSERT_NOTNULL(arena);
     ASSERT_NOTNULL(array);
     ASSERT_NOTNULL(map);
-
-    // if (!map->rows) {
-    //     return NULL;
-    // }
 
     if (map->max > TERM_SIZE / 2) {
         map->max = TERM_SIZE / 2;

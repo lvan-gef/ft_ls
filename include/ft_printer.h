@@ -6,6 +6,6 @@
 #include "./ft_parse.h"
 #include "./ft_str.h"
 
-void printer(t_args *args, t_array *files, t_str *dir_path);
+void printer(t_args *args, t_array *array, t_str *dir_path, bool print_total);
 
 #endif // !FT_PRINTER_H
