@@ -3,9 +3,9 @@
 #include <stddef.h>
 #include <unistd.h>
 
+#include "../include/ft_arena.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
-#include "../include/ft_arena.h"
 
 #include "../libft/include/libft.h"
 
