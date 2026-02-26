@@ -6,8 +6,6 @@
 #include "../include/ft_path.h"
 #include "../include/ft_sort.h"
 
-#include "../libft/include/libft.h"
-
 static void sort_time_(t_array *array);
 static void sort_name_(t_array *array);
 static int compare_(const t_str *a, const t_str *b);
