@@ -16,7 +16,7 @@ t_str *init_str(Arena *arena, uint64_t cap) {
     ASSERT_GT(cap, 0);
 
     const char *err_msg = NULL;
-    const uint64_t arena_pos = ArenaPos(arena);
+    ArenaMark mark = ArenaGetMark(arena);
     t_str *str = ArenaPushNoZero(arena, sizeof(*str));
     if (!str) {
         err_msg = "ArenaPushNoZero failed";
@@ -34,7 +34,7 @@ t_str *init_str(Arena *arena, uint64_t cap) {
         goto failed;
     }
 
-    str->cap = cap;
+    str->cap = cap + 1;
     str->len = 0;
     str->pos = 0;
 
@@ -43,7 +43,7 @@ t_str *init_str(Arena *arena, uint64_t cap) {
 
 failed:
     ft_fprintf(STDERR_FILENO, "%s\n", err_msg);
-    ArenaPopTo(arena, arena_pos);
+    ArenaPopToMark(arena, mark);
     return NULL;
 }
 
@@ -142,6 +142,9 @@ uint64_t cat_l_str(t_str *dst, const t_str *src, uint64_t size) {
     uint64_t len = strlcpy_(dst, src, size + 1);
     dst->len += len;
     dst->pos = cur_pos;
+
+    ASSERT_LT(dst->len, dst->cap);
+    ASSERT_LE(dst->pos, dst->len);
     return len;
 }
 
@@ -180,13 +183,14 @@ t_str *uint_to_str(Arena *arena, uint64_t nbr) {
         return NULL;
     }
 
-    str->str[str->cap] = '\0';
-    str->pos = str->cap;
+    str->str[str->cap - 1] = '\0';
+    str->pos = str->cap - 1;
 
     while (str->pos) {
         --str->pos;
         str->str[str->pos] = (char)((nbr % 10) + '0');
         nbr /= 10;
+        ++str->len;
     }
 
     return str;
@@ -199,6 +203,16 @@ uint64_t append_chars_str(Arena *arena, t_str *dst, const char *src) {
     }
 
     return cat_str(dst, new_str);
+}
+
+uint64_t append_chars_l_str(Arena *arena, t_str *dst, const char *src,
+                            uint64_t size) {
+    t_str *new_str = create_str(arena, src);
+    if (!new_str) {
+        return 0;
+    }
+
+    return cat_l_str(dst, new_str, size);
 }
 
 bool has_next_str(t_str *s) {
@@ -221,29 +235,32 @@ char next_str(t_str *s) {
 
 static uint64_t strlcpy_(t_str *dst, const t_str *src, uint64_t dstsize) {
     ASSERT_LT(src->pos, src->cap);
+    ASSERT_LT(dst->pos, dst->cap);
 
     if (!dstsize) {
-        return (src->len);
+        return 0;
     }
 
     uint64_t index = 0;
+    uint64_t copied = 0;
     while (src->str[src->pos + index]) {
         if (index < dstsize - 1) {
             dst->str[dst->pos + index] = src->str[src->pos + index];
+            copied = index + 1;
         }
         ++index;
     }
 
-    dst->str[dst->pos + index] = '\0';
-    return src->len;
+    dst->str[dst->pos + copied] = '\0';
+    return copied;
 }
 
 static uint64_t len_of_nbr_(uint64_t nbr) {
-    uint64_t len = 0;
+    uint64_t len = 1;
 
-    while (nbr) {
-        ++len;
+    while (nbr >= 10) {
         nbr /= 10;
+        ++len;
     }
 
     return len;
