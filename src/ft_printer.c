@@ -6,10 +6,10 @@
 #include "../include/ft_assert.h"
 #include "../include/ft_parse.h"
 #include "../include/ft_path.h"
+#include "../include/ft_print_list.h"
 #include "../include/ft_printer.h"
 #include "../include/ft_sort.h"
 #include "../include/ft_str.h"
-#include "../include/ft_print_list.h"
 
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
