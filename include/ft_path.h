@@ -1,10 +1,10 @@
 #ifndef FT_PATH_H
 #define FT_PATH_H
 
-#include <stdbool.h>
-#include <sys/stat.h>
 #include <limits.h>
 #include <linux/limits.h>
+#include <stdbool.h>
+#include <sys/stat.h>
 
 #include "ft_str.h"
 
@@ -35,6 +35,7 @@ typedef struct {
     t_str *groupname;
     t_str *size;
     t_str *symlink;
+    t_str *dt;
 } t_file_info;
 
 typedef struct {
@@ -46,6 +47,6 @@ typedef struct {
 } t_entry;
 
 t_str *get_path_entry(Arena *arena, t_entry *entry);
-bool get_file_info(Arena *arena, t_entry *entry);
+bool get_file_info(Arena *arena, Arena *scratch, t_entry *entry);
 
 #endif // !FT_PATH_H
