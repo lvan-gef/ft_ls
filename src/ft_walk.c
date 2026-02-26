@@ -98,7 +98,7 @@ void process(t_args *args, t_array *array, int *exit_code) {
     const bool print_dir_path = args->recursive || array->len > 1;
 
     if (params.files->len) {
-        printer(args, params.files, NULL);
+        printer(args, params.files, NULL, false);
         printed_section = true;
         if (!reset_files_(&params)) {
             err_msg = "Failed to reset files array";
@@ -117,7 +117,7 @@ void process(t_args *args, t_array *array, int *exit_code) {
             *exit_code = 2;
         }
 
-        printer(args, params.files, print_dir_path ? dir_path : NULL);
+        printer(args, params.files, print_dir_path ? dir_path : NULL, true);
         printed_section = true;
         if (!reset_files_(&params)) {
             err_msg = "Failed to reset files array";
@@ -158,6 +158,22 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
                        str->str);
             *exit_code = 2;
             return NULL;
+        }
+
+        bool is_dir_operand = S_ISDIR(st.st_mode);
+        if (S_ISLNK(st.st_mode)) {
+            struct stat st_target;
+            if (stat(str->str, &st_target) == 0 && S_ISDIR(st_target.st_mode)) {
+                is_dir_operand = true;
+            }
+        }
+
+        if (is_dir_operand && !params->args->list) {
+            if (!append_array(params->dirs, str)) {
+                err_msg = "Failed to append dir";
+                goto failed;
+            }
+            continue;
         }
 
         if (S_ISDIR(st.st_mode)) {
