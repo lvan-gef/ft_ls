@@ -14,6 +14,7 @@
 #define LIBFT_H
 
 #include <limits.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -256,6 +257,15 @@ int ft_atoi(const char *str);
  * @return long int
  */
 long int ft_atoli(const char *str);
+
+/**
+ * @brief Convert string to uint64_t
+ *
+ * @param str The long int as string (char*)
+ *
+ * @return uint64_t
+ */
+uint64_t ft_atoui(const char *str);
 
 /**
  * @brief Check if <c> is alpha or digit
