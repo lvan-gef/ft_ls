@@ -1,18 +1,33 @@
+#include <stdbool.h>
 #include <stdint.h>
 #include <unistd.h>
 
+#include "../include/ft_arena.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
+#include "../include/ft_path.h"
 #include "../include/ft_print_list.h"
-#include "ft_arena.h"
-#include "ft_path.h"
-#include "ft_str.h"
+#include "../include/ft_str.h"
 
-static uint64_t get_buf_size_(t_array *array);
+typedef struct {
+    uint64_t total;
+    uint64_t buf_size;
+    uint64_t max_len_links;
+    uint64_t max_len_sizes;
+    bool have_quote;
+} t_sizes;
 
-// todo padding
-// todo header
-void print_list(t_array *array) {
+#ifndef HEADER_PREFIX_LEN
+#define HEADER_PREFIX_LEN UINT64_C(6)
+#endif /* ifndef HEADER_PREFIX_LEN */
+
+static void get_sizes_(t_array *array, t_sizes *sizes);
+static uint64_t len_of_nbr_(uint64_t nbr);
+static void left_pad_(Arena *arena, t_str *buffer, uint64_t src_len,
+                      uint64_t max_size);
+static bool have_quotes_(t_array *array);
+
+void print_list(t_array *array, t_str *path, bool print_total) {
     ASSERT_NOTNULL(array);
 
     Arena *arena = ArenaAlloc(ARENA_SIZE);
@@ -21,105 +36,164 @@ void print_list(t_array *array) {
     }
     ArenaSetAutoAlign(arena, 8);
 
-    uint64_t buf_size = get_buf_size_(array);
-    t_str *buffer = init_str(arena, (buf_size * array->len) + array->len);
-    if (!buffer) {
+    t_sizes sizes = {.have_quote = have_quotes_(array)};
+    get_sizes_(array, &sizes);
+
+    if (path) {
+        sizes.buf_size += (path->len + 1 + 1); // 1 for :, 1 for \n
+    }
+
+    t_str *buf = init_str(arena, sizes.buf_size);
+    if (!buf) {
         goto done;
     }
 
-    t_str *space = create_str(arena, " ");
-    if (!space) {
-        goto done;
+    if (path) {
+        cat_str(buf, path);
+        append_chars_str(arena, buf, ":");
+        append_chars_str(arena, buf, "\n");
     }
 
-    t_str *arrow = create_str(arena, " -> ");
-    if (!arrow) {
-        goto done;
-    }
-
-    t_str *single_quote = create_str(arena, "'");
-    if (!single_quote) {
-        goto done;
-    }
-
-    t_str *newline = create_str(arena, "\n");
-    if (!newline) {
-        goto done;
+    if (print_total) {
+        t_str *total = uint_to_str(arena, (sizes.total + 1) / 2);
+        if (!total) {
+            goto done;
+        }
+        append_chars_str(arena, buf, "total ");
+        cat_str(buf, total);
+        append_chars_str(arena, buf, "\n");
     }
 
     for (uint64_t index = 0; index < array->len; ++index) {
         t_entry *entry = array->data[index];
 
-        cat_l_str(buffer, entry->info->perm, buf_size);
-        cat_l_str(buffer, space, buf_size);
+        cat_l_str(buf, entry->info->perm, sizes.buf_size);
+        append_chars_str(arena, buf, " ");
 
-        cat_l_str(buffer, entry->info->links, buf_size);
-        cat_l_str(buffer, space, buf_size);
+        left_pad_(arena, buf, entry->info->links->len, sizes.max_len_links);
+        cat_l_str(buf, entry->info->links, sizes.buf_size);
+        append_chars_str(arena, buf, " ");
 
-        cat_l_str(buffer, entry->info->username, buf_size);
-        cat_l_str(buffer, space, buf_size);
+        cat_l_str(buf, entry->info->username, sizes.buf_size);
+        append_chars_str(arena, buf, " ");
 
-        cat_l_str(buffer, entry->info->groupname, buf_size);
-        cat_l_str(buffer, space, buf_size);
+        cat_l_str(buf, entry->info->groupname, sizes.buf_size);
+        append_chars_str(arena, buf, " ");
 
-        cat_l_str(buffer, entry->info->size, buf_size);
-        cat_l_str(buffer, space, buf_size);
+        left_pad_(arena, buf, entry->info->size->len, sizes.max_len_sizes);
+        cat_l_str(buf, entry->info->size, sizes.buf_size);
+        append_chars_str(arena, buf, " ");
 
-        cat_l_str(buffer, entry->info->dt, buf_size);
-        cat_l_str(buffer, space, buf_size);
+        cat_l_str(buf, entry->info->dt, sizes.buf_size);
+        append_chars_str(arena, buf, " ");
 
         if (entry->quoted->len) {
-            cat_l_str(buffer, single_quote, buf_size);
-            cat_l_str(buffer, entry->name, buf_size);
-            cat_l_str(buffer, single_quote, buf_size);
+            append_chars_str(arena, buf, "'");
+            cat_l_str(buf, entry->name, sizes.buf_size);
+            append_chars_str(arena, buf, "'");
         } else {
-            cat_l_str(buffer, entry->name, buf_size);
+            if (sizes.have_quote) {
+                append_chars_str(arena, buf, " ");
+            }
+            cat_l_str(buf, entry->name, sizes.buf_size);
         }
 
         if (entry->info->symlink) {
-            cat_l_str(buffer, arrow, buf_size);
-            cat_l_str(buffer, entry->info->symlink, buf_size);
+            append_chars_str(arena, buf, " -> ");
+            cat_l_str(buf, entry->info->symlink, sizes.buf_size);
         }
 
-        cat_l_str(buffer, newline, buf_size);
+        append_chars_str(arena, buf, "\n");
     }
 
-    write(STDOUT_FILENO, buffer->str, buffer->len);
+    write(STDOUT_FILENO, buf->str, buf->len);
 done:
     ArenaRelease(arena);
 }
 
-// todo: check of er een file is met quetes want dan 2 spaties voor
-// elke filename die geen quetes heeft
-static uint64_t get_buf_size_(t_array *array) {
-    ASSERT_NOTNULL(array);
+static void get_sizes_(t_array *array, t_sizes *sizes) {
+    for (uint64_t i = 0; i < array->len; ++i) {
+        t_entry *e = array->data[i];
 
-    uint64_t max = 0;
+        if (e->info->links->len > sizes->max_len_links)
+            sizes->max_len_links = e->info->links->len;
+
+        if (e->info->size->len > sizes->max_len_sizes)
+            sizes->max_len_sizes = e->info->size->len;
+
+        sizes->total += e->info->blocks;
+    }
+
+    uint64_t total_str_len = len_of_nbr_((sizes->total + 1) / 2);
+    sizes->buf_size = 6 + total_str_len + 1; // "total " + number + '\n'
+
+    for (uint64_t i = 0; i < array->len; ++i) {
+        t_entry *e = array->data[i];
+        uint64_t row = 0;
+
+        row += e->info->perm->len + 1;
+
+        row += (sizes->max_len_links - e->info->links->len); // left_pad
+        row += e->info->links->len + 1;
+
+        row += e->info->username->len + 1;
+        row += e->info->groupname->len + 1;
+
+        row += (sizes->max_len_sizes - e->info->size->len); // left_pad
+        row += e->info->size->len + 1;
+
+        row += e->info->dt->len + 1;
+
+        if (e->quoted->len) {
+            row += 2;
+        } else if (sizes->have_quote) {
+            row += 1;
+        }
+
+        row += e->name->len;
+
+        if (e->info->symlink) {
+            row += 4; // " -> "
+            row += e->info->symlink->len;
+        }
+
+        row += 1; // '\n'
+        sizes->buf_size += row;
+    }
+
+    if (!sizes->max_len_sizes) {
+        sizes->buf_size += 2;
+    }
+}
+
+static uint64_t len_of_nbr_(uint64_t nbr) {
+    uint64_t len = 1;
+
+    while (nbr >= 10) {
+        nbr /= 10;
+        ++len;
+    }
+
+    return len;
+}
+
+static void left_pad_(Arena *arena, t_str *buffer, uint64_t src_len,
+                      uint64_t max_size) {
+    ASSERT_LE(src_len, max_size);
+    uint64_t differ = max_size - src_len;
+
+    for (uint64_t index = 0; index < differ; ++index) {
+        append_chars_str(arena, buffer, " ");
+    }
+}
+
+static bool have_quotes_(t_array *array) {
     for (uint64_t index = 0; index < array->len; ++index) {
-        uint64_t total = 0;
         t_entry *entry = array->data[index];
-
-        total += entry->info->perm->len + 1;
-        total += entry->info->links->len + 1;
-        total += entry->info->username->len + 1;
-        total += entry->info->groupname->len + 1;
-        total += entry->info->size->len + 1;
-        total += entry->info->dt->len + 1;
-
         if (entry->quoted->len) {
-            total += 2;
-        }
-        total += entry->name->len;
-
-        if (entry->info->symlink) {
-            total += (1 + 2 + 1); // 1 space, 2 for ->, 1 space
-            total += entry->info->symlink->len;
-        }
-
-        if (total > max) {
-            max = total;
+            return true;
         }
     }
 
-    return max;
+    return false;
 }

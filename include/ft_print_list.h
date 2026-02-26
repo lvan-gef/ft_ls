@@ -1,8 +1,11 @@
 #ifndef FT_PRINT_LIST_H
 #define FT_PRINT_LIST_H
 
-#include "./ft_array.h"
+#include <stdbool.h>
 
-void print_list(t_array *array);
+#include "./ft_array.h"
+#include "./ft_str.h"
+
+void print_list(t_array *array, t_str *path, bool print_total);
 
 #endif // !FT_PRINT_LIST_H
