@@ -8,4 +8,3 @@
 void sort(t_array *array, bool reverse, bool sort_time);
 
 #endif // !FT_SORT_H
-

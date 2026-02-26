@@ -1,7 +1,7 @@
 #define C_ASSERT_IMPLEMENTATION
 
-#include <stdlib.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #include "../include/ft_arena.h"
 #include "../include/ft_array.h"

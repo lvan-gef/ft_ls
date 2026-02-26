@@ -82,10 +82,10 @@ void log_assert_(const char *file, int line, const char *func, const char *fmt,
 
 #ifndef NDEBUG
 
+#include <execinfo.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <time.h>
-#include <execinfo.h>
 
 void log_assert_(const char *file, int line, const char *func, const char *fmt,
                  ...) {
@@ -93,12 +93,11 @@ void log_assert_(const char *file, int line, const char *func, const char *fmt,
     const struct tm *t = localtime(&now);
 
     if (t == NULL) {
-        fprintf(stderr, "[ASSERT FAIL] 25:61:61 | %s:%d | %s() | ",
-                file, line, func);
+        fprintf(stderr, "[ASSERT FAIL] 25:61:61 | %s:%d | %s() | ", file, line,
+                func);
     } else {
         fprintf(stderr, "[ASSERT FAIL] %02d:%02d:%02d | %s:%d | %s() | ",
-                t->tm_hour, t->tm_min, t->tm_sec,
-                file, line, func);
+                t->tm_hour, t->tm_min, t->tm_sec, file, line, func);
     }
 
     va_list args;
