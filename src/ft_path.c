@@ -16,8 +16,7 @@
 static t_str *get_perm_(Arena *arena, Arena *scratch, t_entry *entry);
 static t_str *get_user_(Arena *arena, uid_t user_id);
 static t_str *get_group_(Arena *arena, gid_t group_id);
-static t_str *get_dt_(Arena *arena, Arena *scratch,
-                      const struct timespec *ctim);
+static t_str *get_dt_(Arena *arena, const struct timespec *ctim);
 static bool get_symlink_(Arena *arena, const t_entry *entry, t_str **out);
 
 typedef enum {
@@ -116,7 +115,7 @@ bool get_file_info(Arena *arena, Arena *scratch, t_entry *entry) {
         goto failed;
     }
 
-    info->dt = get_dt_(arena, scratch, &entry->st.st_ctim);
+    info->dt = get_dt_(arena, &entry->st.st_mtim);
     if (!info->dt) {
         goto failed;
     }
@@ -124,6 +123,8 @@ bool get_file_info(Arena *arena, Arena *scratch, t_entry *entry) {
     if (!get_symlink_(arena, entry, &info->symlink)) {
         goto failed;
     }
+
+    info->blocks = (uint64_t)entry->st.st_blocks;
     ArenaClear(scratch);
 
     entry->info = info;
@@ -263,10 +264,7 @@ static t_str *get_group_(Arena *arena, gid_t group_id) {
     return new_str;
 }
 
-static t_str *get_dt_(Arena *arena, Arena *scratch,
-                      const struct timespec *ctim) {
-    (void)scratch;
-
+static t_str *get_dt_(Arena *arena, const struct timespec *ctim) {
     char *dt = ctime(&ctim->tv_sec);
     if (!dt) {
         return NULL;

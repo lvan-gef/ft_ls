@@ -4,6 +4,7 @@
 #include <limits.h>
 #include <linux/limits.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <sys/stat.h>
 
 #include "ft_str.h"
@@ -36,6 +37,7 @@ typedef struct {
     t_str *size;
     t_str *symlink;
     t_str *dt;
+    uint64_t blocks;
 } t_file_info;
 
 typedef struct {
