@@ -19,6 +19,7 @@ typedef struct {
     Arena *dirs_arena;
     Arena *files_arena;
     Arena *entries_arena;
+    Arena *scratch_arena;
     t_array *dirs;
     t_array *files;
     t_array *entries;
@@ -26,6 +27,8 @@ typedef struct {
 
 static bool read_dir_(t_params *params, t_str *path, int *exit_code);
 static bool process_args_(t_params *params, t_array *array, int *exit_code);
+static bool reset_files_(t_params *params);
+static bool reset_entries_(t_params *params);
 static t_str *join_paths_(Arena *files_arena, t_str *lhs, t_str *rhs);
 static t_str *need_quote_(Arena *arena, t_str *str);
 static void clean_up_(t_params *params);
@@ -43,7 +46,8 @@ void process(t_args *args, t_array *array, int *exit_code) {
     t_params params = {.args = args,
                        .dirs_arena = ArenaAlloc(ARENA_SIZE),
                        .files_arena = ArenaAlloc(ARENA_SIZE),
-                       .entries_arena = ArenaAlloc(ARENA_SIZE)};
+                       .entries_arena = ArenaAlloc(ARENA_SIZE),
+                       .scratch_arena = ArenaAlloc(ARENA_SIZE)};
     if (!params.dirs_arena) {
         err_msg = "Failed to alloc arena for dirs";
         goto failed;
@@ -59,9 +63,15 @@ void process(t_args *args, t_array *array, int *exit_code) {
         goto failed;
     }
 
+    if (!params.scratch_arena) {
+        err_msg = "Failed to alloc arena for scratch";
+        goto failed;
+    }
+
     ArenaSetAutoAlign(params.dirs_arena, 8);
     ArenaSetAutoAlign(params.files_arena, 8);
     ArenaSetAutoAlign(params.entries_arena, 8);
+    ArenaSetAutoAlign(params.scratch_arena, 8);
 
     params.dirs = init_array(params.dirs_arena, ARRAY_SIZE);
     if (!params.dirs) {
@@ -90,8 +100,10 @@ void process(t_args *args, t_array *array, int *exit_code) {
     if (params.files->len) {
         printer(args, params.files, NULL);
         printed_section = true;
-        clear_array(params.files);
-        ArenaClear(params.files_arena);
+        if (!reset_files_(&params)) {
+            err_msg = "Failed to reset files array";
+            goto failed;
+        }
     }
 
     while (params.dirs->len) {
@@ -107,8 +119,10 @@ void process(t_args *args, t_array *array, int *exit_code) {
 
         printer(args, params.files, print_dir_path ? dir_path : NULL);
         printed_section = true;
-        clear_array(params.files);
-        ArenaClear(params.files_arena);
+        if (!reset_files_(&params)) {
+            err_msg = "Failed to reset files array";
+            goto failed;
+        }
     }
 
     clean_up_(&params);
@@ -126,6 +140,7 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
     ASSERT_NOTNULL(params->args);
     ASSERT_NOTNULL(params->dirs_arena);
     ASSERT_NOTNULL(params->files_arena);
+    ASSERT_NOTNULL(params->scratch_arena);
     ASSERT_NOTNULL(params->dirs);
     ASSERT_NOTNULL(params->files);
     ASSERT_NOTNULL(array);
@@ -169,7 +184,8 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
         entry->path = str;
         entry->st = st;
         if (params->args->list) {
-            if (!get_file_info(params->files_arena, entry)) {
+            if (!get_file_info(params->files_arena, params->scratch_arena,
+                               entry)) {
                 goto failed;
             }
         }
@@ -191,6 +207,8 @@ static bool read_dir_(t_params *params, t_str *path, int *exit_code) {
     ASSERT_NOTNULL(params->args);
     ASSERT_NOTNULL(params->dirs_arena);
     ASSERT_NOTNULL(params->files_arena);
+    ASSERT_NOTNULL(params->entries_arena);
+    ASSERT_NOTNULL(params->scratch_arena);
     ASSERT_NOTNULL(params->dirs);
     ASSERT_NOTNULL(params->files);
     ASSERT_NOTNULL(path);
@@ -202,6 +220,10 @@ static bool read_dir_(t_params *params, t_str *path, int *exit_code) {
                    "ft_ls: cannot open directory '%s': Permission denied\n",
                    path);
         return false;
+    }
+
+    if (!reset_entries_(params)) {
+        goto failed;
     }
 
     struct dirent *dp;
@@ -243,7 +265,8 @@ static bool read_dir_(t_params *params, t_str *path, int *exit_code) {
         }
 
         if (params->args->list) {
-            if (!get_file_info(params->files_arena, entry)) {
+            if (!get_file_info(params->files_arena, params->scratch_arena,
+                               entry)) {
                 goto failed;
             }
         }
@@ -290,14 +313,41 @@ failed:
     return false;
 }
 
+static bool reset_files_(t_params *params) {
+    ASSERT_NOTNULL(params);
+    ASSERT_NOTNULL(params->files_arena);
+
+    ArenaClear(params->files_arena);
+    params->files = init_array(params->files_arena, ARRAY_SIZE);
+    if (!params->files) {
+        return false;
+    }
+
+    return true;
+}
+
+static bool reset_entries_(t_params *params) {
+    ASSERT_NOTNULL(params);
+    ASSERT_NOTNULL(params->entries_arena);
+
+    ArenaClear(params->entries_arena);
+    params->entries = init_array(params->entries_arena, ARRAY_SIZE);
+    if (!params->entries) {
+        return false;
+    }
+
+    return true;
+}
+
 static t_str *join_paths_(Arena *arena, t_str *lhs, t_str *rhs) {
+    const ArenaMark mark = ArenaGetMark(arena);
     const size_t new_len = lhs->len + 1 + rhs->len + 1;
     t_str *fullname = init_str(arena, new_len);
     if (!fullname) {
         return NULL;
     }
 
-    const uint64_t arena_pos = ArenaPos(arena);
+    const ArenaMark scratch_mark = ArenaGetMark(arena);
     t_str *slash = create_str(arena, "/");
     if (!slash) {
         goto failed;
@@ -310,11 +360,11 @@ static t_str *join_paths_(Arena *arena, t_str *lhs, t_str *rhs) {
     len += cat_str(fullname, rhs);
     ASSERT_EQ(fullname->len, len);
 
-    ArenaPopTo(arena, arena_pos);
+    ArenaPopToMark(arena, scratch_mark);
     return fullname;
 
 failed:
-    ArenaPopTo(arena, arena_pos);
+    ArenaPopToMark(arena, mark);
     return NULL;
 }
 
@@ -359,5 +409,9 @@ static void clean_up_(t_params *params) {
 
     if (params->entries_arena) {
         ArenaRelease(params->entries_arena);
+    }
+
+    if (params->scratch_arena) {
+        ArenaRelease(params->scratch_arena);
     }
 }
