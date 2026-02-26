@@ -3,9 +3,10 @@
 
 #include "../include/ft_assert.h"
 #include "../include/ft_str.h"
+#include "../include/ft_arena.h"
+
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
-#include "ft_arena.h"
 
 // TODO: replace all ft_strlcpy it use strlen...
 static uint64_t strlcpy_(t_str *dst, const t_str *src, uint64_t dstsize);
@@ -81,7 +82,7 @@ t_str *dup_str(Arena *arena, const t_str *str) {
     ASSERT_GE(str->len, 1);
     ASSERT_(*str->str, "%c can not be '\\0'", *str->str);
 
-    t_str *new_str = init_str(arena, str->cap);
+    t_str *new_str = init_str(arena, str->cap - 1);
     if (!new_str) {
         return NULL;
     }
@@ -197,12 +198,15 @@ t_str *uint_to_str(Arena *arena, uint64_t nbr) {
 }
 
 uint64_t append_chars_str(Arena *arena, t_str *dst, const char *src) {
+    ArenaMark marker = ArenaGetMark(arena);
     t_str *new_str = create_str(arena, src);
     if (!new_str) {
         return 0;
     }
 
-    return cat_str(dst, new_str);
+    uint64_t len = cat_str(dst, new_str);
+    ArenaPopToMark(arena, marker);
+    return len;
 }
 
 uint64_t append_chars_l_str(Arena *arena, t_str *dst, const char *src,
