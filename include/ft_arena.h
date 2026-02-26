@@ -18,6 +18,11 @@ typedef struct {
     ArenaBlock *current;
 } Arena;
 
+typedef struct {
+    ArenaBlock *block;
+    uint64_t pos;
+} ArenaMark;
+
 #ifndef ARENA_SIZE
 #define ARENA_SIZE UINT64_C(4096)
 #endif // !ARENA_SIZE
@@ -49,6 +54,13 @@ void ArenaSetAutoAlign(Arena *arena, uint64_t align);
  * @note Only valid for use with ArenaPopTo within the same block.
  */
 uint64_t ArenaPos(Arena *arena);
+
+/**
+ * @brief Captures the current arena state for later rollback.
+ * @param arena (Arena*) Pointer to the arena.
+ * @return (ArenaMark) Block pointer + position snapshot.
+ */
+ArenaMark ArenaGetMark(Arena *arena);
 
 /**
  * @brief Allocates memory from the arena without zeroing it.
@@ -84,6 +96,13 @@ void *ArenaPushAligner(Arena *arena, uint64_t alignment);
  * blocks.
  */
 void ArenaPopTo(Arena *arena, uint64_t pos);
+
+/**
+ * @brief Resets arena to a previously captured mark.
+ * @param arena (Arena*) Pointer to the arena.
+ * @param mark (ArenaMark) Previously captured mark.
+ */
+void ArenaPopToMark(Arena *arena, ArenaMark mark);
 
 /**
  * @brief Pops a number of bytes from the end of the arena.

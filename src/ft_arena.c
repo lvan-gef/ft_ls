@@ -65,6 +65,15 @@ uint64_t ArenaPos(Arena *arena) {
     return arena->current->pos;
 }
 
+ArenaMark ArenaGetMark(Arena *arena) {
+    ASSERT_NOTNULL(arena);
+
+    ArenaMark mark = {.block = arena->current, .pos = arena->current->pos};
+    ASSERT_NOTNULL(mark.block);
+    ASSERT_LE(mark.pos, mark.block->cap);
+    return mark;
+}
+
 void *ArenaPushNoZero(Arena *arena, uint64_t size) {
     ASSERT_NOTNULL(arena);
     ASSERT_GT(size, 0);
@@ -147,6 +156,38 @@ void ArenaPopTo(Arena *arena, uint64_t pos) {
         arena->current->next = NULL;
         free(block);
     }
+
+    ASSERT_NOTNULL(arena->current);
+    ASSERT_NULL(arena->current->next);
+}
+
+void ArenaPopToMark(Arena *arena, ArenaMark mark) {
+    ASSERT_NOTNULL(arena);
+    ASSERT_NOTNULL(mark.block);
+    ASSERT_LE(mark.pos, mark.block->cap);
+
+    ArenaBlock *cursor = arena->current;
+    while (cursor && cursor != mark.block) {
+        cursor = cursor->prev;
+    }
+
+    ASSERT_NOTNULL(cursor);
+    if (!cursor) {
+        return;
+    }
+
+    ArenaBlock *block = arena->current;
+    while (block != mark.block) {
+        ArenaBlock *prev = block->prev;
+        if (prev) {
+            prev->next = NULL;
+        }
+        free(block);
+        block = prev;
+    }
+
+    block->pos = mark.pos;
+    arena->current = block;
 
     ASSERT_NOTNULL(arena->current);
     ASSERT_NULL(arena->current->next);
