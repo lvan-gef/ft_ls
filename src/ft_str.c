@@ -3,6 +3,7 @@
 
 #include "../include/ft_arena.h"
 #include "../include/ft_assert.h"
+#include "../include/ft_helper.h"
 #include "../include/ft_str.h"
 
 #include "../libft/include/ft_fprintf.h"
@@ -10,7 +11,6 @@
 
 // TODO: replace all ft_strlcpy it use strlen...
 static uint64_t strlcpy_(t_str *dst, const t_str *src, uint64_t dstsize);
-static uint64_t len_of_nbr_(uint64_t nbr);
 
 t_str *init_str(Arena *arena, uint64_t cap) {
     ASSERT_NOTNULL(arena);
@@ -149,35 +149,8 @@ uint64_t cat_l_str(t_str *dst, const t_str *src, uint64_t size) {
     return len;
 }
 
-uint64_t cpy_str(t_str *dst, const t_str *src) {
-    ASSERT_NOTNULL(dst);
-    ASSERT_GE(dst->cap, 2);
-    ASSERT_EQ(dst->len, 0);
-    ASSERT_(!*dst->str, "%c can not be '\\0'", *dst->str);
-    ASSERT_NOTNULL(src);
-    ASSERT_GE(src->cap, 2);
-    ASSERT_GE(src->len, 1);
-    ASSERT_LT(src->pos, src->len);
-    ASSERT_(*src->str, "%c can not be '\\0'", *src->str);
-    ASSERT_EQ(dst->cap, src->cap);
-
-    return strlcpy_(dst, src, dst->cap + 1);
-}
-uint64_t cpy_l_str(t_str *dst, const t_str *src, uint64_t size) {
-    ASSERT_NOTNULL(dst);
-    ASSERT_GE(dst->cap, 2);
-    ASSERT_EQ(dst->len, 0);
-    ASSERT_(!*dst->str, "%c can not be '\\0'", *dst->str);
-    ASSERT_NOTNULL(src);
-    ASSERT_GE(src->cap, 2);
-    ASSERT_GE(src->len, 1);
-    ASSERT_(*src->str, "%c can not be '\\0'", *src->str);
-
-    return strlcpy_(dst, src, size);
-}
-
 t_str *uint_to_str(Arena *arena, uint64_t nbr) {
-    uint64_t len = len_of_nbr_(nbr);
+    uint64_t len = len_of_nbr(nbr);
 
     t_str *str = init_str(arena, len);
     if (!str) {
@@ -199,7 +172,7 @@ t_str *uint_to_str(Arena *arena, uint64_t nbr) {
 
 uint64_t append_chars_str(Arena *arena, t_str *dst, const char *src) {
     ArenaMark marker = ArenaGetMark(arena);
-    t_str *new_str = create_str(arena, src);
+    const t_str *new_str = create_str(arena, src);
     if (!new_str) {
         return 0;
     }
@@ -209,17 +182,7 @@ uint64_t append_chars_str(Arena *arena, t_str *dst, const char *src) {
     return len;
 }
 
-uint64_t append_chars_l_str(Arena *arena, t_str *dst, const char *src,
-                            uint64_t size) {
-    t_str *new_str = create_str(arena, src);
-    if (!new_str) {
-        return 0;
-    }
-
-    return cat_l_str(dst, new_str, size);
-}
-
-bool has_next_str(t_str *s) {
+bool has_next_str(const t_str *s) {
     ASSERT_NOTNULL(s);
 
     return s->pos < s->len;
@@ -257,15 +220,4 @@ static uint64_t strlcpy_(t_str *dst, const t_str *src, uint64_t dstsize) {
 
     dst->str[dst->pos + copied] = '\0';
     return copied;
-}
-
-static uint64_t len_of_nbr_(uint64_t nbr) {
-    uint64_t len = 1;
-
-    while (nbr >= 10) {
-        nbr /= 10;
-        ++len;
-    }
-
-    return len;
 }

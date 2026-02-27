@@ -19,15 +19,11 @@ t_str *create_str(Arena *arena, const char *str);
 t_str *dup_str(Arena *arena, const t_str *str);
 uint64_t cat_str(t_str *dst, const t_str *src);
 uint64_t cat_l_str(t_str *dst, const t_str *src, uint64_t size);
-uint64_t cpy_str(t_str *dst, const t_str *src);
-uint64_t cpy_l_str(t_str *dst, const t_str *src, uint64_t size);
 t_str *uint_to_str(Arena *arena, uint64_t nbr);
 
 uint64_t append_chars_str(Arena *arena, t_str *dst, const char *src);
-uint64_t append_chars_l_str(Arena *arena, t_str *dst, const char *src,
-                            uint64_t size);
 
-bool has_next_str(t_str *s);
+bool has_next_str(const t_str *s);
 char peek_str(t_str *s);
 char next_str(t_str *s);
 
