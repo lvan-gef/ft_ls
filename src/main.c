@@ -9,7 +9,7 @@
 #include "../include/ft_parse.h"
 #include "../include/ft_walk.h"
 
-void clean_program_(Arena *arena);
+static void clean_program_(Arena *arena);
 
 int main(int argc, char *argv[]) {
     t_args args = {0};
@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
     return exit_code;
 }
 
-void clean_program_(Arena *arena) {
+static void clean_program_(Arena *arena) {
     ASSERT_NOTNULL(arena);
 
     ArenaRelease(arena);
