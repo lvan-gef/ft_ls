@@ -13,7 +13,7 @@
 
 #include "../libft/include/libft.h"
 
-static t_str *get_perm_(Arena *arena, Arena *scratch, t_entry *entry);
+static t_str *get_perm_(Arena *arena, Arena *scratch, const t_entry *entry);
 static t_str *get_user_(Arena *arena, uid_t user_id);
 static t_str *get_group_(Arena *arena, gid_t group_id);
 static t_str *get_dt_(Arena *arena, const struct timespec *ctim);
@@ -137,7 +137,7 @@ failed:
     return false;
 }
 
-static t_str *get_perm_(Arena *arena, Arena *scratch, t_entry *entry) {
+static t_str *get_perm_(Arena *arena, Arena *scratch, const t_entry *entry) {
     const ArenaMark mark = ArenaGetMark(arena);
 
     t_str *str = init_str(arena, PERMISSION_SIZE);
