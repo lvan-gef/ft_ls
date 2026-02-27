@@ -166,7 +166,7 @@ void ArenaPopToMark(Arena *arena, ArenaMark mark) {
     ASSERT_NOTNULL(mark.block);
     ASSERT_LE(mark.pos, mark.block->cap);
 
-    ArenaBlock *cursor = arena->current;
+    const ArenaBlock *cursor = arena->current;
     while (cursor && cursor != mark.block) {
         cursor = cursor->prev;
     }

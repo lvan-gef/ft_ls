@@ -47,7 +47,7 @@ t_str *get_path_entry(Arena *arena, t_entry *entry) {
     ASSERT_LT(entry->path->len, entry->path->cap);
     ASSERT_NOTNULL(arena);
 
-    char *last_slash = ft_strrchr(entry->path->str, '/');
+    const char *last_slash = ft_strrchr(entry->path->str, '/');
     if (!last_slash) {
         return NULL;
     }
@@ -265,7 +265,7 @@ static t_str *get_group_(Arena *arena, gid_t group_id) {
 }
 
 static t_str *get_dt_(Arena *arena, const struct timespec *ctim) {
-    char *dt = ctime(&ctim->tv_sec);
+    const char *dt = ctime(&ctim->tv_sec);
     if (!dt) {
         return NULL;
     }
