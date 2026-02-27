@@ -20,9 +20,6 @@ typedef struct s_array {
 
 t_array *init_array(Arena *arena, uint64_t size);
 bool append_array(t_array *array, void *content);
-bool insert_array(t_array *array, void *content, uint64_t index);
-void remove_elem_array(t_array *array, const void *content);
 void *pop_array(t_array *array);
-void clear_array(t_array *array);
 
 #endif // !FT_ARRAY_H

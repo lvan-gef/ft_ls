@@ -48,50 +48,6 @@ bool append_array(t_array *array, void *content) {
     return true;
 }
 
-bool insert_array(t_array *array, void *content, uint64_t index) {
-    ASSERT_NOTNULL(array);
-    ASSERT_GT(index, 0);
-    ASSERT_NOTNULL(content);
-
-    if (array->len == array->cap) {
-        if (!realloc_arr_(array)) {
-            return false;
-        }
-    }
-
-    uint64_t i = array->len;
-    while (i > index) {
-        array->data[i] = array->data[i - 1];
-        --i;
-    }
-
-    array->data[index] = content;
-    ++array->len;
-    return true;
-}
-
-void remove_elem_array(t_array *array, const void *content) {
-    ASSERT_NOTNULL(array);
-    ASSERT_NOTNULL(content);
-
-    uint64_t index = 0;
-    while (index < array->len) {
-        if (array->data[index] == content) {
-            uint64_t next_index = index + 1;
-            while (next_index < array->len) {
-                array->data[index] = array->data[next_index];
-                ++index;
-                ++next_index;
-            }
-
-            array->data[array->len - 1] = NULL;
-            --array->len;
-            return;
-        }
-        ++index;
-    }
-}
-
 void *pop_array(t_array *array) {
     ASSERT_NOTNULL(array);
 
@@ -103,11 +59,6 @@ void *pop_array(t_array *array) {
     void *elem = array->data[array->len];
     array->data[array->len] = NULL;
     return elem;
-}
-
-void clear_array(t_array *array) {
-    ASSERT_NOTNULL(array);
-    array->len = 0;
 }
 
 static bool realloc_arr_(t_array *array) {
