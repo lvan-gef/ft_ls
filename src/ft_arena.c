@@ -59,12 +59,6 @@ void ArenaSetAutoAlign(Arena *arena, uint64_t align) {
     }
 }
 
-uint64_t ArenaPos(Arena *arena) {
-    ASSERT_NOTNULL(arena);
-
-    return arena->current->pos;
-}
-
 ArenaMark ArenaGetMark(const Arena *arena) {
     ASSERT_NOTNULL(arena);
 
@@ -130,37 +124,6 @@ void *ArenaPush(Arena *arena, uint64_t size) {
     return ptr;
 }
 
-void *ArenaPushAligner(Arena *arena, uint64_t alignment) {
-    ASSERT_NOTNULL(arena);
-    ASSERT_GT(alignment, 0);
-
-    uint64_t remainder = arena->current->pos % alignment;
-
-    if (remainder) {
-        arena->current->pos += alignment - remainder;
-    }
-
-    return ArenaPush(arena, alignment);
-}
-
-void ArenaPopTo(Arena *arena, uint64_t pos) {
-    ASSERT_NOTNULL(arena);
-
-    if (pos < arena->current->pos) {
-        arena->current->pos = pos;
-    }
-
-    if (!arena->current->pos && arena->current->prev) {
-        ArenaBlock *block = arena->current;
-        arena->current = block->prev;
-        arena->current->next = NULL;
-        free(block);
-    }
-
-    ASSERT_NOTNULL(arena->current);
-    ASSERT_NULL(arena->current->next);
-}
-
 void ArenaPopToMark(Arena *arena, ArenaMark mark) {
     ASSERT_NOTNULL(arena);
     ASSERT_NOTNULL(mark.block);
@@ -188,27 +151,6 @@ void ArenaPopToMark(Arena *arena, ArenaMark mark) {
 
     block->pos = mark.pos;
     arena->current = block;
-
-    ASSERT_NOTNULL(arena->current);
-    ASSERT_NULL(arena->current->next);
-}
-
-void ArenaPop(Arena *arena, uint64_t size) {
-    ASSERT_NOTNULL(arena);
-    ASSERT_GT(size, 0);
-
-    if (size >= arena->current->pos) {
-        arena->current->pos = 0;
-    } else {
-        arena->current->pos -= size;
-    }
-
-    if (!arena->current->pos && arena->current->prev) {
-        ArenaBlock *block = arena->current;
-        arena->current = block->prev;
-        arena->current->next = NULL;
-        free(block);
-    }
 
     ASSERT_NOTNULL(arena->current);
     ASSERT_NULL(arena->current->next);
