@@ -60,7 +60,7 @@ uint64_t ArenaPos(Arena *arena);
  * @param arena (Arena*) Pointer to the arena.
  * @return (ArenaMark) Block pointer + position snapshot.
  */
-ArenaMark ArenaGetMark(Arena *arena);
+ArenaMark ArenaGetMark(const Arena *arena);
 
 /**
  * @brief Allocates memory from the arena without zeroing it.

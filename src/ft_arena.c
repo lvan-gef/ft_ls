@@ -65,7 +65,7 @@ uint64_t ArenaPos(Arena *arena) {
     return arena->current->pos;
 }
 
-ArenaMark ArenaGetMark(Arena *arena) {
+ArenaMark ArenaGetMark(const Arena *arena) {
     ASSERT_NOTNULL(arena);
 
     ArenaMark mark = {.block = arena->current, .pos = arena->current->pos};
