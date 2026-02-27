@@ -35,16 +35,17 @@ typedef struct {
     t_str *dubble_colon;
 } t_spacing;
 
-static void init_print_row_(t_array *array, t_str *dir_path);
-static void print_row_(t_array *array, t_str *buf, t_map *map,
-                       t_spacing *spacing, bool quoted, uint64_t *col_starts);
+static void init_print_row_(t_array *array, const t_str *dir_path);
+static void print_row_(t_array *array, t_str *buf, const t_map *map, const t_spacing *spacing, bool quoted, const uint64_t *col_starts);
 static uint64_t *calc_cols_(Arena *arena, t_array *array, t_map *map,
                             bool quoted);
 static uint64_t calc_layout_width_(t_array *array, uint64_t num_cols,
                                    uint64_t *col_widths, bool quoted);
 static bool check_quoted_(t_array *array);
 
-void printer(t_args *args, t_array *array, t_str *dir_path, bool print_total) {
+// todo need to '' if there are spaces for dir_path
+void printer(const t_args *args, t_array *array, t_str *dir_path, bool print_total,
+             uint64_t min_len_links, uint64_t min_len_sizes) {
     ASSERT_NOTNULL(args);
     ASSERT_NOTNULL(array);
 
@@ -53,13 +54,13 @@ void printer(t_args *args, t_array *array, t_str *dir_path, bool print_total) {
     }
 
     if (args->list) {
-        print_list(array, dir_path, print_total);
+        print_list(array, dir_path, print_total, min_len_links, min_len_sizes);
     } else {
         init_print_row_(array, dir_path);
     }
 }
 
-static void init_print_row_(t_array *array, t_str *dir_path) {
+static void init_print_row_(t_array *array, const t_str *dir_path) {
     ASSERT_NOTNULL(array);
 
     uint64_t max_cols = (TERM_SIZE + SPACE_GAP) / (1 + SPACE_GAP);
@@ -100,10 +101,13 @@ static void init_print_row_(t_array *array, t_str *dir_path) {
             col_starts[index] + col_widths[index] + SPACE_GAP;
     }
 
-    uint64_t buf_size = (TERM_SIZE * map.rows) + map.rows + 1;
+    uint64_t row_width =
+        calc_layout_width_(array, map.cols, col_widths, quoted);
+    uint64_t buf_size = (row_width * map.rows) + map.rows + 1;
 
+    // todo need to '' if there are spaces
     if (dir_path) {
-        buf_size += dir_path->len + 3;
+        buf_size += dir_path->len + 3;  // 1 for space, 1 for :, 1 for \n
     }
 
     t_str *buf = init_str(arena, buf_size);
@@ -139,8 +143,7 @@ done:
     }
 }
 
-static void print_row_(t_array *array, t_str *buf, t_map *map,
-                       t_spacing *spacing, bool quoted, uint64_t *col_starts) {
+static void print_row_(t_array *array, t_str *buf, const t_map *map, const t_spacing *spacing, bool quoted, const uint64_t *col_starts) {
     const uint64_t files_len = array->len;
     const uint64_t buf_size = buf->cap - 1;
 
