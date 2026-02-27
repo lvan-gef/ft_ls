@@ -40,39 +40,6 @@ static gid_t cached_gid = (gid_t)-1;
 static char cached_user[LOGIN_NAME_MAX] = "";
 static char cached_group[LOGIN_NAME_MAX] = "";
 
-t_str *get_path_entry(Arena *arena, t_entry *entry) {
-    ASSERT_NOTNULL(entry);
-    ASSERT_NOTNULL(entry->path);
-    ASSERT_GT(entry->path->cap, 0);
-    ASSERT_LT(entry->path->len, entry->path->cap);
-    ASSERT_NOTNULL(arena);
-
-    const char *last_slash = ft_strrchr(entry->path->str, '/');
-    if (!last_slash) {
-        return NULL;
-    }
-
-    if (last_slash == entry->path->str) {
-        return create_str(arena, "/");
-    }
-
-    uint64_t len = (uint64_t)(last_slash - entry->path->str);
-    if (len + 1 < len) {
-        return NULL;
-    }
-
-    t_str *new_str = init_str(arena, len + 1);
-    if (!new_str) {
-        return NULL;
-    }
-
-    ft_memcpy(new_str->str, entry->path->str, len);
-    new_str->len = len;
-    new_str->str[new_str->len] = '\0';
-
-    return new_str;
-}
-
 bool get_file_info(Arena *arena, Arena *scratch, t_entry *entry) {
     ASSERT_NOTNULL(entry);
     ASSERT_NOTNULL(entry->path);

@@ -48,7 +48,6 @@ typedef struct {
     t_file_info *info;
 } t_entry;
 
-t_str *get_path_entry(Arena *arena, t_entry *entry);
 bool get_file_info(Arena *arena, Arena *scratch, t_entry *entry);
 
 #endif // !FT_PATH_H
