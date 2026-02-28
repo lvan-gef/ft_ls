@@ -36,7 +36,9 @@ typedef struct {
 } t_spacing;
 
 static void init_print_row_(t_array *array, const t_str *dir_path);
-static void print_row_(t_array *array, t_str *buf, const t_map *map, const t_spacing *spacing, bool quoted, const uint64_t *col_starts);
+static void print_row_(t_array *array, t_str *buf, const t_map *map,
+                       const t_spacing *spacing, bool quoted,
+                       const uint64_t *col_starts);
 static uint64_t *calc_cols_(Arena *arena, t_array *array, t_map *map,
                             bool quoted);
 static uint64_t calc_layout_width_(t_array *array, uint64_t num_cols,
@@ -44,8 +46,8 @@ static uint64_t calc_layout_width_(t_array *array, uint64_t num_cols,
 static bool check_quoted_(t_array *array);
 
 // todo need to '' if there are spaces for dir_path
-void printer(const t_args *args, t_array *array, t_str *dir_path, bool print_total,
-             uint64_t min_len_links, uint64_t min_len_sizes) {
+void printer(const t_args *args, t_array *array, const t_str *dir_path,
+             bool print_total, uint64_t min_len_links, uint64_t min_len_sizes) {
     ASSERT_NOTNULL(args);
     ASSERT_NOTNULL(array);
 
@@ -107,7 +109,7 @@ static void init_print_row_(t_array *array, const t_str *dir_path) {
 
     // todo need to '' if there are spaces
     if (dir_path) {
-        buf_size += dir_path->len + 3;  // 1 for space, 1 for :, 1 for \n
+        buf_size += dir_path->len + 3; // 1 for space, 1 for :, 1 for \n
     }
 
     t_str *buf = init_str(arena, buf_size);
@@ -143,7 +145,9 @@ done:
     }
 }
 
-static void print_row_(t_array *array, t_str *buf, const t_map *map, const t_spacing *spacing, bool quoted, const uint64_t *col_starts) {
+static void print_row_(t_array *array, t_str *buf, const t_map *map,
+                       const t_spacing *spacing, bool quoted,
+                       const uint64_t *col_starts) {
     const uint64_t files_len = array->len;
     const uint64_t buf_size = buf->cap - 1;
 
@@ -232,10 +236,10 @@ static uint64_t *calc_cols_(Arena *arena, t_array *array, t_map *map,
         return NULL;
     }
 
-    uint64_t width = 0;
     uint64_t try_cols = map->max;
     while (try_cols > 1) {
-        width = calc_layout_width_(array, try_cols, col_widths, quoted);
+        uint64_t width =
+            calc_layout_width_(array, try_cols, col_widths, quoted);
         if (width < TERM_SIZE) {
             map->cols = try_cols;
             map->rows = (array->len + map->cols - 1) / map->cols;
@@ -293,7 +297,7 @@ static uint64_t calc_layout_width_(t_array *array, uint64_t num_cols,
 
 static bool check_quoted_(t_array *array) {
     for (uint64_t index = 0; index < array->len; ++index) {
-        t_entry *entry = array->data[index];
+        const t_entry *entry = array->data[index];
         if (entry->quoted->len) {
             return true;
         }
