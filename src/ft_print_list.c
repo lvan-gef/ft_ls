@@ -5,6 +5,7 @@
 #include "../include/ft_arena.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
+#include "../include/ft_helper.h"
 #include "../include/ft_path.h"
 #include "../include/ft_print_list.h"
 #include "../include/ft_str.h"
@@ -22,12 +23,12 @@ typedef struct {
 #endif /* ifndef HEADER_PREFIX_LEN */
 
 static void get_sizes_(t_array *array, t_sizes *sizes);
-static uint64_t len_of_nbr_(uint64_t nbr);
 static void left_pad_(Arena *arena, t_str *buffer, uint64_t src_len,
                       uint64_t max_size);
 static bool have_quotes_(t_array *array);
 
-void print_list(t_array *array, t_str *path, bool print_total) {
+void print_list(t_array *array, const t_str *path, bool print_total,
+                uint64_t min_len_links, uint64_t min_len_sizes) {
     ASSERT_NOTNULL(array);
 
     Arena *arena = ArenaAlloc(ARENA_SIZE);
@@ -36,7 +37,9 @@ void print_list(t_array *array, t_str *path, bool print_total) {
     }
     ArenaSetAutoAlign(arena, 8);
 
-    t_sizes sizes = {.have_quote = have_quotes_(array)};
+    t_sizes sizes = {.have_quote = have_quotes_(array),
+                     .max_len_links = min_len_links,
+                     .max_len_sizes = min_len_sizes};
     get_sizes_(array, &sizes);
 
     if (path) {
@@ -55,7 +58,7 @@ void print_list(t_array *array, t_str *path, bool print_total) {
     }
 
     if (print_total) {
-        t_str *total = uint_to_str(arena, (sizes.total + 1) / 2);
+        const t_str *total = uint_to_str(arena, (sizes.total + 1) / 2);
         if (!total) {
             goto done;
         }
@@ -65,7 +68,7 @@ void print_list(t_array *array, t_str *path, bool print_total) {
     }
 
     for (uint64_t index = 0; index < array->len; ++index) {
-        t_entry *entry = array->data[index];
+        const t_entry *entry = array->data[index];
 
         cat_l_str(buf, entry->info->perm, sizes.buf_size);
         append_chars_str(arena, buf, " ");
@@ -124,7 +127,7 @@ static void get_sizes_(t_array *array, t_sizes *sizes) {
         sizes->total += e->info->blocks;
     }
 
-    uint64_t total_str_len = len_of_nbr_((sizes->total + 1) / 2);
+    uint64_t total_str_len = len_of_nbr((sizes->total + 1) / 2);
     sizes->buf_size = 6 + total_str_len + 1; // "total " + number + '\n'
 
     for (uint64_t i = 0; i < array->len; ++i) {
@@ -166,17 +169,6 @@ static void get_sizes_(t_array *array, t_sizes *sizes) {
     }
 }
 
-static uint64_t len_of_nbr_(uint64_t nbr) {
-    uint64_t len = 1;
-
-    while (nbr >= 10) {
-        nbr /= 10;
-        ++len;
-    }
-
-    return len;
-}
-
 static void left_pad_(Arena *arena, t_str *buffer, uint64_t src_len,
                       uint64_t max_size) {
     ASSERT_LE(src_len, max_size);
@@ -189,7 +181,7 @@ static void left_pad_(Arena *arena, t_str *buffer, uint64_t src_len,
 
 static bool have_quotes_(t_array *array) {
     for (uint64_t index = 0; index < array->len; ++index) {
-        t_entry *entry = array->data[index];
+        const t_entry *entry = array->data[index];
         if (entry->quoted->len) {
             return true;
         }
