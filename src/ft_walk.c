@@ -6,6 +6,7 @@
 #include "../include/ft_arena.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
+#include "../include/ft_helper.h"
 #include "../include/ft_path.h"
 #include "../include/ft_printer.h"
 #include "../include/ft_sort.h"
@@ -23,13 +24,15 @@ typedef struct {
     t_array *dirs;
     t_array *files;
     t_array *entries;
+    uint64_t max_len_links;
+    uint64_t max_len_sizes;
 } t_params;
 
 static bool read_dir_(t_params *params, t_str *path, int *exit_code);
 static bool process_args_(t_params *params, t_array *array, int *exit_code);
 static bool reset_files_(t_params *params);
 static bool reset_entries_(t_params *params);
-static t_str *join_paths_(Arena *files_arena, t_str *lhs, t_str *rhs);
+static t_str *join_paths_(Arena *arena, const t_str *lhs, const t_str *rhs);
 static t_str *need_quote_(Arena *arena, t_str *str);
 static void clean_up_(t_params *params);
 
@@ -98,7 +101,8 @@ void process(t_args *args, t_array *array, int *exit_code) {
     const bool print_dir_path = args->recursive || array->len > 1;
 
     if (params.files->len) {
-        printer(args, params.files, NULL, false);
+        printer(args, params.files, NULL, false, params.max_len_links,
+                params.max_len_sizes);
         printed_section = true;
         if (!reset_files_(&params)) {
             err_msg = "Failed to reset files array";
@@ -117,7 +121,8 @@ void process(t_args *args, t_array *array, int *exit_code) {
             *exit_code = 2;
         }
 
-        printer(args, params.files, print_dir_path ? dir_path : NULL, true);
+        printer(args, params.files, print_dir_path ? dir_path : NULL, true, 0,
+                0);
         printed_section = true;
         if (!reset_files_(&params)) {
             err_msg = "Failed to reset files array";
@@ -148,6 +153,11 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
 
     const char *err_msg = NULL;
     struct stat st;
+    t_array *dir_entries = init_array(params->files_arena, ARRAY_SIZE);
+    if (!dir_entries) {
+        err_msg = "Failed to init dir entries";
+        goto failed;
+    }
 
     for (uint64_t index = 0; index < array->len; ++index) {
         t_str *str = array->data[index];
@@ -157,28 +167,62 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
                        "ft_ls: cannot access '%s': No such file or directory\n",
                        str->str);
             *exit_code = 2;
-            return NULL;
+            continue;
+        }
+
+        if (params->args->list) {
+            const uint64_t links_len = len_of_nbr((uint64_t)st.st_nlink);
+            if (links_len > params->max_len_links) {
+                params->max_len_links = links_len;
+            }
+
+            const uint64_t size_len = len_of_nbr((uint64_t)st.st_size);
+            if (size_len > params->max_len_sizes) {
+                params->max_len_sizes = size_len;
+            }
         }
 
         bool is_dir_operand = S_ISDIR(st.st_mode);
+        struct stat st_dir = st;
         if (S_ISLNK(st.st_mode)) {
             struct stat st_target;
             if (stat(str->str, &st_target) == 0 && S_ISDIR(st_target.st_mode)) {
                 is_dir_operand = true;
+                st_dir = st_target;
             }
         }
 
         if (is_dir_operand && !params->args->list) {
-            if (!append_array(params->dirs, str)) {
-                err_msg = "Failed to append dir";
+            t_entry *dir_entry =
+                ArenaPush(params->files_arena, sizeof(*dir_entry));
+            if (!dir_entry) {
+                err_msg = "Failed to alloc dir entry";
+                goto failed;
+            }
+
+            dir_entry->name = str;
+            dir_entry->path = str;
+            dir_entry->st = st_dir;
+            if (!append_array(dir_entries, dir_entry)) {
+                err_msg = "Failed to append dir entry";
                 goto failed;
             }
             continue;
         }
 
         if (S_ISDIR(st.st_mode)) {
-            if (!append_array(params->dirs, str)) {
-                err_msg = "Failed to append dir";
+            t_entry *dir_entry =
+                ArenaPush(params->files_arena, sizeof(*dir_entry));
+            if (!dir_entry) {
+                err_msg = "Failed to alloc dir entry";
+                goto failed;
+            }
+
+            dir_entry->name = str;
+            dir_entry->path = str;
+            dir_entry->st = st;
+            if (!append_array(dir_entries, dir_entry)) {
+                err_msg = "Failed to append dir entry";
                 goto failed;
             }
             continue;
@@ -212,6 +256,17 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
         }
     }
 
+    if (dir_entries->len) {
+        sort(dir_entries, params->args->reverse, params->args->time);
+        while (dir_entries->len) {
+            t_entry *entry = pop_array(dir_entries);
+            if (!append_array(params->dirs, entry->path)) {
+                err_msg = "Failed to append dir";
+                goto failed;
+            }
+        }
+    }
+
     return true;
 failed:
     ft_fprintf(STDERR_FILENO, "Error: %s\n", err_msg);
@@ -242,7 +297,7 @@ static bool read_dir_(t_params *params, t_str *path, int *exit_code) {
         goto failed;
     }
 
-    struct dirent *dp;
+    const struct dirent *dp;
     while ((dp = readdir(d)) != NULL) {
         if (!params->args->all && dp->d_name[0] == '.' &&
             dp->d_name[1] != '/') {
@@ -298,7 +353,7 @@ static bool read_dir_(t_params *params, t_str *path, int *exit_code) {
         size_t index = params->entries->len;
         while (index > 0) {
             --index;
-            t_entry *entry = pop_array(params->entries);
+            const t_entry *entry = pop_array(params->entries);
             if (!entry->name) {
                 continue;
             }
@@ -355,7 +410,7 @@ static bool reset_entries_(t_params *params) {
     return true;
 }
 
-static t_str *join_paths_(Arena *arena, t_str *lhs, t_str *rhs) {
+static t_str *join_paths_(Arena *arena, const t_str *lhs, const t_str *rhs) {
     const ArenaMark mark = ArenaGetMark(arena);
     const size_t new_len = lhs->len + 1 + rhs->len + 1;
     t_str *fullname = init_str(arena, new_len);
@@ -364,17 +419,16 @@ static t_str *join_paths_(Arena *arena, t_str *lhs, t_str *rhs) {
     }
 
     const ArenaMark scratch_mark = ArenaGetMark(arena);
-    t_str *slash = create_str(arena, "/");
+    const t_str *slash = create_str(arena, "/");
     if (!slash) {
         goto failed;
     }
 
-    uint64_t len = cat_str(fullname, lhs);
+    (void)cat_str(fullname, lhs);
     if (fullname->str[fullname->len - 1] != '/') {
-        len += cat_str(fullname, slash);
+        (void)cat_str(fullname, slash);
     }
-    len += cat_str(fullname, rhs);
-    ASSERT_EQ(fullname->len, len);
+    (void)cat_str(fullname, rhs);
 
     ArenaPopToMark(arena, scratch_mark);
     return fullname;
