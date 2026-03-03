@@ -35,7 +35,7 @@ typedef struct {
     t_str *dubble_colon;
 } t_spacing;
 
-static void init_print_row_(t_array *array, const t_str *dir_path);
+static void init_print_row_(Arena *arena, t_array *array, const t_str *dir_path);
 static void print_row_(t_array *array, t_str *buf, const t_map *map,
                        const t_spacing *spacing, bool quoted,
                        const uint64_t *col_starts);
@@ -51,18 +51,27 @@ void printer(const t_args *args, t_array *array, const t_str *dir_path,
     ASSERT_NOTNULL(args);
     ASSERT_NOTNULL(array);
 
+    Arena *arena = ArenaAlloc(ARENA_SIZE);
+    if (!arena) {
+        ft_fprintf(STDERR_FILENO, "Failed to alloc arena for printer");
+        return;
+    }
+    ArenaSetAutoAlign(arena, 8);
+
     if (array->len) {
-        sort(array, args->reverse, args->time);
+        sort(arena, array, args->reverse, args->time);
     }
 
     if (args->list) {
         print_list(array, dir_path, print_total, min_len_links, min_len_sizes);
     } else {
-        init_print_row_(array, dir_path);
+        init_print_row_(arena, array, dir_path);
     }
+
+    ArenaRelease(arena);
 }
 
-static void init_print_row_(t_array *array, const t_str *dir_path) {
+static void init_print_row_(Arena *arena, t_array *array, const t_str *dir_path) {
     ASSERT_NOTNULL(array);
 
     uint64_t max_cols = (TERM_SIZE + SPACE_GAP) / (1 + SPACE_GAP);
@@ -76,13 +85,6 @@ static void init_print_row_(t_array *array, const t_str *dir_path) {
 
     bool quoted = check_quoted_(array);
     const char *err_msg = NULL;
-
-    Arena *arena = ArenaAlloc(ARENA_SIZE);
-    if (!arena) {
-        err_msg = "Failed to alloc arena for printer";
-        goto done;
-    }
-    ArenaSetAutoAlign(arena, 8);
 
     uint64_t *col_widths = calc_cols_(arena, array, &map, quoted);
     if (!col_widths) {
@@ -118,20 +120,25 @@ static void init_print_row_(t_array *array, const t_str *dir_path) {
         goto done;
     }
 
-    t_spacing spacing = {.space = create_str(arena, " "),
-                         .tab = create_str(arena, "\t"),
-                         .new_line = create_str(arena, "\n"),
-                         .dubble_colon = create_str(arena, ":")};
-    if (!spacing.space || !spacing.tab || !spacing.new_line ||
-        !spacing.dubble_colon) {
-        err_msg = "Failed to create spacing struct";
-        goto done;
-    }
+    char space_buf[] = " ";
+    char tab_buf[] = "\t";
+    char new_line_buf[] = "\n";
+    char dubble_colon_buf[] = ":";
+
+    t_str space = {.str = space_buf, .cap = 2, .len = 1, .pos = 0};
+    t_str tab = {.str = tab_buf, .cap = 2, .len = 1, .pos = 0};
+    t_str new_line = {.str = new_line_buf, .cap = 2, .len = 1, .pos = 0};
+    t_str dubble_colon = { .str = dubble_colon_buf, .cap = 2, .len = 1, .pos = 0};
+
+    t_spacing spacing = {.space = &space,
+                         .tab = &tab,
+                         .new_line = &new_line,
+                         .dubble_colon = &dubble_colon};
 
     if (dir_path) {
-        cat_l_str(buf, dir_path, buf->cap - buf->len);
-        cat_l_str(buf, spacing.dubble_colon, buf->cap - buf->len);
-        cat_l_str(buf, spacing.new_line, buf->cap - buf->len);
+        cat_str(buf, dir_path);
+        cat_str(buf, spacing.dubble_colon);
+        cat_str(buf, spacing.new_line);
     }
 
     print_row_(array, buf, &map, &spacing, quoted, col_starts);
@@ -139,17 +146,12 @@ done:
     if (err_msg) {
         ft_fprintf(STDERR_FILENO, "%s\n", err_msg);
     }
-
-    if (arena) {
-        ArenaRelease(arena);
-    }
 }
 
 static void print_row_(t_array *array, t_str *buf, const t_map *map,
                        const t_spacing *spacing, bool quoted,
                        const uint64_t *col_starts) {
     const uint64_t files_len = array->len;
-    const uint64_t buf_size = buf->cap - 1;
 
     for (uint64_t row = 0; row < map->rows; ++row) {
         uint64_t curr_pos = 0;
@@ -164,18 +166,18 @@ static void print_row_(t_array *array, t_str *buf, const t_map *map,
                                (row + (col + 1) * map->rows >= files_len);
 
             if (entry->quoted->len) {
-                cat_l_str(buf, entry->quoted, buf_size - buf->len);
+                cat_str(buf, entry->quoted);
                 curr_pos += entry->quoted->len;
             } else if (quoted) {
-                cat_l_str(buf, spacing->space, buf_size - buf->len);
+                cat_str(buf, spacing->space);
                 curr_pos += 1;
             }
 
-            cat_l_str(buf, entry->name, buf_size - buf->len);
+            cat_str(buf, entry->name);
             curr_pos += entry->name->len;
 
             if (quoted && entry->quoted->len) {
-                cat_l_str(buf, entry->quoted, buf_size - buf->len);
+                cat_str(buf, entry->quoted);
                 curr_pos += entry->quoted->len;
             }
 
@@ -205,16 +207,16 @@ static void print_row_(t_array *array, t_str *buf, const t_map *map,
             while (curr_pos < target_pos) {
                 uint64_t next_tab = ((curr_pos / TABSIZE) + 1) * TABSIZE;
                 if (use_tabs && next_tab <= target_pos) {
-                    cat_l_str(buf, spacing->tab, buf_size - buf->len);
+                    cat_str(buf, spacing->tab);
                     curr_pos = next_tab;
                 } else {
-                    cat_l_str(buf, spacing->space, buf_size - buf->len);
+                    cat_str(buf, spacing->space);
                     curr_pos++;
                 }
             }
         }
 
-        cat_l_str(buf, spacing->new_line, buf_size - buf->len);
+        cat_str(buf, spacing->new_line);
     }
 
     (void)write(STDOUT_FILENO, buf->str, buf->len);
