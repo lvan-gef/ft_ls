@@ -1,9 +1,11 @@
+#include <errno.h>
 #include <grp.h>
 #include <linux/limits.h>
 #include <pwd.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <sys/stat.h>
+#include <sys/xattr.h>
 #include <time.h>
 
 #include "../include/ft_arena.h"
@@ -18,6 +20,7 @@ static t_str *get_user_(Arena *arena, uid_t user_id);
 static t_str *get_group_(Arena *arena, gid_t group_id);
 static t_str *get_dt_(Arena *arena, const struct timespec *ctim);
 static bool get_symlink_(Arena *arena, const t_entry *entry, t_str **out);
+static bool has_xattr_(const char *path, const char *name);
 
 typedef enum {
     P_LINK,
@@ -32,6 +35,7 @@ typedef enum {
     P_ROTHER,
     P_WOTHER,
     P_XOTHER,
+    P_ATTR,
     P_TOTAL
 } t_perm_lttr;
 
@@ -166,6 +170,13 @@ static t_str *get_perm_(Arena *arena, Arena *scratch, const t_entry *entry) {
                 append_chars_str(scratch, str,
                                  entry->st.st_mode & S_IXOTH ? "x" : "-");
                 break;
+            case P_ATTR:
+                if (has_xattr_(entry->path->str, "system.posix_acl_access")) {
+                    append_chars_str(scratch, str, "+");
+                } else if (has_xattr_(entry->path->str, "security.selinux")) {
+                    append_chars_str(scratch, str, ".");
+                }
+                break;
             default: ASSERT_FALSE(true);
         }
     }
@@ -298,4 +309,13 @@ static bool get_symlink_(Arena *arena, const t_entry *entry, t_str **out) {
 failed:
     ArenaPopToMark(arena, mark);
     return false;
+}
+
+static bool has_xattr_(const char *path, const char *name) {
+    ssize_t n = getxattr(path, name, NULL, 0);
+    if (n < 0) {
+        return false;
+    }
+
+    return true;
 }

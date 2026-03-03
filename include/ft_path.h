@@ -18,7 +18,7 @@
 #endif // ifndef PATH_MAX //
 
 #ifndef PERMISSION_SIZE
-#define PERMISSION_SIZE UINT64_C(12)
+#define PERMISSION_SIZE UINT64_C(13)
 #endif // ifndef PERMISSION_SIZE //
 
 #ifndef DT_LEN
@@ -44,8 +44,9 @@ typedef struct {
     t_str *name;
     t_str *path;
     t_str *quoted;
-    struct stat st;
     t_file_info *info;
+    struct stat st;
+    bool is_escaped;
 } t_entry;
 
 bool get_file_info(Arena *arena, Arena *scratch, t_entry *entry);
