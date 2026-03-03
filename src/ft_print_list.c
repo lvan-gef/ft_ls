@@ -15,6 +15,7 @@ typedef struct {
     uint64_t buf_size;
     uint64_t max_len_links;
     uint64_t max_len_sizes;
+    uint64_t max_len_perm;
     bool have_quote;
 } t_sizes;
 
@@ -36,7 +37,8 @@ static void left_pad_(Arena *arena, t_str *buffer, uint64_t src_len,
                       uint64_t max_size);
 static bool have_quotes_(t_array *array);
 
-void print_list(t_array *array, const t_str *path, bool print_total,
+// todo: err msg when someting goes wrong
+void print_list(t_array *array, t_entry *dir_entry, bool print_total,
                 uint64_t min_len_links, uint64_t min_len_sizes) {
     ASSERT_NOTNULL(array);
 
@@ -55,20 +57,30 @@ void print_list(t_array *array, const t_str *path, bool print_total,
     char quote_buf[] = "'";
     char new_line_buf[] = "\n";
     char dubble_colon_buf[] = ":";
+    char total_buf[] = "total ";
 
     t_str space = {.str = space_buf, .cap = 2, .len = 1, .pos = 0};
     t_str quote = {.str = quote_buf, .cap = 2, .len = 1, .pos = 0};
     t_str new_line = {.str = new_line_buf, .cap = 2, .len = 1, .pos = 0};
     t_str dubble_colon = {
         .str = dubble_colon_buf, .cap = 2, .len = 1, .pos = 0};
+    t_str total_str = {.str = total_buf, .cap = 7, .len = 6, .pos = 0};
 
     t_spacing spacing = {.space = &space,
                          .quote = &quote,
                          .new_line = &new_line,
                          .dubble_colon = &dubble_colon};
 
-    if (path) {
-        sizes.buf_size += (path->len + 1 + 1); // 1 for :, 1 for \n
+    if (dir_entry) {
+        dir_entry = escape_seq_entry(arena, dir_entry);
+        if (!dir_entry) {
+            goto done;
+        }
+
+        if (dir_entry->quoted && dir_entry->quoted->len) {
+            sizes.buf_size += 2;
+        }
+        sizes.buf_size += dir_entry->name->len + 3; // 1 for :, 1 for \n
     }
 
     t_str *buf = init_str(arena, sizes.buf_size);
@@ -76,10 +88,17 @@ void print_list(t_array *array, const t_str *path, bool print_total,
         goto done;
     }
 
-    if (path) {
-        cat_str(buf, path);
-        cat_str(buf, &dubble_colon);
-        cat_str(buf, &new_line);
+    if (dir_entry) {
+        if (dir_entry->quoted && dir_entry->quoted->len) {
+            cat_str(buf, dir_entry->quoted);
+            cat_str(buf, dir_entry->name);
+            cat_str(buf, dir_entry->quoted);
+        } else {
+            cat_str(buf, dir_entry->name);
+        }
+
+        cat_str(buf, spacing.dubble_colon);
+        cat_str(buf, spacing.new_line);
     }
 
     if (print_total) {
@@ -87,7 +106,7 @@ void print_list(t_array *array, const t_str *path, bool print_total,
         if (!total) {
             goto done;
         }
-        append_chars_str(arena, buf, "total ");
+        cat_str(buf, &total_str);
         cat_str(buf, total);
         cat_str(buf, &new_line);
     }
@@ -103,6 +122,7 @@ static void printer_(Arena *arena, t_array *array, t_str *buf,
         const t_entry *entry = array->data[index];
 
         cat_str(buf, entry->info->perm);
+        left_pad_(arena, buf, entry->info->perm->len, sizes->max_len_perm);
         cat_str(buf, spacing->space);
 
         left_pad_(arena, buf, entry->info->links->len, sizes->max_len_links);
@@ -123,9 +143,9 @@ static void printer_(Arena *arena, t_array *array, t_str *buf,
         cat_str(buf, spacing->space);
 
         if (entry->quoted->len) {
-            cat_str(buf, spacing->quote);
+            cat_str(buf, entry->quoted);
             cat_str(buf, entry->name);
-            cat_str(buf, spacing->quote);
+            cat_str(buf, entry->quoted);
         } else {
             if (sizes->have_quote) {
                 cat_str(buf, spacing->space);
@@ -148,11 +168,17 @@ static void get_sizes_(t_array *array, t_sizes *sizes) {
     for (uint64_t i = 0; i < array->len; ++i) {
         t_entry *e = array->data[i];
 
-        if (e->info->links->len > sizes->max_len_links)
+        if (e->info->links->len > sizes->max_len_links) {
             sizes->max_len_links = e->info->links->len;
+        }
 
-        if (e->info->size->len > sizes->max_len_sizes)
+        if (e->info->size->len > sizes->max_len_sizes) {
             sizes->max_len_sizes = e->info->size->len;
+        }
+
+        if (e->info->perm->len > sizes->max_len_perm) {
+            sizes->max_len_perm = e->info->perm->len;
+        }
 
         sizes->total += e->info->blocks;
     }
@@ -165,6 +191,7 @@ static void get_sizes_(t_array *array, t_sizes *sizes) {
         uint64_t row = 0;
 
         row += e->info->perm->len + 1;
+        row += (sizes->max_len_perm - e->info->perm->len); // left_pad
 
         row += (sizes->max_len_links - e->info->links->len); // left_pad
         row += e->info->links->len + 1;
@@ -183,6 +210,8 @@ static void get_sizes_(t_array *array, t_sizes *sizes) {
             row += 1;
         }
 
+        e = escape_seq_entry(array->arena, e);
+        // array->data[i] = e;
         row += e->name->len;
 
         if (e->info->symlink) {
