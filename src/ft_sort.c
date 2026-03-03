@@ -5,20 +5,26 @@
 #include "../include/ft_assert.h"
 #include "../include/ft_path.h"
 #include "../include/ft_sort.h"
+#include "ft_arena.h"
 
-static void sort_time_(t_array *array);
-static void sort_name_(t_array *array);
+typedef int (*t_cmp_entry)(const t_entry *a, const t_entry *b);
+
+static void merge_sort_(Arena *arena, t_array *array, t_cmp_entry cmp);
+static uint64_t add_capped_(uint64_t lhs, uint64_t rhs, uint64_t cap);
+static void merge_(void **data, void **tmp, uint64_t left, uint64_t mid,
+                   uint64_t right, t_cmp_entry cmp);
+static int cmp_name_entry_(const t_entry *a, const t_entry *b);
+static int cmp_time_entry_(const t_entry *a, const t_entry *b);
 static int compare_(const t_str *a, const t_str *b);
 static int compare_time_(const struct timespec *a, const struct timespec *b);
 static void reverse_(t_array *array);
 
-void sort(t_array *array, bool reverse, bool sort_time) {
+void sort(Arena *arena, t_array *array, bool reverse, bool sort_time) {
     ASSERT_NOTNULL(array);
 
-    if (sort_time) {
-        sort_time_(array);
-    } else {
-        sort_name_(array);
+    if (array->len > 1) {
+        const t_cmp_entry cmp = sort_time ? cmp_time_entry_ : cmp_name_entry_;
+        merge_sort_(arena, array, cmp);
     }
 
     if (reverse && array->len) {
@@ -26,67 +32,100 @@ void sort(t_array *array, bool reverse, bool sort_time) {
     }
 }
 
-static void sort_time_(t_array *array) {
+static void merge_sort_(Arena *arena, t_array *array, t_cmp_entry cmp) {
     ASSERT_NOTNULL(array);
-    ASSERT_GT(array->len, 0);
+    ASSERT_NOTNULL(cmp);
 
-    uint64_t size = array->len - 1;
-    while (true) {
-        bool changed = false;
+    const uint64_t max_len = (uint64_t)(SIZE_MAX / sizeof(void *));
+    if (array->len > max_len) {
+        return;
+    }
 
-        for (uint64_t index = 0; index < size; ++index) {
-            t_entry *entry_a = array->data[index];
-            t_entry *entry_b = array->data[index + 1];
+    ArenaMark marker = ArenaGetMark(arena);
+    void **tmp =
+        (void **)ArenaPushNoZero(arena, (size_t)array->len * sizeof(void *));
+    if (!tmp) {
+        return;
+    }
 
-            int cmp = compare_time_(&entry_a->st.st_mtim, &entry_b->st.st_mtim);
-            bool should_swap = false;
-            if (cmp == 0) {
-                should_swap = compare_(entry_a->name, entry_b->name) > 0;
-            } else {
-                should_swap = cmp < 0;
+    for (uint64_t width = 1; width < array->len;) {
+        uint64_t left = 0;
+        while (left < array->len) {
+            const uint64_t mid = add_capped_(left, width, array->len);
+            const uint64_t right = add_capped_(mid, width, array->len);
+            if (mid < right) {
+                merge_(array->data, tmp, left, mid, right, cmp);
             }
 
-            if (should_swap) {
-                array->data[index] = entry_b;
-                array->data[index + 1] = entry_a;
-                changed = true;
-            }
+            const uint64_t step = add_capped_(width, width, array->len);
+            left = add_capped_(left, step, array->len);
         }
 
-        if (!changed) {
+        if (width >= array->len - width) {
             break;
         }
 
-        --size;
+        width += width;
+    }
+
+    ArenaPopToMark(arena, marker);
+}
+
+static uint64_t add_capped_(uint64_t lhs, uint64_t rhs, uint64_t cap) {
+    if (lhs >= cap || rhs >= cap - lhs) {
+        return cap;
+    }
+
+    return lhs + rhs;
+}
+
+static void merge_(void **data, void **tmp, uint64_t left, uint64_t mid,
+                   uint64_t right, t_cmp_entry cmp) {
+    uint64_t i = left;
+    uint64_t j = mid;
+    uint64_t out = left;
+
+    while (i < mid && j < right) {
+        const t_entry *a = data[i];
+        const t_entry *b = data[j];
+
+        if (cmp(a, b) <= 0) {
+            tmp[out++] = data[i++];
+        } else {
+            tmp[out++] = data[j++];
+        }
+    }
+
+    while (i < mid) {
+        tmp[out++] = data[i++];
+    }
+
+    while (j < right) {
+        tmp[out++] = data[j++];
+    }
+
+    for (uint64_t idx = left; idx < right; ++idx) {
+        data[idx] = tmp[idx];
     }
 }
 
-static void sort_name_(t_array *array) {
-    ASSERT_NOTNULL(array);
-    ASSERT_GT(array->len, 0);
+static int cmp_name_entry_(const t_entry *a, const t_entry *b) {
+    ASSERT_NOTNULL(a);
+    ASSERT_NOTNULL(b);
 
-    size_t size = array->len - 1;
-    while (true) {
-        bool changed = false;
+    return compare_(a->name, b->name);
+}
 
-        for (uint64_t index = 0; index < size; ++index) {
-            t_entry *entry_a = (t_entry *)array->data[index];
-            t_entry *entry_b = (t_entry *)array->data[index + 1];
+static int cmp_time_entry_(const t_entry *a, const t_entry *b) {
+    ASSERT_NOTNULL(a);
+    ASSERT_NOTNULL(b);
 
-            int result = compare_(entry_a->name, entry_b->name);
-            if (result > 0) {
-                array->data[index] = entry_b;
-                array->data[index + 1] = entry_a;
-                changed = true;
-            }
-        }
-
-        if (!changed) {
-            break;
-        }
-
-        --size;
+    const int cmp = compare_time_(&a->st.st_mtim, &b->st.st_mtim);
+    if (cmp != 0) {
+        return -cmp;
     }
+
+    return compare_(a->name, b->name);
 }
 
 static int compare_(const t_str *lhs, const t_str *rhs) {
@@ -95,14 +134,6 @@ static int compare_(const t_str *lhs, const t_str *rhs) {
 
     const unsigned char *a = (const unsigned char *)lhs->str;
     const unsigned char *b = (const unsigned char *)rhs->str;
-
-    if (*a == '\'' || *a == '"') {
-        ++a;
-    }
-
-    if (*b == '\'' || *b == '"') {
-        ++b;
-    }
 
     while (*a && *b) {
         if (*a != *b) {
