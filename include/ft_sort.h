@@ -3,8 +3,8 @@
 
 #include <stdbool.h>
 
-#include "./ft_array.h"
 #include "./ft_arena.h"
+#include "./ft_array.h"
 
 void sort(Arena *arena, t_array *array, bool reverse, bool sort_time);
 

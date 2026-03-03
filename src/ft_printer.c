@@ -35,7 +35,8 @@ typedef struct {
     t_str *dubble_colon;
 } t_spacing;
 
-static void init_print_row_(Arena *arena, t_array *array, const t_str *dir_path);
+static void init_print_row_(Arena *arena, t_array *array,
+                            const t_str *dir_path);
 static void print_row_(t_array *array, t_str *buf, const t_map *map,
                        const t_spacing *spacing, bool quoted,
                        const uint64_t *col_starts);
@@ -71,7 +72,8 @@ void printer(const t_args *args, t_array *array, const t_str *dir_path,
     ArenaRelease(arena);
 }
 
-static void init_print_row_(Arena *arena, t_array *array, const t_str *dir_path) {
+static void init_print_row_(Arena *arena, t_array *array,
+                            const t_str *dir_path) {
     ASSERT_NOTNULL(array);
 
     uint64_t max_cols = (TERM_SIZE + SPACE_GAP) / (1 + SPACE_GAP);
@@ -128,7 +130,8 @@ static void init_print_row_(Arena *arena, t_array *array, const t_str *dir_path)
     t_str space = {.str = space_buf, .cap = 2, .len = 1, .pos = 0};
     t_str tab = {.str = tab_buf, .cap = 2, .len = 1, .pos = 0};
     t_str new_line = {.str = new_line_buf, .cap = 2, .len = 1, .pos = 0};
-    t_str dubble_colon = { .str = dubble_colon_buf, .cap = 2, .len = 1, .pos = 0};
+    t_str dubble_colon = {
+        .str = dubble_colon_buf, .cap = 2, .len = 1, .pos = 0};
 
     t_spacing spacing = {.space = &space,
                          .tab = &tab,

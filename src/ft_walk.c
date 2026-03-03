@@ -257,7 +257,8 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
     }
 
     if (dir_entries->len) {
-        sort(params->scratch_arena, dir_entries, params->args->reverse, params->args->time);
+        sort(params->scratch_arena, dir_entries, params->args->reverse,
+             params->args->time);
         while (dir_entries->len) {
             t_entry *entry = pop_array(dir_entries);
             if (!append_array(params->dirs, entry->path)) {
@@ -349,7 +350,8 @@ static bool read_dir_(t_params *params, t_str *path, int *exit_code) {
     d = NULL;
 
     if (params->args->recursive && params->entries->len) {
-        sort(params->scratch_arena, params->entries, params->args->reverse, params->args->time);
+        sort(params->scratch_arena, params->entries, params->args->reverse,
+             params->args->time);
         size_t index = params->entries->len;
         while (index > 0) {
             --index;
