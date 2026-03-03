@@ -121,8 +121,13 @@ void process(t_args *args, t_array *array, int *exit_code) {
             *exit_code = 2;
         }
 
-        printer(args, params.files, print_dir_path ? dir_path : NULL, true, 0,
-                0);
+        t_entry entry = {.name = dir_path};
+        entry.quoted = need_quote_(params.entries_arena, entry.name);
+        if (!entry.quoted) {
+            err_msg = "Failed to get quote";
+            goto failed;
+        }
+        printer(args, params.files, print_dir_path ? &entry : NULL, true, 0, 0);
         printed_section = true;
         if (!reset_files_(&params)) {
             err_msg = "Failed to reset files array";
@@ -452,14 +457,23 @@ static t_str *need_quote_(Arena *arena, t_str *str) {
     }
 
     const uint64_t cur_pos = str->pos;
+    bool found_double = false;
     while (has_next_str(str)) {
         const char lttr = next_str(str);
         switch (lttr) {
-            case SINGLE_QUOTE: quote->str[0] = '"'; break;
-            case DOUBLE_QUOTE: /* FALLTHROUGH */
+            case SINGLE_QUOTE:
+                quote->str[0] = '"';
+                break;
+            case DOUBLE_QUOTE:
+                found_double = true;
+            __attribute__((fallthrough));
             case SPACE: quote->str[0] = '\''; break;
             default: break;
         }
+    }
+
+    if (quote->str[0] == '"' && found_double) {
+        quote->str[0] = '\'';
     }
 
     str->pos = cur_pos;
