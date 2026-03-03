@@ -31,7 +31,7 @@ typedef struct {
 
 static void get_sizes_(t_array *array, t_sizes *sizes);
 static void printer_(Arena *arena, t_array *array, t_str *buf,
-                     t_spacing *spacing, t_sizes *sizes);
+                     const t_spacing *spacing, const t_sizes *sizes);
 static void left_pad_(Arena *arena, t_str *buffer, uint64_t src_len,
                       uint64_t max_size);
 static bool have_quotes_(t_array *array);
@@ -98,7 +98,7 @@ done:
 }
 
 static void printer_(Arena *arena, t_array *array, t_str *buf,
-                     t_spacing *spacing, t_sizes *sizes) {
+                     const t_spacing *spacing, const t_sizes *sizes) {
     for (uint64_t index = 0; index < array->len; ++index) {
         const t_entry *entry = array->data[index];
 
