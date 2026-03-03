@@ -7,7 +7,7 @@
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
 #include "../include/ft_helper.h"
-#include "../include/ft_path.h"
+#include "../include/ft_entry.h"
 #include "../include/ft_printer.h"
 #include "../include/ft_sort.h"
 #include "../include/ft_str.h"

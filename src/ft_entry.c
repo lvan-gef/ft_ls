@@ -10,7 +10,7 @@
 
 #include "../include/ft_arena.h"
 #include "../include/ft_assert.h"
-#include "../include/ft_path.h"
+#include "../include/ft_entry.h"
 #include "../include/ft_str.h"
 
 #include "../libft/include/libft.h"

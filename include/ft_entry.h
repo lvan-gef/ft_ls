@@ -1,5 +1,5 @@
-#ifndef FT_PATH_H
-#define FT_PATH_H
+#ifndef FT_ENTRY_H
+#define FT_ENTRY_H
 
 #include <limits.h>
 #include <linux/limits.h>
@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <sys/stat.h>
 
-#include "ft_str.h"
+#include "./ft_str.h"
 
 #ifndef LOGIN_NAME_MAX
 #define LOGIN_NAME_MAX INT64_C(256)
@@ -51,4 +51,4 @@ typedef struct {
 
 bool get_file_info(Arena *arena, Arena *scratch, t_entry *entry);
 
-#endif // !FT_PATH_H
+#endif // !FT_ENTRY_H

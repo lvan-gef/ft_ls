@@ -6,10 +6,6 @@
 
 #include "../libft/include/libft.h"
 
-#ifndef NDEBUG
-#include "../libft/include/ft_fprintf.h"
-#endif // NDEBUG
-
 static ArenaBlock *new_block_(uint64_t cap);
 
 Arena *ArenaAlloc(uint64_t cap) {
@@ -87,9 +83,6 @@ void *ArenaPushNoZero(Arena *arena, uint64_t size) {
             cap = size;
         }
 
-#ifndef NDEBUG
-        ft_fprintf(STDERR_FILENO, "No room left\n", cap);
-#endif // NDEBUG
         ArenaBlock *block = new_block_(cap);
         if (!block) {
             return NULL;
@@ -174,9 +167,6 @@ void ArenaClear(Arena *arena) {
 }
 
 static ArenaBlock *new_block_(uint64_t cap) {
-#ifndef NDEBUG
-    ft_fprintf(STDERR_FILENO, "Alloc new block with size: %d\n", cap);
-#endif // NDEBUG
     ASSERT_GT(cap, 0);
 
     ArenaBlock *block = malloc(sizeof(*block) + cap);
