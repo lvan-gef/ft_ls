@@ -15,7 +15,7 @@ static void merge_(void **data, void **tmp, uint64_t left, uint64_t mid,
                    uint64_t right, t_cmp_entry cmp);
 static int cmp_name_entry_(const t_entry *a, const t_entry *b);
 static int cmp_time_entry_(const t_entry *a, const t_entry *b);
-static int compare_(const t_str *a, const t_str *b);
+static int compare_(const t_str *lhs, const t_str *rhs);
 static int compare_time_(const struct timespec *a, const struct timespec *b);
 static void reverse_(t_array *array);
 
