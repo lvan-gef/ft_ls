@@ -142,14 +142,12 @@ t_str *uint_to_str(Arena *arena, uint64_t nbr) {
 }
 
 uint64_t append_chars_str(Arena *arena, t_str *dst, const char *src) {
-    ArenaMark marker = ArenaGetMark(arena);
     const t_str *new_str = create_str(arena, src);
     if (!new_str) {
         return 0;
     }
 
     uint64_t len = cat_str(dst, new_str);
-    ArenaPopToMark(arena, marker);
     return len;
 }
 
