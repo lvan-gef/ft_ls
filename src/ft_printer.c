@@ -4,6 +4,7 @@
 #include "../include/ft_arena.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
+#include "../include/ft_helper.h"
 #include "../include/ft_parse.h"
 #include "../include/ft_path.h"
 #include "../include/ft_print_list.h"
@@ -36,18 +37,17 @@ typedef struct {
 } t_spacing;
 
 static void init_print_row_(Arena *arena, t_array *array,
-                            const t_str *dir_path);
+                            t_entry *dir_entry);
 static void print_row_(t_array *array, t_str *buf, const t_map *map,
                        const t_spacing *spacing, bool quoted,
                        const uint64_t *col_starts);
 static uint64_t *calc_cols_(Arena *arena, t_array *array, t_map *map,
                             bool quoted);
-static uint64_t calc_layout_width_(t_array *array, uint64_t num_cols,
-                                   uint64_t *col_widths, bool quoted);
+static uint64_t calc_width_(Arena *arena, t_array *array, uint64_t num_cols,
+                            uint64_t *col_widths, bool quoted);
 static bool check_quoted_(t_array *array);
 
-// todo need to '' if there are spaces for dir_path
-void printer(const t_args *args, t_array *array, const t_str *dir_path,
+void printer(const t_args *args, t_array *array, t_entry *dir_entry,
              bool print_total, uint64_t min_len_links, uint64_t min_len_sizes) {
     ASSERT_NOTNULL(args);
     ASSERT_NOTNULL(array);
@@ -64,16 +64,17 @@ void printer(const t_args *args, t_array *array, const t_str *dir_path,
     }
 
     if (args->list) {
-        print_list(array, dir_path, print_total, min_len_links, min_len_sizes);
+        print_list(array, dir_entry, print_total, min_len_links, min_len_sizes);
     } else {
-        init_print_row_(arena, array, dir_path);
+        init_print_row_(arena, array, dir_entry);
     }
 
     ArenaRelease(arena);
 }
 
 static void init_print_row_(Arena *arena, t_array *array,
-                            const t_str *dir_path) {
+                            t_entry *dir_entry) {
+    ASSERT_NOTNULL(arena);
     ASSERT_NOTNULL(array);
 
     uint64_t max_cols = (TERM_SIZE + SPACE_GAP) / (1 + SPACE_GAP);
@@ -108,12 +109,20 @@ static void init_print_row_(Arena *arena, t_array *array,
     }
 
     uint64_t row_width =
-        calc_layout_width_(array, map.cols, col_widths, quoted);
+        calc_width_(arena, array, map.cols, col_widths, quoted);
     uint64_t buf_size = (row_width * map.rows) + map.rows + 1;
 
-    // todo need to '' if there are spaces
-    if (dir_path) {
-        buf_size += dir_path->len + 3; // 1 for space, 1 for :, 1 for \n
+    if (dir_entry) {
+        dir_entry = escape_seq_entry(arena, dir_entry);
+        if (!dir_entry) {
+            err_msg = "Failed to escape dir";
+            goto done;
+        }
+
+        if (dir_entry->quoted && dir_entry->quoted->len) {
+            buf_size += 2;
+        }
+        buf_size += dir_entry->name->len + 3; // 1 for space, 1 for :, 1 for \n
     }
 
     t_str *buf = init_str(arena, buf_size);
@@ -138,8 +147,15 @@ static void init_print_row_(Arena *arena, t_array *array,
                          .new_line = &new_line,
                          .dubble_colon = &dubble_colon};
 
-    if (dir_path) {
-        cat_str(buf, dir_path);
+    if (dir_entry) {
+        if (dir_entry->quoted && dir_entry->quoted->len) {
+            cat_str(buf, dir_entry->quoted);
+            cat_str(buf, dir_entry->name);
+            cat_str(buf, dir_entry->quoted);
+        } else {
+            cat_str(buf, dir_entry->name);
+        }
+
         cat_str(buf, spacing.dubble_colon);
         cat_str(buf, spacing.new_line);
     }
@@ -244,7 +260,7 @@ static uint64_t *calc_cols_(Arena *arena, t_array *array, t_map *map,
     uint64_t try_cols = map->max;
     while (try_cols > 1) {
         uint64_t width =
-            calc_layout_width_(array, try_cols, col_widths, quoted);
+            calc_width_(arena, array, try_cols, col_widths, quoted);
         if (width < TERM_SIZE) {
             map->cols = try_cols;
             map->rows = (array->len + map->cols - 1) / map->cols;
@@ -253,12 +269,12 @@ static uint64_t *calc_cols_(Arena *arena, t_array *array, t_map *map,
         --try_cols;
     }
 
-    (void)calc_layout_width_(array, 1, col_widths, quoted);
+    (void)calc_width_(arena, array, 1, col_widths, quoted);
     return col_widths;
 }
 
-static uint64_t calc_layout_width_(t_array *array, uint64_t num_cols,
-                                   uint64_t *col_widths, bool quoted) {
+static uint64_t calc_width_(Arena *arena, t_array *array, uint64_t num_cols,
+                            uint64_t *col_widths, bool quoted) {
     uint64_t num_rows = (array->len + num_cols - 1) / num_cols;
     uint64_t index = 0;
 
@@ -271,10 +287,11 @@ static uint64_t calc_layout_width_(t_array *array, uint64_t num_cols,
                 break;
             }
 
-            const t_entry *entry = array->data[index];
+            t_entry *entry = array->data[index];
             ASSERT_NOTNULL(entry);
             ASSERT_GT(entry->name->len, 0);
 
+            entry = escape_seq_entry(arena, entry);
             uint64_t len = entry->name->len;
             if (entry->quoted->len) {
                 len += entry->quoted->len * 2;
