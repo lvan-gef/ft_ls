@@ -13,6 +13,7 @@ import termios
 import shutil
 from itertools import combinations
 
+
 from create_test_folders import create_test_folders
 
 ALLOWED_FLAGS = ["R", "a", "l", "r", "t"]
@@ -100,6 +101,7 @@ def flag_combination_tests(test_path: Path) -> None:
         test_path / "symlinks",
         test_path / "permissions",
         test_path / "sizes",
+        test_path / "xattrs",
         test_path / "special_chars",
         test_path / "quote_paths",
         test_path / "quote_files",
@@ -261,8 +263,41 @@ def feature_specific_tests(test_path: Path) -> None:
         output_l, "rw", cmd_l, "Permission string should appear in -l output"
     )
     print("    4.5 Long format (-l): passed")
+    # 4.5b ACL marker (+) test (Linux)
+    xattrs_dir = test_path / "xattrs"
+    cmd_acl = [own_bin, "-l", str(xattrs_dir)]
+    ft_out = run_with_pty(cmd=cmd_acl)
+    ls_out = run_with_pty(cmd=["ls", "-l", str(xattrs_dir)])
+
+    # If the fixture successfully set an ACL, GNU ls should show a '+' on acl_file.txt.
+    # If not (no setfacl/ACL support), we skip the marker assertion but still require output match.
+    if ft_out != ls_out:
+        assert_output_match(
+            cmd_acl,
+            ["ls", "-l", str(xattrs_dir)],
+            "ACL dir long format should match ls -l",
+        )
+
+    # Only assert the marker when ls actually prints it (depends on setfacl + fs support).
+    for line in ls_out.splitlines():
+        if line.rstrip().endswith("acl_file.txt"):
+            if "+" in line.split()[0]:
+                for fline in ft_out.splitlines():
+                    if fline.rstrip().endswith("acl_file.txt"):
+                        if "+" not in fline.split()[0]:
+                            print(f"Command: {' '.join(cmd_acl)}", file=sys.stderr)
+                            print("ft_ls line:", file=sys.stderr)
+                            print(line, file=sys.stderr)
+                            print("ls line:", file=sys.stderr)
+                            print(line, file=sys.stderr)
+                            raise AssertionError("ACL marker '+' missing from ft_ls -l output")
+                break
+
+    print("    4.5b ACL marker (+) if supported: passed")
 
     # 4.6 Recursive time sort (-Rt) test
+
+
     rec_dir = test_path / "recursive"
     assert_output_match(
         [own_bin, "-Rt", str(rec_dir)],
@@ -611,15 +646,17 @@ def edge_case_tests(test_path: Path) -> None:
         )
     print(f"    5.15 Quote file arguments ({len(all_flags)} flag combos): passed")
 
-    # 5.16 Recursive /mnt/bulk output comparison
-    bulk_path = Path("/mnt/bulk")
-    if not bulk_path.exists():
-        print("    5.16 Recursive /mnt/bulk (-R): skipped (path not found)")
-    else:
-        ft_cmd = [own_bin, "-R", str(bulk_path)]
-        ls_cmd = ["ls", "-R", str(bulk_path)]
-        assert_output_match(ft_cmd, ls_cmd, "Recursive /mnt/bulk with -R should match")
-        print("    5.16 Recursive /mnt/bulk (-R): passed")
+    # 5.16 Recursive output comparison know paths
+    paths = [Path("/mnt/bulk"), Path().home()]
+
+    for i, p in enumerate(paths):
+        if not p.exists():
+            print(f"    5.16{string.ascii_lowercase[i]} Recursive {p} (-R): skipped (path not found)")
+        else:
+            ft_cmd = [own_bin, "-R", str(p)]
+            ls_cmd = ["ls", "-R", str(p)]
+            assert_output_match(ft_cmd, ls_cmd, f"Recursive {p} with -R should match")
+            print("    5.16 Recursive /mnt/bulk (-R): passed")
 
 
 def compare_output(flags: str, path: str, cols: int = 80) -> None:

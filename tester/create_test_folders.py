@@ -1,6 +1,9 @@
 from pathlib import Path
 import os
 import time
+import subprocess
+import getpass
+import shutil
 
 
 def create_test_folders(path: Path) -> list[Path]:
@@ -27,6 +30,9 @@ def create_test_folders(path: Path) -> list[Path]:
 
     # Various file sizes for -l testing
     fullpaths.append(create_sizes(path))
+
+    # ACL/xattr marker tests for -l (Linux)
+    fullpaths.append(create_xattrs(path))
 
     # Special character filenames
     fullpaths.append(create_special_chars(path))
@@ -232,6 +238,44 @@ def create_sizes(path: Path) -> Path:
     return sizes_path
 
 
+
+
+def create_xattrs(path: Path) -> Path:
+    """Create files with ACLs / xattrs to exercise ls -l marker behavior on Linux.
+
+    GNU ls may show a trailing '+' in the mode string when a file has an ACL
+    (stored in the 'system.posix_acl_access' xattr).
+    """
+    x_path = path.joinpath("xattrs").absolute()
+    x_path.mkdir(parents=True, exist_ok=True)
+
+    normal = x_path.joinpath("normal.txt")
+    normal.write_text("normal\n")
+
+    acl_file = x_path.joinpath("acl_file.txt")
+    acl_file.write_text("acl\n")
+
+    # Try to set an ACL so `ls -l` prints a '+' on the permissions field.
+    # If setfacl is unavailable (or filesystem doesn't support ACLs), we skip.
+    if shutil.which("setfacl") is not None:
+        user = getpass.getuser()
+        subprocess.run(
+            ["setfacl", "-m", f"u:{user}:rw", str(acl_file)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+    # Optional: a harmless user.* xattr (GNU ls won't show it by default).
+    if shutil.which("setfattr") is not None:
+        subprocess.run(
+            ["setfattr", "-n", "user.ft_ls_test", "-v", "hello", str(normal)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+
+    return x_path
+
+
 def create_special_chars(path: Path) -> Path:
     """Create directory with special character filenames.
 
@@ -276,6 +320,8 @@ def quote_case_names() -> list[str]:
         "space and 'single",
         'space and "double',
         "single'and\"double",
+        'single\'and"double',
+        'single"and\'double',
         "all 'and\" together",
     ]
 
