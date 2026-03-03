@@ -9,7 +9,6 @@
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
 
-// TODO: replace all ft_strlcpy it use strlen...
 static uint64_t strlcpy_(t_str *dst, const t_str *src, uint64_t dstsize);
 
 t_str *init_str(Arena *arena, uint64_t cap) {
@@ -113,36 +112,6 @@ uint64_t cat_str(t_str *dst, const t_str *src) {
     uint64_t cur_pos = dst->pos;
     dst->pos = dst->len;
     size_t len = strlcpy_(dst, src, dst->cap - dst->len + 1);
-    dst->len += len;
-    dst->pos = cur_pos;
-
-    ASSERT_LT(dst->len, dst->cap);
-    ASSERT_LE(dst->pos, dst->len);
-    return len;
-}
-
-uint64_t cat_l_str(t_str *dst, const t_str *src, uint64_t size) {
-    ASSERT_NOTNULL(dst);
-    ASSERT_GE(dst->cap, 2);
-    ASSERT_NOTNULL(src);
-    ASSERT_GE(src->cap, 2);
-    ASSERT_GE(src->len, 1);
-    ASSERT_LT(src->pos, src->len);
-    ASSERT_(*src->str, "%c can not be '\\0'", *src->str);
-    ASSERT_GT(size, 0);
-
-    uint64_t cap = dst->cap - dst->len;
-    if (!cap) {
-        return 0;
-    }
-
-    if (size > cap) {
-        size = cap;
-    }
-
-    uint64_t cur_pos = dst->pos;
-    dst->pos = dst->len;
-    uint64_t len = strlcpy_(dst, src, size + 1);
     dst->len += len;
     dst->pos = cur_pos;
 
