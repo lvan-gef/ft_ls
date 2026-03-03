@@ -1,11 +1,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "../include/ft_arena.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
 #include "../include/ft_path.h"
 #include "../include/ft_sort.h"
-#include "ft_arena.h"
 
 typedef int (*t_cmp_entry)(const t_entry *a, const t_entry *b);
 
