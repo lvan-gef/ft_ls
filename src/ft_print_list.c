@@ -18,11 +18,20 @@ typedef struct {
     bool have_quote;
 } t_sizes;
 
+typedef struct {
+    t_str *space;
+    t_str *quote;
+    t_str *new_line;
+    t_str *dubble_colon;
+} t_spacing;
+
 #ifndef HEADER_PREFIX_LEN
 #define HEADER_PREFIX_LEN UINT64_C(6)
 #endif /* ifndef HEADER_PREFIX_LEN */
 
 static void get_sizes_(t_array *array, t_sizes *sizes);
+static void printer_(Arena *arena, t_array *array, t_str *buf,
+                     t_spacing *spacing, t_sizes *sizes);
 static void left_pad_(Arena *arena, t_str *buffer, uint64_t src_len,
                       uint64_t max_size);
 static bool have_quotes_(t_array *array);
@@ -42,6 +51,22 @@ void print_list(t_array *array, const t_str *path, bool print_total,
                      .max_len_sizes = min_len_sizes};
     get_sizes_(array, &sizes);
 
+    char space_buf[] = " ";
+    char quote_buf[] = "'";
+    char new_line_buf[] = "\n";
+    char dubble_colon_buf[] = ":";
+
+    t_str space = {.str = space_buf, .cap = 2, .len = 1, .pos = 0};
+    t_str quote = {.str = quote_buf, .cap = 2, .len = 1, .pos = 0};
+    t_str new_line = {.str = new_line_buf, .cap = 2, .len = 1, .pos = 0};
+    t_str dubble_colon = {
+        .str = dubble_colon_buf, .cap = 2, .len = 1, .pos = 0};
+
+    t_spacing spacing = {.space = &space,
+                         .quote = &quote,
+                         .new_line = &new_line,
+                         .dubble_colon = &dubble_colon};
+
     if (path) {
         sizes.buf_size += (path->len + 1 + 1); // 1 for :, 1 for \n
     }
@@ -53,8 +78,8 @@ void print_list(t_array *array, const t_str *path, bool print_total,
 
     if (path) {
         cat_str(buf, path);
-        append_chars_str(arena, buf, ":");
-        append_chars_str(arena, buf, "\n");
+        cat_str(buf, &dubble_colon);
+        cat_str(buf, &new_line);
     }
 
     if (print_total) {
@@ -64,54 +89,59 @@ void print_list(t_array *array, const t_str *path, bool print_total,
         }
         append_chars_str(arena, buf, "total ");
         cat_str(buf, total);
-        append_chars_str(arena, buf, "\n");
+        cat_str(buf, &new_line);
     }
 
+    printer_(arena, array, buf, &spacing, &sizes);
+done:
+    ArenaRelease(arena);
+}
+
+static void printer_(Arena *arena, t_array *array, t_str *buf,
+                     t_spacing *spacing, t_sizes *sizes) {
     for (uint64_t index = 0; index < array->len; ++index) {
         const t_entry *entry = array->data[index];
 
-        cat_l_str(buf, entry->info->perm, sizes.buf_size);
-        append_chars_str(arena, buf, " ");
+        cat_str(buf, entry->info->perm);
+        cat_str(buf, spacing->space);
 
-        left_pad_(arena, buf, entry->info->links->len, sizes.max_len_links);
-        cat_l_str(buf, entry->info->links, sizes.buf_size);
-        append_chars_str(arena, buf, " ");
+        left_pad_(arena, buf, entry->info->links->len, sizes->max_len_links);
+        cat_str(buf, entry->info->links);
+        cat_str(buf, spacing->space);
 
-        cat_l_str(buf, entry->info->username, sizes.buf_size);
-        append_chars_str(arena, buf, " ");
+        cat_str(buf, entry->info->username);
+        cat_str(buf, spacing->space);
 
-        cat_l_str(buf, entry->info->groupname, sizes.buf_size);
-        append_chars_str(arena, buf, " ");
+        cat_str(buf, entry->info->groupname);
+        cat_str(buf, spacing->space);
 
-        left_pad_(arena, buf, entry->info->size->len, sizes.max_len_sizes);
-        cat_l_str(buf, entry->info->size, sizes.buf_size);
-        append_chars_str(arena, buf, " ");
+        left_pad_(arena, buf, entry->info->size->len, sizes->max_len_sizes);
+        cat_str(buf, entry->info->size);
+        cat_str(buf, spacing->space);
 
-        cat_l_str(buf, entry->info->dt, sizes.buf_size);
-        append_chars_str(arena, buf, " ");
+        cat_str(buf, entry->info->dt);
+        cat_str(buf, spacing->space);
 
         if (entry->quoted->len) {
-            append_chars_str(arena, buf, "'");
-            cat_l_str(buf, entry->name, sizes.buf_size);
-            append_chars_str(arena, buf, "'");
+            cat_str(buf, spacing->quote);
+            cat_str(buf, entry->name);
+            cat_str(buf, spacing->quote);
         } else {
-            if (sizes.have_quote) {
-                append_chars_str(arena, buf, " ");
+            if (sizes->have_quote) {
+                cat_str(buf, spacing->space);
             }
-            cat_l_str(buf, entry->name, sizes.buf_size);
+            cat_str(buf, entry->name);
         }
 
         if (entry->info->symlink) {
             append_chars_str(arena, buf, " -> ");
-            cat_l_str(buf, entry->info->symlink, sizes.buf_size);
+            cat_str(buf, entry->info->symlink);
         }
 
-        append_chars_str(arena, buf, "\n");
+        cat_str(buf, spacing->new_line);
     }
 
     write(STDOUT_FILENO, buf->str, buf->len);
-done:
-    ArenaRelease(arena);
 }
 
 static void get_sizes_(t_array *array, t_sizes *sizes) {
