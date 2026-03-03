@@ -19,7 +19,6 @@ t_array *parse_args(Arena *arena, uint64_t argc, char **argv, t_args *args) {
     ASSERT_NOTNULL(args);
 
     t_array *inputs = init_array(arena, ARRAY_SIZE);
-    ArenaSetAutoAlign(arena, 8);
     if (!inputs) {
         return NULL;
     }
@@ -73,6 +72,7 @@ t_array *parse_args(Arena *arena, uint64_t argc, char **argv, t_args *args) {
     }
 
     ASSERT_NOTNULL(inputs);
+    ASSERT_GE(inputs->len, 1);
     return inputs;
 }
 
