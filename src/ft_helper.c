@@ -8,8 +8,6 @@
 
 #include "../libft/include/libft.h"
 
-static t_str *escape_str_(Arena *arena, t_str *str);
-
 uint64_t len_of_nbr(uint64_t nbr) {
     uint64_t len = 1;
 
@@ -21,7 +19,7 @@ uint64_t len_of_nbr(uint64_t nbr) {
     return len;
 }
 
-t_entry *escape_seq_entry(Arena *arena, t_entry *entry) {
+t_entry *escape_entry(Arena *arena, t_entry *entry) {
     ASSERT_NOTNULL(arena);
     ASSERT_NOTNULL(entry);
 
@@ -39,7 +37,7 @@ t_entry *escape_seq_entry(Arena *arena, t_entry *entry) {
         return entry;
     }
 
-    t_str *new_str = escape_str_(arena, entry->name);
+    t_str *new_str = escape_str(arena, entry->name);
     if (!new_str) {
         return entry;
     }
@@ -49,7 +47,7 @@ t_entry *escape_seq_entry(Arena *arena, t_entry *entry) {
     return entry;
 }
 
-static t_str *escape_str_(Arena *arena, t_str *str) {
+t_str *escape_str(Arena *arena, t_str *str) {
     ASSERT_NOTNULL(arena);
     ASSERT_NOTNULL(str);
 
