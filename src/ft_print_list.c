@@ -72,7 +72,7 @@ void print_list(t_array *array, t_entry *dir_entry, bool print_total,
                          .dubble_colon = &dubble_colon};
 
     if (dir_entry) {
-        dir_entry = escape_seq_entry(arena, dir_entry);
+        dir_entry = escape_entry(arena, dir_entry);
         if (!dir_entry) {
             goto done;
         }
@@ -210,7 +210,7 @@ static void get_sizes_(t_array *array, t_sizes *sizes) {
             row += 1;
         }
 
-        e = escape_seq_entry(array->arena, e);
+        e = escape_entry(array->arena, e);
         // array->data[i] = e;
         row += e->name->len;
 

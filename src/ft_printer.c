@@ -113,7 +113,7 @@ static void init_print_row_(Arena *arena, t_array *array,
     uint64_t buf_size = (row_width * map.rows) + map.rows + 1;
 
     if (dir_entry) {
-        dir_entry = escape_seq_entry(arena, dir_entry);
+        dir_entry = escape_entry(arena, dir_entry);
         if (!dir_entry) {
             err_msg = "Failed to escape dir";
             goto done;
@@ -291,7 +291,7 @@ static uint64_t calc_width_(Arena *arena, t_array *array, uint64_t num_cols,
             ASSERT_NOTNULL(entry);
             ASSERT_GT(entry->name->len, 0);
 
-            entry = escape_seq_entry(arena, entry);
+            entry = escape_entry(arena, entry);
             uint64_t len = entry->name->len;
             if (entry->quoted->len) {
                 len += entry->quoted->len * 2;
