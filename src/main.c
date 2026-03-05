@@ -1,7 +1,6 @@
 #define C_ASSERT_IMPLEMENTATION
 
 #include <stdint.h>
-#include <stdlib.h>
 
 #include "../include/ft_arena.h"
 #include "../include/ft_array.h"
@@ -15,14 +14,14 @@ int main(int argc, char *argv[]) {
     t_args args = {0};
     Arena *arena = ArenaAlloc(ARENA_SIZE);
     if (!arena) {
-        return EXIT_FAILURE;
+        return 2;
     }
     ArenaSetAutoAlign(arena, 8);
 
     t_array *inputs = parse_args(arena, (uint64_t)argc, argv, &args);
     if (!inputs) {
         clean_program_(arena);
-        return EXIT_FAILURE;
+        return 2;
     }
 
     int exit_code = 0;
