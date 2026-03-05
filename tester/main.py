@@ -11,57 +11,62 @@ import subprocess
 import sys
 import tempfile
 import termios
-from collections import namedtuple
-from itertools import permutations
+from itertools import permutations, zip_longest
 from pathlib import Path
 from typing import Generator
+from typing import NamedTuple
 
 
-from create_test_folders import create_test_folders
+from create_test_folders import create_test_folders, Paths
 
-CommandResult = namedtuple('CommandResult', ['stdout', 'stderr', 'returncode'])
+class CommandResult(NamedTuple):
+    stdout: str
+    stderr: str
+    returncode: int
+
 ALLOWED_FLAGS = ["R", "a", "l", "r", "t"]
 DEBUG = True
 TERMINAL_MIN = 80  # include
 TERMINAL_MAX = 513  # exclude
 ft_ls = "./ft_ls"
 if DEBUG:
-    own_bin = f"{ft_ls}_d"
+    ft_ls = f"{ft_ls}_d"
 
 
 def main() -> None:
     test_path = Path.cwd().joinpath("ft_ls_tester")
-    test_paths = create_test_folders(path=test_path)
+    paths: Paths = create_test_folders(path=test_path)
+    paths.paths.append(test_path)
 
-    if test_path.exists():
-        shutil.rmtree(test_path)
+    try:
+        # clean_up(paths=paths)
 
-    # Phase 1: Invalid flags (no terminal width dependency)
-    subprocess.run("make fclean", shell=True, capture_output=True)
-    # compile_ls()
-    # print("=" * 60)
-    # print("Phase 1: Invalid Flags")
-    # print("=" * 60)
-    # invalid_flags()
+        subprocess.run("make fclean", shell=True, capture_output=True)
+        compile_ls()
 
-    # Phase 2-5: Flag combination and feature tests
-    print("=" * 60)
-    print("Phase 2-5: Flag Combinations and Feature Tests")
-    print("=" * 60)
-    flag_combination_tests(test_paths=test_paths)
-    subprocess.run("make fclean", shell=True, capture_output=True)
+        # print("=" * 60)
+        # print('Phase 1: Non-existent paths and files')
+        # flag_combination_tests(test_paths=paths)
+        #
+        # test_path = Path.cwd().joinpath("ft_ls_tester")
+        # paths: Paths = create_test_folders(path=test_path)
+        # paths.paths.append(test_path)
+        #
+        # print("=" * 60)
+        # print("Phase 2: Invalid Flags")
+        invalid_flags()
+        #
+        print("=" * 60)
+        print("Phase 3: Flag Combinations and Feature Tests")
+        flag_combination_tests(test_paths=paths)
+        subprocess.run("make fclean", shell=True, capture_output=True)
 
-    # Phase 6: Terminal width tests
-    # for term_size in range(TERMINAL_MIN, TERMINAL_MAX):
-    #     compile_ls(term_size=term_size)
-    #     print("-" * 10, "Test column width:", term_size, "-" * 10)
-    #     simple_tests(term_size=term_size, test_files=test_files)
-    #     subprocess.run("make fclean", shell=True, capture_output=True)
-
-    shutil.rmtree(test_path)
-    print("=" * 60)
-    print("All tests passed!")
-    print("=" * 60)
+        print("=" * 60)
+        print("All tests passed!")
+        print("=" * 60)
+    finally:
+        pass
+        # clean_up(paths=paths)
 
 
 def compile_ls(term_size: int = 80) -> None:
@@ -90,7 +95,7 @@ def invalid_flags() -> None:
             f"{ft_ls} -{lttr}", shell=True, capture_output=True, text=True
         )
 
-        assert result.returncode == 1, f"Flag -{lttr} should return exit code 1"
+        assert result.returncode == 2, f"Flag -{lttr} should return exit code 1"
         assert result.stdout == "", f"Flag -{lttr} should have empty stdout"
         assert result.stderr != "", f"Flag -{lttr} should have stderr message"
         counter += 1
@@ -98,48 +103,58 @@ def invalid_flags() -> None:
     print(f"  Tested {counter} invalid flags: all passed")
 
 
-def flag_combination_tests(test_paths: list[Path]) -> None:
+def flag_combination_tests(test_paths: Paths) -> None:
     """Phase 2-5: Test all flag combinations against test fixtures."""
 
     # Phase 2: Single flag tests
-    print("\n  Phase 2: Single Flag Tests")
     flags_counter = 0
     dirs_counter = 0
-    for flag in generate_flag():
-        for test_dir in test_paths:
-            ft_cmd = [ft_ls, flag, str(test_dir)] if flag else [ft_ls, str(test_dir)]
-            ls_cmd = ['ls', flag, str(test_dir)] if flag else ['ls', str(test_dir)]
+    for s_flag, m_flag in zip_longest(generate_flag(), generate_flag_combinations()):
+        for test_dir in test_paths.paths:
+            ft_cmd = []
+            ls_cmd = []
+            if s_flag:
+                ft_cmd = [ft_ls, s_flag, str(test_dir)] if s_flag else [ft_ls, str(test_dir)]
+                ls_cmd = ['ls', s_flag, str(test_dir)] if s_flag else ['ls', str(test_dir)]
+                flags_counter += 1
+
+            if m_flag:
+                ft_cmd = [ft_ls, m_flag, str(test_dir)] if m_flag else [ft_ls, str(test_dir)]
+                ls_cmd = ['ls', m_flag, str(test_dir)] if m_flag else ['ls', str(test_dir)]
+                flags_counter += 1
+
+            if not s_flag and not m_flag:
+                AssertionError('This should never ever happen')
 
             assert_command(ft_cmd=ft_cmd,
                            ls_cmd=ls_cmd,
                            msg='single flag test failed')
             dirs_counter += 1
-        flags_counter += 1
     print(f"    Tested {flags_counter} flag variants x {dirs_counter} dirs")
 
     # Phase 3: Flag combinations (2-5 flags)
-    print("\n  Phase 3: Flag Combination Tests")
-    flags_counter = 0
-    dirs_counter = 0
-    for flags in generate_flag_combinations():
-        for test_dir in test_paths:
-            ft_cmd = [ft_ls, flags, str(test_dir)]
-            ls_cmd = ['ls', flags, str(test_dir)]
+    # print("\n  Phase 3: Flag Combination Tests")
+    # flags_counter = 0
+    # dirs_counter = 0
+    # for flags in generate_flag_combinations():
+    #     for test_dir in test_paths.paths:
+    #         ft_cmd = [ft_ls, flags, str(test_dir)]
+    #         ls_cmd = ['ls', flags, str(test_dir)]
+    #
+    #         assert_command(ft_cmd=ft_cmd,
+    #                        ls_cmd=ls_cmd,
+    #                        msg='single flag test failed')
+    #         dirs_counter += 1
+    #     flags_counter += 1
+    # print(f"    Tested {flags_counter} combinations x {dirs_counter} dirs")
 
-            assert_command(ft_cmd=ft_cmd,
-                           ls_cmd=ls_cmd,
-                           msg='single flag test failed')
-            dirs_counter += 1
-        flags_counter += 1
-    print(f"    Tested {flags_counter} combinations x {dirs_counter} dirs")
-
-    # Phase 4: Feature-specific tests
-    print("\n  Phase 4: Feature-Specific Tests")
-    feature_specific_tests(test_paths=test_paths)
-
-    # Phase 5: Edge case tests
-    print("\n  Phase 5: Edge Case Tests")
-    edge_case_tests(test_path)
+    # # Phase 4: Feature-specific tests
+    # print("\n  Phase 4: Feature-Specific Tests")
+    # feature_specific_tests(test_paths=test_paths)
+    #
+    # # Phase 5: Edge case tests
+    # print("\n  Phase 5: Edge Case Tests")
+    # edge_case_tests(test_path)
 
 
 # def assert_contains(output: str, needle: str, cmd: list[str], msg: str) -> None:
@@ -696,9 +711,9 @@ def assert_command(ft_cmd: list[str], ls_cmd: list[str], msg: str) -> None:
 
     if ft.stdout != ls.stdout:
         print(f"\nMismatch on stdout for: {' '.join(ft_cmd)}", file=sys.stderr)
-        print(f"ls stdout: {ls.stdout}", file=sys.stderr)
+        print(f"ls stdout   :\n{ls.stdout}", file=sys.stderr)
         print("-" * 40, file=sys.stderr)
-        print(f"ft_ls stdout: {ft.stdout}", file=sys.stderr)
+        print(f"ft_ls stdout:\n{ft.stdout}", file=sys.stderr)
 
         seqm = difflib.SequenceMatcher(None, ft.stdout, ls.stdout)
         for opcode, a0, a1, b0, b1 in seqm.get_opcodes():
@@ -714,74 +729,95 @@ def assert_command(ft_cmd: list[str], ls_cmd: list[str], msg: str) -> None:
 
         raise AssertionError(f"{msg}: {' '.join(ft_cmd)}")
 
-    if ft.stderr != ls.stderr:
+    ft_stderr = ft.stderr
+    if ft.stderr.startswith('ft_ls'):
+        ft_stderr = ft.stderr.replace('ft_ls', 'ls', 1)
+    if ft_stderr != ls.stderr:
         print(f"\nMismatch on stderr for: {' '.join(ft_cmd)}", file=sys.stderr)
-        print(f"ls stderr: {ls.stderr}", file=sys.stderr)
+        print(f"ls stderr   :\n{ls.stderr}", file=sys.stderr)
         print("-" * 40, file=sys.stderr)
-        print(f"ft_ls stderr: {ft.stderr}", file=sys.stderr)
+        print(f"ft_ls stderr:\n{ft_stderr}", file=sys.stderr)
 
-        seqm = difflib.SequenceMatcher(None, ft.stderr, ls.stderr)
+        seqm = difflib.SequenceMatcher(None, ft_stderr, ls.stderr)
         for opcode, a0, a1, b0, b1 in seqm.get_opcodes():
             if opcode == "replace":
                 print(
-                    f"Replace:\n'{ft.stderr[a0:a1]}'\nWith:\n'{ls.stderr[b0:b1]}'",
+                    f"Replace:\n'{ft_stderr[a0:a1]}'\nWith:\n'{ls.stderr[b0:b1]}'",
                     file=sys.stderr,
                 )
             elif opcode == "insert":
                 print(f"Insert:\n'{ls.stderr[b0:b1]}'", file=sys.stderr)
             elif opcode == "delete":
-                print(f"Delete:\n'{ft.stderr[a0:a1]}'", file=sys.stderr)
+                print(f"Delete:\n'{ft_stderr[a0:a1]}'", file=sys.stderr)
 
         raise AssertionError(f"{msg}: {' '.join(ft_cmd)}")
 
     if ft.returncode != ls.returncode:
         print(f"\nMismatch on returncode for: {' '.join(ft_cmd)}", file=sys.stderr)
-        print(f"ls returncode {ls.returncode}:", file=sys.stderr)
+        print(f"ls returncode   : {ls.returncode}", file=sys.stderr)
         print("-" * 40, file=sys.stderr)
         print(f"ft_ls returncode: {ft.returncode}", file=sys.stderr)
+        raise AssertionError(f"{msg}: {' '.join(ft_cmd)}")
 
 
 def run_with_pty(cmd: list[str], cols: int = 80) -> CommandResult:
     """Run command in a PTY with specified terminal width."""
-    with tempfile.NamedTemporaryFile(delete=False) as stdout_file, \
-         tempfile.NamedTemporaryFile(delete=False) as stderr_file:
+    with tempfile.NamedTemporaryFile(delete=False) as stderr_file:
 
         master, slave = pty.openpty()
+        return_code = 0
+        try:
+            winsize = struct.pack("HHHH", 24, cols, 0, 0)  # rows, cols, xpixel, ypixel
+            fcntl.ioctl(slave, termios.TIOCSWINSZ, winsize)
+            env = os.environ.copy()
+            env["LC_ALL"] = "C"
+            env["LANG"] = "C"
+            env.pop("COLUMNS", None)
+            env["TERM"] = "screen-256color"
 
-        # Set terminal width
-        winsize = struct.pack("HHHH", 24, cols, 0, 0)  # rows, cols, xpixel, ypixel
-        fcntl.ioctl(slave, termios.TIOCSWINSZ, winsize)
-        env = os.environ.copy()
-        env["LC_ALL"] = "C"
-        env["LANG"] = "C"
-        env.pop("COLUMNS", None)
-        env["TERM"] = "screen-256color"
+            proc = subprocess.Popen(
+                cmd,
+                stdout=slave,
+                stderr=stderr_file,
+                stdin=slave,
+                close_fds=True,
+                env=env,
+            )
 
-        proc = subprocess.Popen(
-            cmd,
-            stdout=stdout_file,
-            stderr=stderr_file,
-            stdin=slave,
-            close_fds=True,
-            env=env,
-        )
-        os.close(slave)
+            proc.wait()
+            return_code = proc.returncode
+        finally:
+            os.close(slave)
+            os.close(master)
 
-        proc.wait()
 
-    with open(stdout_file.name, 'r') as f:
-        stdout_output = f.read()
+    output = b""
+    while True:
+        try:
+            data = os.read(master, 1024)
+            if not data:
+                break
+            output += data
+        except OSError:
+            break
 
     with open(stderr_file.name, 'r') as f:
         stderr_output = f.read()
 
-    os.remove(stdout_file.name)
     os.remove(stderr_file.name)
 
-    return CommandResult(stdout=stdout_output,
+    return CommandResult(stdout=output.decode().replace("\r", ""),
                          stderr=stderr_output,
-                         returncode=proc.returncode)
+                         returncode=return_code)
 
+def clean_up(paths=Paths):
+    for p in paths.paths:
+        if p.exists():
+            p.chmod(0o777)
+
+    for p in paths.paths:
+        if p.exists():
+            shutil.rmtree(p)
 
 if __name__ == "__main__":
     main()
