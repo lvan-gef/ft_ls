@@ -36,12 +36,16 @@ typedef struct s_dirjob {
     int is_operand;
 } t_dirjob;
 
-static void read_dir_(t_params *params, t_dirjob *path, int *exit_code);
+static bool run_(t_args *args, t_params *params, t_array *array,
+                 int *exit_code);
+static bool read_dir_(t_params *params, t_dirjob *path, int *exit_code);
 static bool process_args_(t_params *params, t_array *array, int *exit_code);
-static bool reset_files_(t_params *params);
-static bool reset_entries_(t_params *params);
+static int check_links(t_params *params, t_str *str, t_array *dir_entries,
+                       struct stat *st, int *exit_code);
 static t_str *join_paths_(Arena *arena, const t_str *lhs, const t_str *rhs);
 static t_str *need_quote_(Arena *arena, t_str *str);
+static bool has_quote_char_(const t_str *str);
+static bool has_quoted_operands_(const t_array *array);
 static void clean_up_(t_params *params);
 static void print_err_(Arena *arena, t_str *str, int e, const char *prefix);
 
@@ -102,44 +106,8 @@ void process(t_args *args, t_array *array, int *exit_code) {
         goto failed;
     }
 
-    if (!process_args_(&params, array, exit_code)) {
+    if (!run_(args, &params, array, exit_code)) {
         goto failed;
-    }
-
-    bool printed_section = false;
-    const bool print_dir_path = args->recursive || array->len > 1;
-
-    if (params.files->len) {
-        printer(args, params.files, NULL, false, params.max_len_links,
-                params.max_len_sizes);
-        printed_section = true;
-        if (!reset_files_(&params)) {
-            err_msg = "Failed to reset files array";
-            goto failed;
-        }
-    }
-
-    while (params.dirs->len) {
-        t_dirjob *dir_path = pop_array(params.dirs);
-
-        if (printed_section) {
-            write(STDOUT_FILENO, "\n", 1);
-        }
-
-        read_dir_(&params, dir_path, exit_code);
-
-        t_entry entry = {.name = dir_path->path};
-        entry.quoted = need_quote_(params.entries_arena, entry.name);
-        if (!entry.quoted) {
-            err_msg = "Failed to get quote";
-            goto failed;
-        }
-        printer(args, params.files, print_dir_path ? &entry : NULL, true, 0, 0);
-        printed_section = true;
-        if (!reset_files_(&params)) {
-            err_msg = "Failed to reset files array";
-            goto failed;
-        }
     }
 
     clean_up_(&params);
@@ -150,6 +118,76 @@ failed:
     }
 
     clean_up_(&params);
+}
+
+static bool run_(t_args *args, t_params *params, t_array *array,
+                 int *exit_code) {
+    const char *err_msg = NULL;
+    if (!process_args_(params, array, exit_code)) {
+        goto failed;
+    }
+
+    const bool has_quoted_operands = has_quoted_operands_(array);
+    bool printed_files = false;
+    bool printed_dir = false;
+    bool inserted_files_dirs_gap = false;
+    const bool print_dir_path = args->recursive || array->len > 1;
+
+    if (params->files->len) {
+        printer(args, params->files, NULL, false, params->max_len_links,
+                params->max_len_sizes, has_quoted_operands);
+        printed_files = true;
+        params->files = reset_array(params->files_arena);
+        if (!params->files) {
+            err_msg = "Failed to reset files array";
+            goto failed;
+        }
+    }
+
+    while (params->dirs->len) {
+        t_dirjob *dir_path = pop_array(params->dirs);
+
+        if (!inserted_files_dirs_gap && printed_files && dir_path->is_operand) {
+            write(STDOUT_FILENO, "\n", 1);
+            inserted_files_dirs_gap = true;
+        }
+
+        if (!read_dir_(params, dir_path, exit_code)) {
+            params->files = reset_array(params->files_arena);
+            if (!params->files) {
+                err_msg = "Failed to reset files array";
+                goto failed;
+            }
+            continue;
+        }
+
+        if (printed_dir) {
+            write(STDOUT_FILENO, "\n", 1);
+        }
+
+        t_entry entry = {.name = dir_path->path};
+        entry.quoted = need_quote_(params->entries_arena, entry.name);
+        if (!entry.quoted) {
+            err_msg = "Failed to get quote";
+            goto failed;
+        }
+        printer(args, params->files, print_dir_path ? &entry : NULL, true, 0, 0,
+                false);
+        printed_dir = true;
+        params->files = reset_array(params->files_arena);
+        if (!params->files) {
+            err_msg = "Failed to reset files array";
+            goto failed;
+        }
+    }
+
+    return true;
+failed:
+    if (err_msg) {
+        ft_fprintf(STDERR_FILENO, "Error: %s\n", err_msg);
+    }
+
+    return false;
 }
 
 static bool process_args_(t_params *params, t_array *array, int *exit_code) {
@@ -174,52 +212,11 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
     for (uint64_t index = 0; index < array->len; ++index) {
         t_str *str = array->data[index];
 
-        if (lstat(str->str, &st) == -1) {
-            int e = errno;
-            const char *prefix = "cannot access";
-            print_err_(params->files_arena, str, e, prefix);
-            *exit_code = 2;
+        int state = check_links(params, str, dir_entries, &st, exit_code);
+        if (state == 0) {
             continue;
-        }
-
-        if (params->args->list) {
-            const uint64_t links_len = len_of_nbr((uint64_t)st.st_nlink);
-            if (links_len > params->max_len_links) {
-                params->max_len_links = links_len;
-            }
-
-            const uint64_t size_len = len_of_nbr((uint64_t)st.st_size);
-            if (size_len > params->max_len_sizes) {
-                params->max_len_sizes = size_len;
-            }
-        }
-
-        bool is_dir_operand = S_ISDIR(st.st_mode);
-        struct stat st_dir = st;
-        if (S_ISLNK(st.st_mode)) {
-            struct stat st_target;
-            if (stat(str->str, &st_target) == 0 && S_ISDIR(st_target.st_mode)) {
-                is_dir_operand = true;
-                st_dir = st_target;
-            }
-        }
-
-        if (is_dir_operand && !params->args->list) {
-            t_entry *dir_entry =
-                ArenaPush(params->files_arena, sizeof(*dir_entry));
-            if (!dir_entry) {
-                err_msg = "Failed to alloc dir entry";
-                goto failed;
-            }
-
-            dir_entry->name = str;
-            dir_entry->path = str;
-            dir_entry->st = st_dir;
-            if (!append_array(dir_entries, dir_entry)) {
-                err_msg = "Failed to append dir entry";
-                goto failed;
-            }
-            continue;
+        } else if (state < 0) {
+            goto failed;
         }
 
         if (S_ISDIR(st.st_mode)) {
@@ -296,7 +293,66 @@ failed:
     return false;
 }
 
-static void read_dir_(t_params *params, t_dirjob *path, int *exit_code) {
+static int check_links(t_params *params, t_str *str, t_array *dir_entries,
+                       struct stat *st, int *exit_code) {
+    const char *err_msg = NULL;
+    if (lstat(str->str, st) == -1) {
+        int e = errno;
+        const char *prefix = "cannot access";
+        print_err_(params->files_arena, str, e, prefix);
+        *exit_code = 2;
+        return 0;
+    }
+
+    if (params->args->list) {
+        const uint64_t links_len = len_of_nbr((uint64_t)st->st_nlink);
+        if (links_len > params->max_len_links) {
+            params->max_len_links = links_len;
+        }
+
+        const uint64_t size_len = len_of_nbr((uint64_t)st->st_size);
+        if (size_len > params->max_len_sizes) {
+            params->max_len_sizes = size_len;
+        }
+    }
+
+    bool is_dir_operand = S_ISDIR(st->st_mode);
+    struct stat *st_dir = st;
+    if (S_ISLNK(st->st_mode)) {
+        struct stat *st_target = NULL;
+        if (stat(str->str, st_target) == 0 && S_ISDIR(st_target->st_mode)) {
+            is_dir_operand = true;
+            st_dir = st_target;
+        }
+    }
+
+    if (is_dir_operand && !params->args->list) {
+        t_entry *dir_entry = ArenaPush(params->files_arena, sizeof(*dir_entry));
+        if (!dir_entry) {
+            err_msg = "Failed to alloc dir entry";
+            goto failed;
+        }
+
+        dir_entry->name = str;
+        dir_entry->path = str;
+        dir_entry->st = *st_dir;
+        if (!append_array(dir_entries, dir_entry)) {
+            err_msg = "Failed to append dir entry";
+            goto failed;
+        }
+        return 0;
+    }
+
+    return 1;
+failed:
+    if (err_msg) {
+        ft_fprintf(STDERR_FILENO, "%s\n", err_msg);
+    }
+
+    return -1;
+}
+
+static bool read_dir_(t_params *params, t_dirjob *path, int *exit_code) {
     ASSERT_NOTNULL(params);
     ASSERT_NOTNULL(params->args);
     ASSERT_NOTNULL(params->dirs_arena);
@@ -315,10 +371,11 @@ static void read_dir_(t_params *params, t_dirjob *path, int *exit_code) {
         const char *prefix = "cannot open directory";
         print_err_(params->files_arena, path->path, e, prefix);
         *exit_code = (path->is_operand ? 2 : 1);
-        return;
+        return false;
     }
 
-    if (!reset_entries_(params)) {
+    params->entries = reset_array(params->entries_arena);
+    if (!params->entries) {
         goto failed;
     }
 
@@ -339,7 +396,8 @@ static void read_dir_(t_params *params, t_dirjob *path, int *exit_code) {
             goto failed;
         }
 
-        entry->path = join_paths_(params->entries_arena, path->path, entry->name);
+        entry->path =
+            join_paths_(params->entries_arena, path->path, entry->name);
         if (!entry->path) {
             goto failed;
         }
@@ -351,7 +409,6 @@ static void read_dir_(t_params *params, t_dirjob *path, int *exit_code) {
 
         if (lstat(entry->path->str, &entry->st) == -1) {
             *exit_code = 2;
-            ft_fprintf(STDERR_FILENO, "in read_dir loop\n");
             continue;
         }
 
@@ -408,40 +465,14 @@ static void read_dir_(t_params *params, t_dirjob *path, int *exit_code) {
         }
     }
 
-    return;
+    return true;
 failed:
     if (d) {
         closedir(d);
     }
 
-    ft_fprintf(STDERR_FILENO, "hier??\n");
     *exit_code = 2;
-}
-
-static bool reset_files_(t_params *params) {
-    ASSERT_NOTNULL(params);
-    ASSERT_NOTNULL(params->files_arena);
-
-    ArenaClear(params->files_arena);
-    params->files = init_array(params->files_arena, ARRAY_SIZE);
-    if (!params->files) {
-        return false;
-    }
-
-    return true;
-}
-
-static bool reset_entries_(t_params *params) {
-    ASSERT_NOTNULL(params);
-    ASSERT_NOTNULL(params->entries_arena);
-
-    ArenaClear(params->entries_arena);
-    params->entries = init_array(params->entries_arena, ARRAY_SIZE);
-    if (!params->entries) {
-        return false;
-    }
-
-    return true;
+    return false;
 }
 
 static t_str *join_paths_(Arena *arena, const t_str *lhs, const t_str *rhs) {
@@ -510,6 +541,38 @@ static t_str *need_quote_(Arena *arena, t_str *str) {
     return quote;
 }
 
+static bool has_quote_char_(const t_str *str) {
+    ASSERT_NOTNULL(str);
+    ASSERT_NOTNULL(str->str);
+
+    for (uint64_t index = 0; index < str->len; ++index) {
+        const char letter = str->str[index];
+        if (letter == SINGLE_QUOTE || letter == DOUBLE_QUOTE ||
+            letter == SPACE) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool has_quoted_operands_(const t_array *array) {
+    ASSERT_NOTNULL(array);
+
+    for (uint64_t index = 0; index < array->len; ++index) {
+        const t_str *operand = array->data[index];
+        if (!operand) {
+            continue;
+        }
+
+        if (has_quote_char_(operand)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 static void clean_up_(t_params *params) {
     if (params->dirs_arena) {
         ArenaRelease(params->dirs_arena);
@@ -534,24 +597,18 @@ static void print_err_(Arena *arena, t_str *str, int e, const char *prefix) {
 
     if (quote && quote->len) {
         if (quote->str[0] == '"') {
-            ft_fprintf(
-                STDERR_FILENO,
-                "ft_ls: %s %s%s%s: %s\n",
-                prefix, quote->str, str->str, quote->str, msg);
+            ft_fprintf(STDERR_FILENO, "ft_ls: %s %s%s%s: %s\n", prefix,
+                       quote->str, str->str, quote->str, msg);
             return;
         }
 
         t_str *new_str = escape_str(arena, str);
         if (new_str) {
-            ft_fprintf(
-                STDERR_FILENO,
-                "ft_ls: %s %s%s%s: %s\n",
-                prefix, quote->str, new_str->str, quote->str, msg);
+            ft_fprintf(STDERR_FILENO, "ft_ls: %s %s%s%s: %s\n", prefix,
+                       quote->str, new_str->str, quote->str, msg);
             return;
         }
     }
 
-    ft_fprintf(STDERR_FILENO,
-               "ft_ls: %s '%s': %s\n",
-               prefix, str->str, msg);
+    ft_fprintf(STDERR_FILENO, "ft_ls: %s '%s': %s\n", prefix, str->str, msg);
 }
