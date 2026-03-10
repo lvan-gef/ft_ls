@@ -5,8 +5,8 @@
 #include "../include/ft_arena.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
-#include "../include/ft_helper.h"
 #include "../include/ft_entry.h"
+#include "../include/ft_helper.h"
 #include "../include/ft_print_list.h"
 #include "../include/ft_str.h"
 
@@ -39,7 +39,8 @@ static bool have_quotes_(t_array *array);
 
 // todo: err msg when someting goes wrong
 void print_list(t_array *array, t_entry *dir_entry, bool print_total,
-                uint64_t min_len_links, uint64_t min_len_sizes) {
+                uint64_t min_len_links, uint64_t min_len_sizes,
+                bool force_quote_padding) {
     ASSERT_NOTNULL(array);
 
     Arena *arena = ArenaAlloc(ARENA_SIZE);
@@ -48,7 +49,7 @@ void print_list(t_array *array, t_entry *dir_entry, bool print_total,
     }
     ArenaSetAutoAlign(arena, 8);
 
-    t_sizes sizes = {.have_quote = have_quotes_(array),
+    t_sizes sizes = {.have_quote = force_quote_padding || have_quotes_(array),
                      .max_len_links = min_len_links,
                      .max_len_sizes = min_len_sizes};
     get_sizes_(array, &sizes);
