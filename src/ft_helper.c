@@ -52,35 +52,28 @@ t_str *escape_str(Arena *arena, t_str *str) {
     ASSERT_NOTNULL(str);
 
     uint64_t single_count = 0;
-    const uint64_t cur_pos = str->pos;
-    while (has_next_str(str)) {
-        const char lttr = next_str(str);
-        if (lttr == '\'') {
+    for (uint64_t index = 0; index < str->len; ++index) {
+        if (str->str[index] == '\'') {
             ++single_count;
         }
     }
-    str->pos = cur_pos;
 
     t_str *new_str = init_str(arena, str->len + (single_count * 3));
     if (!new_str) {
         return NULL;
     }
 
-    const char *quote = ft_memchr(str->str, '\'', str->len);
-    while (quote) {
-        uint64_t len = (uint64_t)(quote - str->str);
-        ft_memcpy(new_str->str + new_str->len, str->str + str->pos, len);
-        new_str->len += len;
+    for (uint64_t index = 0; index < str->len; ++index) {
+        if (str->str[index] == '\'') {
+            ft_memcpy(new_str->str + new_str->len, "'\\''", 4);
+            new_str->len += 4;
+            continue;
+        }
 
-        ft_memcpy(new_str->str + new_str->len, "'\\'", 3);
-        new_str->len += 3;
-        str->pos += len;
-        ++quote;
-        quote = ft_memchr(quote, '\'', str->len);
+        new_str->str[new_str->len] = str->str[index];
+        ++new_str->len;
     }
 
-    ft_memcpy(new_str->str + new_str->len, str->str + str->pos, str->len - str->pos);
-    new_str->len += str->len - str->pos;
     new_str->str[new_str->len] = '\0';
     return new_str;
 }
