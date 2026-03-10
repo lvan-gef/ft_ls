@@ -10,8 +10,8 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <stdint.h>
 #include "../../include/libft.h"
+#include <stdint.h>
 
 uint64_t ft_atoui(const char *str) {
     uint64_t result;
