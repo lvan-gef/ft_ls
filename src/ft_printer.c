@@ -4,9 +4,9 @@
 #include "../include/ft_arena.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
+#include "../include/ft_entry.h"
 #include "../include/ft_helper.h"
 #include "../include/ft_parse.h"
-#include "../include/ft_entry.h"
 #include "../include/ft_print_list.h"
 #include "../include/ft_printer.h"
 #include "../include/ft_sort.h"
@@ -36,8 +36,8 @@ typedef struct {
     t_str *dubble_colon;
 } t_spacing;
 
-static void init_print_row_(Arena *arena, t_array *array,
-                            t_entry *dir_entry);
+static void init_print_row_(Arena *arena, t_array *array, t_entry *dir_entry,
+                            bool force_quote_padding);
 static void print_row_(t_array *array, t_str *buf, const t_map *map,
                        const t_spacing *spacing, bool quoted,
                        const uint64_t *col_starts);
@@ -48,7 +48,8 @@ static uint64_t calc_width_(Arena *arena, t_array *array, uint64_t num_cols,
 static bool check_quoted_(t_array *array);
 
 void printer(const t_args *args, t_array *array, t_entry *dir_entry,
-             bool print_total, uint64_t min_len_links, uint64_t min_len_sizes) {
+             bool print_total, uint64_t min_len_links, uint64_t min_len_sizes,
+             bool force_quote_padding) {
     ASSERT_NOTNULL(args);
     ASSERT_NOTNULL(array);
 
@@ -64,16 +65,17 @@ void printer(const t_args *args, t_array *array, t_entry *dir_entry,
     }
 
     if (args->list) {
-        print_list(array, dir_entry, print_total, min_len_links, min_len_sizes);
+        print_list(array, dir_entry, print_total, min_len_links, min_len_sizes,
+                   force_quote_padding);
     } else {
-        init_print_row_(arena, array, dir_entry);
+        init_print_row_(arena, array, dir_entry, force_quote_padding);
     }
 
     ArenaRelease(arena);
 }
 
-static void init_print_row_(Arena *arena, t_array *array,
-                            t_entry *dir_entry) {
+static void init_print_row_(Arena *arena, t_array *array, t_entry *dir_entry,
+                            bool force_quote_padding) {
     ASSERT_NOTNULL(arena);
     ASSERT_NOTNULL(array);
 
@@ -86,7 +88,7 @@ static void init_print_row_(Arena *arena, t_array *array,
                  .rows = array->len,
                  .max = array->len < max_cols ? array->len : max_cols};
 
-    bool quoted = check_quoted_(array);
+    bool quoted = force_quote_padding || check_quoted_(array);
     const char *err_msg = NULL;
 
     uint64_t *col_widths = calc_cols_(arena, array, &map, quoted);
