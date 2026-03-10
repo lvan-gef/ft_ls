@@ -21,5 +21,6 @@ typedef struct s_array {
 t_array *init_array(Arena *arena, uint64_t size);
 bool append_array(t_array *array, void *content);
 void *pop_array(t_array *array);
+t_array *reset_array(Arena *arena);
 
 #endif // !FT_ARRAY_H

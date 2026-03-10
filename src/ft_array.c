@@ -61,6 +61,18 @@ void *pop_array(t_array *array) {
     return elem;
 }
 
+t_array *reset_array(Arena *arena) {
+    ASSERT_NOTNULL(arena);
+
+    ArenaClear(arena);
+    t_array *array = init_array(arena, ARRAY_SIZE);
+    if (!array) {
+        return NULL;
+    }
+
+    return array;
+}
+
 static bool realloc_arr_(t_array *array) {
     ASSERT_NOTNULL(array);
 
