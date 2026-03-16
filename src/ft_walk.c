@@ -103,6 +103,7 @@ void process(t_args *args, t_array *array, int *exit_code) {
 
     params.entries = init_array(params.entries_arena, ARRAY_SIZE);
     if (!params.entries) {
+        err_msg = "Failed to alloc entries";
         goto failed;
     }
 
@@ -122,6 +123,12 @@ failed:
 
 static bool run_(t_args *args, t_params *params, t_array *array,
                  int *exit_code) {
+    ASSERT_NOTNULL(args);
+    ASSERT_NOTNULL(params);
+    ASSERT_NOTNULL(array);
+    ASSERT_NOTNULL(exit_code);
+    ASSERT_EQ(*exit_code, 0);
+
     const char *err_msg = NULL;
     if (!process_args_(params, array, exit_code)) {
         goto failed;
@@ -171,8 +178,9 @@ static bool run_(t_args *args, t_params *params, t_array *array,
             err_msg = "Failed to get quote";
             goto failed;
         }
-        printer(args, params->files, print_dir_path ? &entry : NULL, true, 0, 0,
-                false);
+
+        t_entry *ent = print_dir_path ? &entry : NULL;
+        printer(args, params->files, ent, true, 0, 0, false);
         printed_dir = true;
         params->files = reset_array(params->files_arena);
         if (!params->files) {
@@ -574,6 +582,8 @@ static bool has_quoted_operands_(const t_array *array) {
 }
 
 static void clean_up_(t_params *params) {
+    ASSERT_NOTNULL(params);
+
     if (params->dirs_arena) {
         ArenaRelease(params->dirs_arena);
     }

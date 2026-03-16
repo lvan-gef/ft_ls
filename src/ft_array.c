@@ -45,6 +45,7 @@ bool append_array(t_array *array, void *content) {
 
     array->data[array->len] = content;
     ++array->len;
+    ASSERT_LE(array->len, array->cap);
     return true;
 }
 
@@ -55,6 +56,7 @@ void *pop_array(t_array *array) {
         return NULL;
     }
 
+    ASSERT_LT(array->len - 1, array->len);
     --array->len;
     void *elem = array->data[array->len];
     array->data[array->len] = NULL;
@@ -70,6 +72,8 @@ t_array *reset_array(Arena *arena) {
         return NULL;
     }
 
+    ASSERT_EQ(array->len, 0);
+    ASSERT_LT(array->len, array->cap);
     return array;
 }
 

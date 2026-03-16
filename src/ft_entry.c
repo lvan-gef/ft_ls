@@ -1,4 +1,3 @@
-#include <errno.h>
 #include <grp.h>
 #include <linux/limits.h>
 #include <pwd.h>
@@ -45,12 +44,12 @@ static char cached_user[LOGIN_NAME_MAX] = "";
 static char cached_group[LOGIN_NAME_MAX] = "";
 
 bool get_file_info(Arena *arena, Arena *scratch, t_entry *entry) {
+    ASSERT_NOTNULL(arena);
+    ASSERT_NOTNULL(scratch);
     ASSERT_NOTNULL(entry);
     ASSERT_NOTNULL(entry->path);
     ASSERT_GT(entry->path->cap, 0);
     ASSERT_LT(entry->path->len, entry->path->cap);
-    ASSERT_NOTNULL(arena);
-    ASSERT_NOTNULL(scratch);
 
     const ArenaMark mark = ArenaGetMark(arena);
     ArenaClear(scratch);
@@ -100,7 +99,6 @@ bool get_file_info(Arena *arena, Arena *scratch, t_entry *entry) {
 
     entry->info = info;
     return true;
-
 failed:
     ArenaClear(scratch);
     ArenaPopToMark(arena, mark);
@@ -109,6 +107,9 @@ failed:
 }
 
 static t_str *get_perm_(Arena *arena, Arena *scratch, const t_entry *entry) {
+    ASSERT_NOTNULL(arena);
+    ASSERT_NOTNULL(scratch);
+    ASSERT_NOTNULL(entry);
     const ArenaMark mark = ArenaGetMark(arena);
 
     t_str *str = init_str(arena, PERMISSION_SIZE);
@@ -128,7 +129,6 @@ static t_str *get_perm_(Arena *arena, Arena *scratch, const t_entry *entry) {
                     append_chars_str(scratch, str, "-");
                 }
                 break;
-
             case P_DIR:
                 if ((entry->st.st_mode & S_IFMT) == S_IFDIR) {
                     append_chars_str(scratch, str, "d");
@@ -181,6 +181,8 @@ static t_str *get_perm_(Arena *arena, Arena *scratch, const t_entry *entry) {
         }
     }
 
+    ASSERT_EQ(new_str->len, PERMISSION_SIZE - 1);
+    ASSERT_EQ(new_str->pos, 0);
     return str;
 failed:
     ArenaPopToMark(arena, mark);
@@ -189,6 +191,8 @@ failed:
 }
 
 static t_str *get_user_(Arena *arena, uid_t user_id) {
+    ASSERT_NOTNULL(arena);
+
     if (user_id == cached_uid) {
         return create_str(arena, cached_user);
     }
@@ -212,10 +216,14 @@ static t_str *get_user_(Arena *arena, uid_t user_id) {
     }
 
     cached_uid = user_id;
+    ASSERT_LE(new_str->len, LOGIN_NAME_MAX - 1);
+    ASSERT_EQ(new_str->pos, 0);
     return new_str;
 }
 
 static t_str *get_group_(Arena *arena, gid_t group_id) {
+    ASSERT_NOTNULL(arena);
+
     if (group_id == cached_gid) {
         return create_str(arena, cached_group);
     }
@@ -239,10 +247,15 @@ static t_str *get_group_(Arena *arena, gid_t group_id) {
     }
 
     cached_gid = group_id;
+    ASSERT_LE(new_str->len, LOGIN_NAME_MAX - 1);
+    ASSERT_EQ(new_str->pos, 0);
     return new_str;
 }
 
 static t_str *get_dt_(Arena *arena, const struct timespec *ctim) {
+    ASSERT_NOTNULL(arena);
+    ASSERT_NOTNULL(ctim);
+
     const char *dt = ctime(&ctim->tv_sec);
     if (!dt) {
         return NULL;
@@ -264,6 +277,7 @@ static t_str *get_dt_(Arena *arena, const struct timespec *ctim) {
     new_str->str[new_str->len] = '\0';
 
     ASSERT_EQ(new_str->len, DT_LEN - 1);
+    ASSERT_EQ(new_str->pos, 0);
     return new_str;
 }
 
@@ -271,6 +285,7 @@ static bool get_symlink_(Arena *arena, const t_entry *entry, t_str **out) {
     ASSERT_NOTNULL(arena);
     ASSERT_NOTNULL(entry);
     ASSERT_NOTNULL(out);
+    ASSERT_NOTNULL(*out);
 
     *out = NULL;
     if (!S_ISLNK(entry->st.st_mode)) {
@@ -283,35 +298,41 @@ static bool get_symlink_(Arena *arena, const t_entry *entry, t_str **out) {
     while (true) {
         t_str *new_str = init_str(arena, cap);
         if (!new_str) {
-            goto failed;
+            break;
         }
 
         ssize_t len = readlink(entry->path->str, new_str->str, (size_t)cap);
         if (len < 0) {
-            goto failed;
+            break;
         }
 
         if ((uint64_t)len < cap) {
             new_str->len = (uint64_t)len;
             new_str->str[new_str->len] = '\0';
             *out = new_str;
+            ASSERT_EQ(*out->len, cap - 1);
+            ASSERT_EQ(*out->pos, 0);
             return true;
         }
 
         ArenaPopToMark(arena, mark);
         if (cap > UINT64_MAX / 2) {
-            goto failed;
+            break;
         }
 
         cap *= 2;
     }
 
-failed:
     ArenaPopToMark(arena, mark);
     return false;
 }
 
 static bool has_xattr_(const char *path, const char *name) {
+    ASSERT_NOTNULL(path);
+    ASSERT_NOTNULL(name);
+    ASSERT_(*path, "%c can not be '\\0'", *path);
+    ASSERT_(*name, "%c can not be '\\0'", *name);
+
     ssize_t n = getxattr(path, name, NULL, 0);
     if (n < 0) {
         return false;

@@ -9,6 +9,7 @@
 #include "../include/ft_helper.h"
 #include "../include/ft_print_list.h"
 #include "../include/ft_str.h"
+#include "ft_fprintf.h"
 
 typedef struct {
     uint64_t total;
@@ -33,7 +34,7 @@ typedef struct {
 static void get_sizes_(t_array *array, t_sizes *sizes);
 static void printer_(Arena *arena, t_array *array, t_str *buf,
                      const t_spacing *spacing, const t_sizes *sizes);
-static void left_pad_(Arena *arena, t_str *buffer, uint64_t src_len,
+static bool left_pad_(Arena *arena, t_str *buffer, uint64_t src_len,
                       uint64_t max_size);
 static bool have_quotes_(t_array *array);
 
@@ -119,14 +120,27 @@ done:
 
 static void printer_(Arena *arena, t_array *array, t_str *buf,
                      const t_spacing *spacing, const t_sizes *sizes) {
+    ASSERT_NOTNULL(arena);
+    ASSERT_NOTNULL(array);
+    ASSERT_NOTNULL(buf);
+    ASSERT_NOTNULL(spacing);
+    ASSERT_NOTNULL(sizes);
+
+    const char *err_msg = NULL;
     for (uint64_t index = 0; index < array->len; ++index) {
         const t_entry *entry = array->data[index];
 
         cat_str(buf, entry->info->perm);
-        left_pad_(arena, buf, entry->info->perm->len, sizes->max_len_perm);
+        if (!left_pad_(arena, buf, entry->info->perm->len, sizes->max_len_perm)) {
+            err_msg = "Failed to left pad";
+            goto failed;
+        }
         cat_str(buf, spacing->space);
 
-        left_pad_(arena, buf, entry->info->links->len, sizes->max_len_links);
+        if (!left_pad_(arena, buf, entry->info->links->len, sizes->max_len_links)) {
+            err_msg = "Failed to left pad";
+            goto failed;
+        }
         cat_str(buf, entry->info->links);
         cat_str(buf, spacing->space);
 
@@ -136,7 +150,10 @@ static void printer_(Arena *arena, t_array *array, t_str *buf,
         cat_str(buf, entry->info->groupname);
         cat_str(buf, spacing->space);
 
-        left_pad_(arena, buf, entry->info->size->len, sizes->max_len_sizes);
+        if (!left_pad_(arena, buf, entry->info->size->len, sizes->max_len_sizes)) {
+            err_msg = "Failed to left pad";
+            goto failed;
+        }
         cat_str(buf, entry->info->size);
         cat_str(buf, spacing->space);
 
@@ -155,7 +172,10 @@ static void printer_(Arena *arena, t_array *array, t_str *buf,
         }
 
         if (entry->info->symlink) {
-            append_chars_str(arena, buf, " -> ");
+            if (!append_chars_str(arena, buf, " -> ")) {
+                err_msg = "Failed to append str";
+                goto failed;
+            }
             cat_str(buf, entry->info->symlink);
         }
 
@@ -163,9 +183,15 @@ static void printer_(Arena *arena, t_array *array, t_str *buf,
     }
 
     write(STDOUT_FILENO, buf->str, buf->len);
+    return;
+failed:
+    ft_fprintf(STDERR_FILENO, "%s\n", err_msg);
 }
 
 static void get_sizes_(t_array *array, t_sizes *sizes) {
+    ASSERT_NOTNULL(array);
+    ASSERT_NOTNULL(sizes);
+
     for (uint64_t i = 0; i < array->len; ++i) {
         t_entry *e = array->data[i];
 
@@ -229,17 +255,25 @@ static void get_sizes_(t_array *array, t_sizes *sizes) {
     }
 }
 
-static void left_pad_(Arena *arena, t_str *buffer, uint64_t src_len,
+static bool left_pad_(Arena *arena, t_str *buffer, uint64_t src_len,
                       uint64_t max_size) {
+    ASSERT_NOTNULL(arena);
+    ASSERT_NOTNULL(buffer);
     ASSERT_LE(src_len, max_size);
     uint64_t differ = max_size - src_len;
 
     for (uint64_t index = 0; index < differ; ++index) {
-        append_chars_str(arena, buffer, " ");
+        if (append_chars_str(arena, buffer, " ") < 0) {
+            return false;
+        }
     }
+
+    return true;
 }
 
 static bool have_quotes_(t_array *array) {
+    ASSERT_NOTNULL(array);
+
     for (uint64_t index = 0; index < array->len; ++index) {
         const t_entry *entry = array->data[index];
         if (entry->quoted->len) {

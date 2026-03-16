@@ -20,19 +20,23 @@ static int compare_time_(const struct timespec *a, const struct timespec *b);
 static void reverse_(t_array *array);
 
 void sort(Arena *arena, t_array *array, bool reverse, bool sort_time) {
+    ASSERT_NOTNULL(arena);
     ASSERT_NOTNULL(array);
 
-    if (array->len > 1) {
-        const t_cmp_entry cmp = sort_time ? cmp_time_entry_ : cmp_name_entry_;
-        merge_sort_(arena, array, cmp);
+    if (array->len <= 1) {
+        return;
     }
 
-    if (reverse && array->len) {
+    const t_cmp_entry cmp = sort_time ? cmp_time_entry_ : cmp_name_entry_;
+    merge_sort_(arena, array, cmp);
+
+    if (reverse) {
         reverse_(array);
     }
 }
 
 static void merge_sort_(Arena *arena, t_array *array, t_cmp_entry cmp) {
+    ASSERT_NOTNULL(arena);
     ASSERT_NOTNULL(array);
     ASSERT_NOTNULL(cmp);
 
@@ -43,7 +47,7 @@ static void merge_sort_(Arena *arena, t_array *array, t_cmp_entry cmp) {
 
     ArenaMark marker = ArenaGetMark(arena);
     void **tmp =
-        (void **)ArenaPushNoZero(arena, (size_t)array->len * sizeof(void *));
+        (void **)ArenaPushNoZero(arena, (uint64_t)array->len * sizeof(void *));
     if (!tmp) {
         return;
     }
@@ -81,6 +85,11 @@ static uint64_t add_capped_(uint64_t lhs, uint64_t rhs, uint64_t cap) {
 
 static void merge_(void **data, void **tmp, uint64_t left, uint64_t mid,
                    uint64_t right, t_cmp_entry cmp) {
+    ASSERT_NOTNULL(data);
+    ASSERT_NOTNULL(*data);
+    ASSERT_NOTNULL(tmp);
+    ASSERT_NOTNULL(*tmp);
+
     uint64_t i = left;
     uint64_t j = mid;
     uint64_t out = left;
@@ -160,7 +169,7 @@ static int compare_time_(const struct timespec *a, const struct timespec *b) {
 
 static void reverse_(t_array *array) {
     ASSERT_NOTNULL(array);
-    ASSERT_GT(array->len, 0);
+    ASSERT_GT(array->len, 1);
 
     size_t index = 0;
     size_t end = array->len - 1;

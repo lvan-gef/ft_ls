@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include "../include/ft_arena.h"
 #include "../include/ft_assert.h"
@@ -111,7 +112,7 @@ uint64_t cat_str(t_str *dst, const t_str *src) {
 
     uint64_t cur_pos = dst->pos;
     dst->pos = dst->len;
-    size_t len = strlcpy_(dst, src, dst->cap - dst->len + 1);
+    uint64_t len = strlcpy_(dst, src, dst->cap - dst->len + 1);
     dst->len += len;
     dst->pos = cur_pos;
 
@@ -121,8 +122,9 @@ uint64_t cat_str(t_str *dst, const t_str *src) {
 }
 
 t_str *uint_to_str(Arena *arena, uint64_t nbr) {
-    uint64_t len = len_of_nbr(nbr);
+    ASSERT_NOTNULL(arena);
 
+    uint64_t len = len_of_nbr(nbr);
     t_str *str = init_str(arena, len);
     if (!str) {
         return NULL;
@@ -138,17 +140,25 @@ t_str *uint_to_str(Arena *arena, uint64_t nbr) {
         ++str->len;
     }
 
+    ASSERT_NOTNULL(str);
+    ASSERT_LT(dst->len, dst->cap);
+    ASSERT_EQ(dst->pos, 0);
     return str;
 }
 
-uint64_t append_chars_str(Arena *arena, t_str *dst, const char *src) {
+ssize_t append_chars_str(Arena *arena, t_str *dst, const char *src) {
+    ASSERT_NOTNULL(arena);
+    ASSERT_NOTNULL(dst);
+    ASSERT_NOTNULL(src);
+    ASSERT_(*src->str, "%c can not be '\\0'", *src->str);
+
     const t_str *new_str = create_str(arena, src);
     if (!new_str) {
-        return 0;
+        return -1;
     }
 
     uint64_t len = cat_str(dst, new_str);
-    return len;
+    return (ssize_t)len;
 }
 
 bool has_next_str(const t_str *s) {
@@ -172,6 +182,7 @@ char next_str(t_str *s) {
 static uint64_t strlcpy_(t_str *dst, const t_str *src, uint64_t dstsize) {
     ASSERT_LT(src->pos, src->cap);
     ASSERT_LT(dst->pos, dst->cap);
+    ASSERT_GT(dstsize, 0);
 
     if (!dstsize) {
         return 0;
@@ -179,7 +190,7 @@ static uint64_t strlcpy_(t_str *dst, const t_str *src, uint64_t dstsize) {
 
     uint64_t index = 0;
     uint64_t copied = 0;
-    while (src->str[src->pos + index]) {
+    while (src->str[src->pos + index] && dst->pos + index < dst->cap) {
         if (index < dstsize - 1) {
             dst->str[dst->pos + index] = src->str[src->pos + index];
             copied = index + 1;

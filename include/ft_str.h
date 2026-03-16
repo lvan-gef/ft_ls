@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include "./ft_arena.h"
 
@@ -21,7 +22,7 @@ uint64_t cat_str(t_str *dst, const t_str *src);
 uint64_t cat_l_str(t_str *dst, const t_str *src, uint64_t size);
 t_str *uint_to_str(Arena *arena, uint64_t nbr);
 
-uint64_t append_chars_str(Arena *arena, t_str *dst, const char *src);
+ssize_t append_chars_str(Arena *arena, t_str *dst, const char *src);
 
 bool has_next_str(const t_str *s);
 char peek_str(t_str *s);
