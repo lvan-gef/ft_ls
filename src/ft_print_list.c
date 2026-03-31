@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <unistd.h>
 
-#include "../include/ft_arena.h"
+#include "../include/ft_free_list.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
 #include "../include/ft_entry.h"
@@ -32,9 +32,9 @@ typedef struct {
 #endif /* ifndef HEADER_PREFIX_LEN */
 
 static void get_sizes_(t_array *array, t_sizes *sizes);
-static void printer_(Arena *arena, t_array *array, t_str *buf,
+static void printer_(free_list *fl, t_array *array, t_str *buf,
                      const t_spacing *spacing, const t_sizes *sizes);
-static bool left_pad_(Arena *arena, t_str *buffer, uint64_t src_len,
+static bool left_pad_(free_list *fl, t_str *buffer, uint64_t src_len,
                       uint64_t max_size);
 static bool have_quotes_(t_array *array);
 
@@ -44,11 +44,14 @@ void print_list(t_array *array, t_entry *dir_entry, bool print_total,
                 bool force_quote_padding) {
     ASSERT_NOTNULL(array);
 
-    Arena *arena = ArenaAlloc(ARENA_SIZE);
-    if (!arena) {
-        return;
-    }
-    ArenaSetAutoAlign(arena, 8);
+    unsigned char buffer[1024 * 8];
+    free_list fl;
+    free_list_init(&fl, buffer, sizeof(buffer));
+    // free_list *fl = free_listAlloc(fl_SIZE);
+    // if (!fl) {
+    //     return;
+    // }
+    // free_listSetAutoAlign(fl, 8);
 
     t_sizes sizes = {.have_quote = force_quote_padding || have_quotes_(array),
                      .max_len_links = min_len_links,
@@ -74,7 +77,7 @@ void print_list(t_array *array, t_entry *dir_entry, bool print_total,
                          .dubble_colon = &dubble_colon};
 
     if (dir_entry) {
-        dir_entry = escape_entry(arena, dir_entry);
+        dir_entry = escape_entry(&fl, dir_entry);
         if (!dir_entry) {
             goto done;
         }
@@ -85,7 +88,7 @@ void print_list(t_array *array, t_entry *dir_entry, bool print_total,
         sizes.buf_size += dir_entry->name->len + 3; // 1 for :, 1 for \n
     }
 
-    t_str *buf = init_str(arena, sizes.buf_size);
+    t_str *buf = init_str(&fl, sizes.buf_size);
     if (!buf) {
         goto done;
     }
@@ -104,7 +107,7 @@ void print_list(t_array *array, t_entry *dir_entry, bool print_total,
     }
 
     if (print_total) {
-        const t_str *total = uint_to_str(arena, (sizes.total + 1) / 2);
+        const t_str *total = uint_to_str(&fl, (sizes.total + 1) / 2);
         if (!total) {
             goto done;
         }
@@ -113,14 +116,14 @@ void print_list(t_array *array, t_entry *dir_entry, bool print_total,
         cat_str(buf, &new_line);
     }
 
-    printer_(arena, array, buf, &spacing, &sizes);
+    printer_(&fl, array, buf, &spacing, &sizes);
 done:
-    ArenaRelease(arena);
+    return;
 }
 
-static void printer_(Arena *arena, t_array *array, t_str *buf,
+static void printer_(free_list *fl, t_array *array, t_str *buf,
                      const t_spacing *spacing, const t_sizes *sizes) {
-    ASSERT_NOTNULL(arena);
+    ASSERT_NOTNULL(fl);
     ASSERT_NOTNULL(array);
     ASSERT_NOTNULL(buf);
     ASSERT_NOTNULL(spacing);
@@ -131,13 +134,13 @@ static void printer_(Arena *arena, t_array *array, t_str *buf,
         const t_entry *entry = array->data[index];
 
         cat_str(buf, entry->info->perm);
-        if (!left_pad_(arena, buf, entry->info->perm->len, sizes->max_len_perm)) {
+        if (!left_pad_(fl, buf, entry->info->perm->len, sizes->max_len_perm)) {
             err_msg = "Failed to left pad";
             goto failed;
         }
         cat_str(buf, spacing->space);
 
-        if (!left_pad_(arena, buf, entry->info->links->len, sizes->max_len_links)) {
+        if (!left_pad_(fl, buf, entry->info->links->len, sizes->max_len_links)) {
             err_msg = "Failed to left pad";
             goto failed;
         }
@@ -150,7 +153,7 @@ static void printer_(Arena *arena, t_array *array, t_str *buf,
         cat_str(buf, entry->info->groupname);
         cat_str(buf, spacing->space);
 
-        if (!left_pad_(arena, buf, entry->info->size->len, sizes->max_len_sizes)) {
+        if (!left_pad_(fl, buf, entry->info->size->len, sizes->max_len_sizes)) {
             err_msg = "Failed to left pad";
             goto failed;
         }
@@ -172,7 +175,7 @@ static void printer_(Arena *arena, t_array *array, t_str *buf,
         }
 
         if (entry->info->symlink) {
-            if (!append_chars_str(arena, buf, " -> ")) {
+            if (!append_chars_str(fl, buf, " -> ")) {
                 err_msg = "Failed to append str";
                 goto failed;
             }
@@ -237,7 +240,7 @@ static void get_sizes_(t_array *array, t_sizes *sizes) {
             row += 1;
         }
 
-        e = escape_entry(array->arena, e);
+        e = escape_entry(array->fl, e);
         // array->data[i] = e;
         row += e->name->len;
 
@@ -255,15 +258,15 @@ static void get_sizes_(t_array *array, t_sizes *sizes) {
     }
 }
 
-static bool left_pad_(Arena *arena, t_str *buffer, uint64_t src_len,
+static bool left_pad_(free_list *fl, t_str *buffer, uint64_t src_len,
                       uint64_t max_size) {
-    ASSERT_NOTNULL(arena);
+    ASSERT_NOTNULL(fl);
     ASSERT_NOTNULL(buffer);
     ASSERT_LE(src_len, max_size);
     uint64_t differ = max_size - src_len;
 
     for (uint64_t index = 0; index < differ; ++index) {
-        if (append_chars_str(arena, buffer, " ") < 0) {
+        if (append_chars_str(fl, buffer, " ") < 0) {
             return false;
         }
     }

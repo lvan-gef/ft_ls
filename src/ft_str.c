@@ -2,23 +2,22 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "../include/ft_arena.h"
 #include "../include/ft_assert.h"
 #include "../include/ft_helper.h"
 #include "../include/ft_str.h"
 
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
+#include "../include/ft_free_list.h"
 
 static uint64_t strlcpy_(t_str *dst, const t_str *src, uint64_t dstsize);
 
-t_str *init_str(Arena *arena, uint64_t cap) {
-    ASSERT_NOTNULL(arena);
+t_str *init_str(free_list *fl, uint64_t cap) {
+    ASSERT_NOTNULL(fl);
     ASSERT_GT(cap, 0);
 
     const char *err_msg = NULL;
-    ArenaMark mark = ArenaGetMark(arena);
-    t_str *str = ArenaPushNoZero(arena, sizeof(*str));
+    t_str *str = free_list_alloc(fl, sizeof(*str), 8);
     if (!str) {
         err_msg = "ArenaPushNoZero failed";
         goto failed;
@@ -29,7 +28,7 @@ t_str *init_str(Arena *arena, uint64_t cap) {
         goto failed;
     }
 
-    str->str = ArenaPushNoZero(arena, cap + 1);
+    str->str = free_list_alloc(fl, cap + 1, 8);
     if (!str->str) {
         err_msg = "ArenaPushNoZero failed";
         goto failed;
@@ -44,12 +43,15 @@ t_str *init_str(Arena *arena, uint64_t cap) {
 
 failed:
     ft_fprintf(STDERR_FILENO, "%s\n", err_msg);
-    ArenaPopToMark(arena, mark);
+    if (str) {
+        free_str(fl, str);
+    }
+
     return NULL;
 }
 
-t_str *create_str(Arena *arena, const char *str) {
-    ASSERT_NOTNULL(arena);
+t_str *create_str(free_list *fl, const char *str) {
+    ASSERT_NOTNULL(fl);
     ASSERT_NOTNULL(str);
     ASSERT_(*str, "%c can not be '\\0'", *str);
 
@@ -59,7 +61,7 @@ t_str *create_str(Arena *arena, const char *str) {
         return NULL;
     }
 
-    t_str *new_str = init_str(arena, len + 1);
+    t_str *new_str = init_str(fl, len + 1);
     if (!new_str) {
         return NULL;
     }
@@ -75,14 +77,14 @@ t_str *create_str(Arena *arena, const char *str) {
     return new_str;
 }
 
-t_str *dup_str(Arena *arena, const t_str *str) {
-    ASSERT_NOTNULL(arena);
+t_str *dup_str(free_list *fl, const t_str *str) {
+    ASSERT_NOTNULL(fl);
     ASSERT_NOTNULL(str);
     ASSERT_GE(str->cap, 2);
     ASSERT_GE(str->len, 1);
     ASSERT_(*str->str, "%c can not be '\\0'", *str->str);
 
-    t_str *new_str = init_str(arena, str->cap - 1);
+    t_str *new_str = init_str(fl, str->cap - 1);
     if (!new_str) {
         return NULL;
     }
@@ -121,11 +123,11 @@ uint64_t cat_str(t_str *dst, const t_str *src) {
     return len;
 }
 
-t_str *uint_to_str(Arena *arena, uint64_t nbr) {
-    ASSERT_NOTNULL(arena);
+t_str *uint_to_str(free_list *fl, uint64_t nbr) {
+    ASSERT_NOTNULL(fl);
 
     uint64_t len = len_of_nbr(nbr);
-    t_str *str = init_str(arena, len);
+    t_str *str = init_str(fl, len);
     if (!str) {
         return NULL;
     }
@@ -146,13 +148,13 @@ t_str *uint_to_str(Arena *arena, uint64_t nbr) {
     return str;
 }
 
-ssize_t append_chars_str(Arena *arena, t_str *dst, const char *src) {
-    ASSERT_NOTNULL(arena);
+ssize_t append_chars_str(free_list *fl, t_str *dst, const char *src) {
+    ASSERT_NOTNULL(fl);
     ASSERT_NOTNULL(dst);
     ASSERT_NOTNULL(src);
     ASSERT_(*src, "%c can not be '\\0'", *src);
 
-    const t_str *new_str = create_str(arena, src);
+    const t_str *new_str = create_str(fl, src);
     if (!new_str) {
         return -1;
     }
@@ -177,6 +179,16 @@ char next_str(t_str *s) {
     ASSERT_NOTNULL(s);
 
     return s->str[s->pos++];
+}
+
+void free_str(free_list *fl, t_str *str) {
+    ASSERT_NOTNULL(str);
+
+    if (str->str) {
+        free_list_free(fl, str->str);
+    }
+
+    free_list_free(fl, str);
 }
 
 static uint64_t strlcpy_(t_str *dst, const t_str *src, uint64_t dstsize) {

@@ -7,18 +7,18 @@
 #include <sys/xattr.h>
 #include <time.h>
 
-#include "../include/ft_arena.h"
+#include "../include/ft_free_list.h"
 #include "../include/ft_assert.h"
 #include "../include/ft_entry.h"
 #include "../include/ft_str.h"
 
 #include "../libft/include/libft.h"
 
-static t_str *get_perm_(Arena *arena, Arena *scratch, const t_entry *entry);
-static t_str *get_user_(Arena *arena, uid_t user_id);
-static t_str *get_group_(Arena *arena, gid_t group_id);
-static t_str *get_dt_(Arena *arena, const struct timespec *ctim);
-static bool get_symlink_(Arena *arena, const t_entry *entry, t_str **out);
+static t_str *get_perm_(free_list *fl, free_list *scratch, const t_entry *entry);
+static t_str *get_user_(free_list *fl, uid_t user_id);
+static t_str *get_group_(free_list *fl, gid_t group_id);
+static t_str *get_dt_(free_list *fl, const struct timespec *ctim);
+static bool get_symlink_(free_list *fl, const t_entry *entry, t_str **out);
 static bool has_xattr_(const char *path, const char *name);
 
 typedef enum {
@@ -43,76 +43,70 @@ static gid_t cached_gid = (gid_t)-1;
 static char cached_user[LOGIN_NAME_MAX] = "";
 static char cached_group[LOGIN_NAME_MAX] = "";
 
-bool get_file_info(Arena *arena, Arena *scratch, t_entry *entry) {
-    ASSERT_NOTNULL(arena);
+bool get_file_info(free_list *fl, free_list *scratch, t_entry *entry) {
+    ASSERT_NOTNULL(fl);
     ASSERT_NOTNULL(scratch);
     ASSERT_NOTNULL(entry);
     ASSERT_NOTNULL(entry->path);
     ASSERT_GT(entry->path->cap, 0);
     ASSERT_LT(entry->path->len, entry->path->cap);
 
-    const ArenaMark mark = ArenaGetMark(arena);
-    ArenaClear(scratch);
 
-    t_file_info *info = ArenaPush(arena, sizeof(*info));
+    t_file_info *info = free_list_alloc(fl, sizeof(*info), 8);
     if (!info) {
         goto failed;
     }
 
-    info->perm = get_perm_(arena, scratch, entry);
+    info->perm = get_perm_(fl, scratch, entry);
     if (!info->perm) {
         goto failed;
     }
-    ArenaClear(scratch);
 
-    info->links = uint_to_str(arena, entry->st.st_nlink);
+    info->links = uint_to_str(fl, entry->st.st_nlink);
     if (!info->links) {
         goto failed;
     }
 
-    info->username = get_user_(arena, entry->st.st_uid);
+    info->username = get_user_(fl, entry->st.st_uid);
     if (!info->username) {
         goto failed;
     }
 
-    info->groupname = get_group_(arena, entry->st.st_gid);
+    info->groupname = get_group_(fl, entry->st.st_gid);
     if (!info->groupname) {
         goto failed;
     }
 
-    info->size = uint_to_str(arena, (uint64_t)entry->st.st_size);
+    info->size = uint_to_str(fl, (uint64_t)entry->st.st_size);
     if (!info->size) {
         goto failed;
     }
 
-    info->dt = get_dt_(arena, &entry->st.st_mtim);
+    info->dt = get_dt_(fl, &entry->st.st_mtim);
     if (!info->dt) {
         goto failed;
     }
 
-    if (!get_symlink_(arena, entry, &info->symlink)) {
+    if (!get_symlink_(fl, entry, &info->symlink)) {
         goto failed;
     }
 
     info->blocks = (uint64_t)entry->st.st_blocks;
-    ArenaClear(scratch);
 
     entry->info = info;
     return true;
 failed:
-    ArenaClear(scratch);
-    ArenaPopToMark(arena, mark);
+    free_list_free_all(scratch);
 
     return false;
 }
 
-static t_str *get_perm_(Arena *arena, Arena *scratch, const t_entry *entry) {
-    ASSERT_NOTNULL(arena);
+static t_str *get_perm_(free_list *fl, free_list *scratch, const t_entry *entry) {
+    ASSERT_NOTNULL(fl);
     ASSERT_NOTNULL(scratch);
     ASSERT_NOTNULL(entry);
-    const ArenaMark mark = ArenaGetMark(arena);
 
-    t_str *str = init_str(arena, PERMISSION_SIZE);
+    t_str *str = init_str(fl, PERMISSION_SIZE);
     if (!str) {
         goto failed;
     }
@@ -185,29 +179,27 @@ static t_str *get_perm_(Arena *arena, Arena *scratch, const t_entry *entry) {
     ASSERT_EQ(str->pos, 0);
     return str;
 failed:
-    ArenaPopToMark(arena, mark);
-
     return NULL;
 }
 
-static t_str *get_user_(Arena *arena, uid_t user_id) {
-    ASSERT_NOTNULL(arena);
+static t_str *get_user_(free_list *fl, uid_t user_id) {
+    ASSERT_NOTNULL(fl);
 
     if (user_id == cached_uid) {
-        return create_str(arena, cached_user);
+        return create_str(fl, cached_user);
     }
 
     const struct passwd *pwd = getpwuid(user_id);
     t_str *new_str = NULL;
     if (pwd) {
-        new_str = create_str(arena, pwd->pw_name);
+        new_str = create_str(fl, pwd->pw_name);
         if (!new_str) {
             return NULL;
         }
 
         ft_strlcpy(cached_user, pwd->pw_name, sizeof(cached_user));
     } else {
-        new_str = uint_to_str(arena, user_id);
+        new_str = uint_to_str(fl, user_id);
         if (!new_str) {
             return NULL;
         }
@@ -221,24 +213,24 @@ static t_str *get_user_(Arena *arena, uid_t user_id) {
     return new_str;
 }
 
-static t_str *get_group_(Arena *arena, gid_t group_id) {
-    ASSERT_NOTNULL(arena);
+static t_str *get_group_(free_list *fl, gid_t group_id) {
+    ASSERT_NOTNULL(fl);
 
     if (group_id == cached_gid) {
-        return create_str(arena, cached_group);
+        return create_str(fl, cached_group);
     }
 
     const struct group *grp = getgrgid(group_id);
     t_str *new_str = NULL;
     if (grp) {
-        new_str = create_str(arena, grp->gr_name);
+        new_str = create_str(fl, grp->gr_name);
         if (!new_str) {
             return NULL;
         }
 
         ft_strlcpy(cached_group, grp->gr_name, sizeof(cached_group));
     } else {
-        new_str = uint_to_str(arena, group_id);
+        new_str = uint_to_str(fl, group_id);
         if (!new_str) {
             return NULL;
         }
@@ -252,8 +244,8 @@ static t_str *get_group_(Arena *arena, gid_t group_id) {
     return new_str;
 }
 
-static t_str *get_dt_(Arena *arena, const struct timespec *ctim) {
-    ASSERT_NOTNULL(arena);
+static t_str *get_dt_(free_list *fl, const struct timespec *ctim) {
+    ASSERT_NOTNULL(fl);
     ASSERT_NOTNULL(ctim);
 
     const char *dt = ctime(&ctim->tv_sec);
@@ -266,7 +258,7 @@ static t_str *get_dt_(Arena *arena, const struct timespec *ctim) {
         return NULL;
     }
 
-    t_str *new_str = init_str(arena, DT_LEN);
+    t_str *new_str = init_str(fl, DT_LEN);
     if (!new_str) {
         return NULL;
     }
@@ -281,8 +273,8 @@ static t_str *get_dt_(Arena *arena, const struct timespec *ctim) {
     return new_str;
 }
 
-static bool get_symlink_(Arena *arena, const t_entry *entry, t_str **out) {
-    ASSERT_NOTNULL(arena);
+static bool get_symlink_(free_list *fl, const t_entry *entry, t_str **out) {
+    ASSERT_NOTNULL(fl);
     ASSERT_NOTNULL(entry);
     ASSERT_NOTNULL(out);
     ASSERT_NOTNULL(*out);
@@ -292,11 +284,10 @@ static bool get_symlink_(Arena *arena, const t_entry *entry, t_str **out) {
         return true;
     }
 
-    ArenaMark mark = ArenaGetMark(arena);
     uint64_t cap = (entry->st.st_size > 0) ? (uint64_t)entry->st.st_size
                                            : (uint64_t)PATH_MAX;
     while (true) {
-        t_str *new_str = init_str(arena, cap);
+        t_str *new_str = init_str(fl, cap);
         if (!new_str) {
             break;
         }
@@ -313,7 +304,6 @@ static bool get_symlink_(Arena *arena, const t_entry *entry, t_str **out) {
             return true;
         }
 
-        ArenaPopToMark(arena, mark);
         if (cap > UINT64_MAX / 2) {
             break;
         }
@@ -321,7 +311,6 @@ static bool get_symlink_(Arena *arena, const t_entry *entry, t_str **out) {
         cap *= 2;
     }
 
-    ArenaPopToMark(arena, mark);
     return false;
 }
 

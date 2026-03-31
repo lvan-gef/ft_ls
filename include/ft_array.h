@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "./ft_arena.h"
+#include "./ft_free_list.h"
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE UINT64_C(10)
@@ -15,12 +15,12 @@ typedef struct s_array {
     uint64_t len;
     uint64_t cap;
     void **data;
-    Arena *arena;
+    free_list *fl;
 } t_array;
 
-t_array *init_array(Arena *arena, uint64_t size);
+t_array *init_array(free_list *fl, uint64_t size);
 bool append_array(t_array *array, void *content);
 void *pop_array(t_array *array);
-t_array *reset_array(Arena *arena);
+void reset_array(free_list *fl, t_array *array);
 
 #endif // !FT_ARRAY_H

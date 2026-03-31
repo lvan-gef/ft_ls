@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <unistd.h>
 
-#include "../include/ft_arena.h"
+#include "../include/ft_free_list.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
 #include "../include/ft_entry.h"
@@ -36,14 +36,14 @@ typedef struct {
     t_str *dubble_colon;
 } t_spacing;
 
-static void init_print_row_(Arena *arena, t_array *array, t_entry *dir_entry,
+static void init_print_row_(free_list *fl, t_array *array, t_entry *dir_entry,
                             bool force_quote_padding);
 static void print_row_(t_array *array, t_str *buf, const t_map *map,
                        const t_spacing *spacing, bool quoted,
                        const uint64_t *col_starts);
-static uint64_t *calc_cols_(Arena *arena, t_array *array, t_map *map,
+static uint64_t *calc_cols_(free_list *fl, t_array *array, t_map *map,
                             bool quoted);
-static uint64_t calc_width_(Arena *arena, t_array *array, uint64_t num_cols,
+static uint64_t calc_width_(free_list *fl, t_array *array, uint64_t num_cols,
                             uint64_t *col_widths, bool quoted);
 static bool check_quoted_(t_array *array);
 
@@ -53,30 +53,31 @@ void printer(const t_args *args, t_array *array, t_entry *dir_entry,
     ASSERT_NOTNULL(args);
     ASSERT_NOTNULL(array);
 
-    Arena *arena = ArenaAlloc(ARENA_SIZE);
-    if (!arena) {
-        ft_fprintf(STDERR_FILENO, "Failed to alloc arena for printer");
-        return;
-    }
-    ArenaSetAutoAlign(arena, 8);
+    unsigned char buffer[1024 * 8];
+    free_list fl;
+    free_list_init(&fl, buffer, sizeof(buffer));
+    // free_list *fl = free_listAlloc(fl_SIZE);
+    // if (!fl) {
+    //     ft_fprintf(STDERR_FILENO, "Failed to alloc fl for printer");
+    //     return;
+    // }
+    // free_listSetAutoAlign(fl, 8);
 
     if (array->len) {
-        sort(arena, array, args->reverse, args->time);
+        sort(&fl, array, args->reverse, args->time);
     }
 
     if (args->list) {
         print_list(array, dir_entry, print_total, min_len_links, min_len_sizes,
                    force_quote_padding);
     } else {
-        init_print_row_(arena, array, dir_entry, force_quote_padding);
+        init_print_row_(&fl, array, dir_entry, force_quote_padding);
     }
-
-    ArenaRelease(arena);
 }
 
-static void init_print_row_(Arena *arena, t_array *array, t_entry *dir_entry,
+static void init_print_row_(free_list *fl, t_array *array, t_entry *dir_entry,
                             bool force_quote_padding) {
-    ASSERT_NOTNULL(arena);
+    ASSERT_NOTNULL(fl);
     ASSERT_NOTNULL(array);
 
     uint64_t max_cols = (TERM_SIZE + SPACE_GAP) / (1 + SPACE_GAP);
@@ -91,18 +92,13 @@ static void init_print_row_(Arena *arena, t_array *array, t_entry *dir_entry,
     bool quoted = force_quote_padding || check_quoted_(array);
     const char *err_msg = NULL;
 
-    uint64_t *col_widths = calc_cols_(arena, array, &map, quoted);
+    uint64_t *col_widths = calc_cols_(fl, array, &map, quoted);
     if (!col_widths) {
         err_msg = "Failed to calc column leng";
         goto done;
     }
 
-    uint64_t *col_starts =
-        ArenaPushNoZero(arena, (map.cols + 1) * sizeof(*col_starts));
-    if (!col_starts) {
-        err_msg = "Failed to alloc from arena";
-        goto done;
-    }
+    uint64_t *col_starts = free_list_alloc(fl, (map.cols + 1) * sizeof(*col_starts), 8);
 
     col_starts[0] = 0;
     for (uint64_t index = 0; index < map.cols; ++index) {
@@ -111,11 +107,11 @@ static void init_print_row_(Arena *arena, t_array *array, t_entry *dir_entry,
     }
 
     uint64_t row_width =
-        calc_width_(arena, array, map.cols, col_widths, quoted);
+        calc_width_(fl, array, map.cols, col_widths, quoted);
     uint64_t buf_size = (row_width * map.rows) + map.rows + 1;
 
     if (dir_entry) {
-        dir_entry = escape_entry(arena, dir_entry);
+        dir_entry = escape_entry(fl, dir_entry);
         if (!dir_entry) {
             err_msg = "Failed to escape dir";
             goto done;
@@ -127,7 +123,7 @@ static void init_print_row_(Arena *arena, t_array *array, t_entry *dir_entry,
         buf_size += dir_entry->name->len + 3; // 1 for space, 1 for :, 1 for \n
     }
 
-    t_str *buf = init_str(arena, buf_size);
+    t_str *buf = init_str(fl, buf_size);
     if (!buf) {
         err_msg = "Failed to init t_str for buffer";
         goto done;
@@ -243,9 +239,9 @@ static void print_row_(t_array *array, t_str *buf, const t_map *map,
     (void)write(STDOUT_FILENO, buf->str, buf->len);
 }
 
-static uint64_t *calc_cols_(Arena *arena, t_array *array, t_map *map,
+static uint64_t *calc_cols_(free_list *fl, t_array *array, t_map *map,
                             bool quoted) {
-    ASSERT_NOTNULL(arena);
+    ASSERT_NOTNULL(fl);
     ASSERT_NOTNULL(array);
     ASSERT_NOTNULL(map);
 
@@ -253,16 +249,12 @@ static uint64_t *calc_cols_(Arena *arena, t_array *array, t_map *map,
         map->max = TERM_SIZE / 2;
     }
 
-    uint64_t *col_widths =
-        ArenaPushNoZero(arena, (map->max + 1) * sizeof(*col_widths));
-    if (!col_widths) {
-        return NULL;
-    }
+    uint64_t *col_widths = free_list_alloc(fl, (map->max + 1) * sizeof(*col_widths), 8);
 
     uint64_t try_cols = map->max;
     while (try_cols > 1) {
         uint64_t width =
-            calc_width_(arena, array, try_cols, col_widths, quoted);
+            calc_width_(fl, array, try_cols, col_widths, quoted);
         if (width < TERM_SIZE) {
             map->cols = try_cols;
             map->rows = (array->len + map->cols - 1) / map->cols;
@@ -271,11 +263,11 @@ static uint64_t *calc_cols_(Arena *arena, t_array *array, t_map *map,
         --try_cols;
     }
 
-    (void)calc_width_(arena, array, 1, col_widths, quoted);
+    (void)calc_width_(fl, array, 1, col_widths, quoted);
     return col_widths;
 }
 
-static uint64_t calc_width_(Arena *arena, t_array *array, uint64_t num_cols,
+static uint64_t calc_width_(free_list *fl, t_array *array, uint64_t num_cols,
                             uint64_t *col_widths, bool quoted) {
     uint64_t num_rows = (array->len + num_cols - 1) / num_cols;
     uint64_t index = 0;
@@ -293,7 +285,7 @@ static uint64_t calc_width_(Arena *arena, t_array *array, uint64_t num_cols,
             ASSERT_NOTNULL(entry);
             ASSERT_GT(entry->name->len, 0);
 
-            entry = escape_entry(arena, entry);
+            entry = escape_entry(fl, entry);
             uint64_t len = entry->name->len;
             if (entry->quoted->len) {
                 len += entry->quoted->len * 2;

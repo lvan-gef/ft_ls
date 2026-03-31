@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 
 #include "./ft_str.h"
+#include "ft_free_list.h"
 
 #ifndef LOGIN_NAME_MAX
 #define LOGIN_NAME_MAX INT64_C(256)
@@ -50,6 +51,6 @@ typedef struct {
     bool is_escaped;
 } t_entry;
 
-bool get_file_info(Arena *arena, Arena *scratch, t_entry *entry);
+bool get_file_info(free_list *fl, free_list *scratch, t_entry *entry);
 
 #endif // !FT_ENTRY_H

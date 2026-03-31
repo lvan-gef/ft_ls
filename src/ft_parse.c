@@ -1,7 +1,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "../include/ft_arena.h"
+#include "../include/ft_free_list.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
 #include "../include/ft_parse.h"
@@ -12,13 +12,13 @@
 
 static void print_error_(const char *flag);
 
-t_array *parse_args(Arena *arena, uint64_t argc, char **argv, t_args *args) {
+t_array *parse_args(free_list *fl, uint64_t argc, char **argv, t_args *args) {
     ASSERT_GE(argc, 1);
     ASSERT_NOTNULL(argv);
     ASSERT_NOTNULL(*argv);
     ASSERT_NOTNULL(args);
 
-    t_array *inputs = init_array(arena, ARRAY_SIZE);
+    t_array *inputs = init_array(fl, ARRAY_SIZE);
     if (!inputs) {
         return NULL;
     }
@@ -46,7 +46,7 @@ t_array *parse_args(Arena *arena, uint64_t argc, char **argv, t_args *args) {
             continue;
         }
 
-        t_str *str = create_str(arena, argv[index]);
+        t_str *str = create_str(fl, argv[index]);
         if (!str) {
             return NULL;
         }
@@ -57,7 +57,7 @@ t_array *parse_args(Arena *arena, uint64_t argc, char **argv, t_args *args) {
     }
 
     if (!inputs->len) {
-        t_str *str = create_str(arena, ".");
+        t_str *str = create_str(fl, ".");
         if (!str) {
             return NULL;
         }

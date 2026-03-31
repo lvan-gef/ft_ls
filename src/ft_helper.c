@@ -1,6 +1,6 @@
 #include <stdint.h>
 
-#include "../include/ft_arena.h"
+#include "../include/ft_free_list.h"
 #include "../include/ft_assert.h"
 #include "../include/ft_entry.h"
 #include "../include/ft_helper.h"
@@ -19,8 +19,8 @@ uint64_t len_of_nbr(uint64_t nbr) {
     return len;
 }
 
-t_entry *escape_entry(Arena *arena, t_entry *entry) {
-    ASSERT_NOTNULL(arena);
+t_entry *escape_entry(free_list *fl, t_entry *entry) {
+    ASSERT_NOTNULL(fl);
     ASSERT_NOTNULL(entry);
 
     if (entry->is_escaped) {
@@ -37,7 +37,7 @@ t_entry *escape_entry(Arena *arena, t_entry *entry) {
         return entry;
     }
 
-    t_str *new_str = escape_str(arena, entry->name);
+    t_str *new_str = escape_str(fl, entry->name);
     if (!new_str) {
         return entry;
     }
@@ -47,8 +47,8 @@ t_entry *escape_entry(Arena *arena, t_entry *entry) {
     return entry;
 }
 
-t_str *escape_str(Arena *arena, t_str *str) {
-    ASSERT_NOTNULL(arena);
+t_str *escape_str(free_list *fl, t_str *str) {
+    ASSERT_NOTNULL(fl);
     ASSERT_NOTNULL(str);
 
     uint64_t single_count = 0;
@@ -58,7 +58,7 @@ t_str *escape_str(Arena *arena, t_str *str) {
         }
     }
 
-    t_str *new_str = init_str(arena, str->len + (single_count * 3));
+    t_str *new_str = init_str(fl, str->len + (single_count * 3));
     if (!new_str) {
         return NULL;
     }

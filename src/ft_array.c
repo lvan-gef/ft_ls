@@ -1,33 +1,35 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <unistd.h>
 
-#include "../include/ft_arena.h"
+#include "../include/ft_free_list.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
 
 #include "../libft/include/libft.h"
+#include "ft_fprintf.h"
 
 static bool realloc_arr_(t_array *array);
 
-t_array *init_array(Arena *arena, uint64_t size) {
-    ASSERT_NOTNULL(arena);
+t_array *init_array(free_list *fl, uint64_t size) {
+    ASSERT_NOTNULL(fl);
     ASSERT_GT(size, 0);
 
-    t_array *array = ArenaPush(arena, sizeof(*array));
+    t_array *array = free_list_alloc(fl, 1 * sizeof(*array), 8);
     if (!array) {
         return NULL;
     }
 
-    array->data = (void **)ArenaPush(arena, size * sizeof(*array->data));
+    array->data = (void **)free_list_alloc(fl, size * sizeof(*array->data), 8);
     if (!array->data) {
         return NULL;
     }
 
     array->len = 0;
     array->cap = size;
-    array->arena = arena;
+    array->fl = fl;
 
     ASSERT_NOTNULL(array);
     return array;
@@ -51,30 +53,25 @@ bool append_array(t_array *array, void *content) {
 
 void *pop_array(t_array *array) {
     ASSERT_NOTNULL(array);
+    ASSERT_GT(array->len, 0);
 
-    if (!array->len) {
-        return NULL;
-    }
-
-    ASSERT_LT(array->len - 1, array->len);
     --array->len;
     void *elem = array->data[array->len];
     array->data[array->len] = NULL;
     return elem;
 }
 
-t_array *reset_array(Arena *arena) {
-    ASSERT_NOTNULL(arena);
+void reset_array(free_list *fl, t_array *array) {
+    ASSERT_NOTNULL(fl);
+    ASSERT_NOTNULL(array);
 
-    ArenaClear(arena);
-    t_array *array = init_array(arena, ARRAY_SIZE);
-    if (!array) {
-        return NULL;
+    while (array->len) {
+        void *elem = pop_array(array);
+        free_list_free(fl, elem);
     }
 
     ASSERT_EQ(array->len, 0);
     ASSERT_LT(array->len, array->cap);
-    return array;
 }
 
 static bool realloc_arr_(t_array *array) {
@@ -88,7 +85,7 @@ static bool realloc_arr_(t_array *array) {
 
     void **old_data = array->data;
     void **new_data =
-        (void **)ArenaPush(array->arena, new_cap * sizeof(*new_data));
+        (void **)free_list_alloc(array->fl, new_cap * sizeof(*new_data), 8);
     if (!new_data) {
         return false;
     }

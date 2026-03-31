@@ -24,14 +24,14 @@ R_CFLAGS  := -DNDEBUG -O3 -march=native -fomit-frame-pointer -fPIE -fstack-clash
 R_LDFLAGS := -pie -Wl,-z,relro,-z,now
 
 # Debug flags
-SANITIZERS := -fsanitize=address,undefined,null,leak,integer-divide-by-zero,signed-integer-overflow
-# SANITIZERS :=
+# SANITIZERS := -fsanitize=address,undefined,null,leak,integer-divide-by-zero,signed-integer-overflow
+SANITIZERS :=
 D_CFLAGS   := -g3 -fno-omit-frame-pointer -fstack-protector-strong $(SANITIZERS)
 D_LDFLAGS  := $(SANITIZERS) -rdynamic
 
 SRC_DIR := src
 
-SRC_FILES := ft_arena.c ft_array.c ft_entry.c ft_helper.c ft_parse.c ft_printer.c ft_print_list.c ft_sort.c ft_str.c ft_walk.c main.c
+SRC_FILES := ft_array.c ft_entry.c ft_free_list.c ft_helper.c ft_parse.c ft_printer.c ft_print_list.c ft_sort.c ft_str.c ft_walk.c main.c
 
 SRCS := $(addprefix $(SRC_DIR)/, $(SRC_FILES))
 

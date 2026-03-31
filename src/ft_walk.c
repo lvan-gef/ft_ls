@@ -6,7 +6,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "../include/ft_arena.h"
+#include "../include/ft_free_list.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
 #include "../include/ft_entry.h"
@@ -20,10 +20,7 @@
 
 typedef struct {
     t_args *args;
-    Arena *dirs_arena;
-    Arena *files_arena;
-    Arena *entries_arena;
-    Arena *scratch_arena;
+    free_list fl;
     t_array *dirs;
     t_array *files;
     t_array *entries;
@@ -34,17 +31,17 @@ typedef struct {
 static bool run_(t_args *args, t_params *params, t_array *array,
                  int *exit_code);
 static bool read_dir_(t_params *params, t_entry *path, int *exit_code);
-static bool walk_recurssive_(t_params *params);
+static bool walk_recurssive_(t_params *params, free_list *fl);
 static bool process_args_(t_params *params, t_array *array, int *exit_code);
-static t_entry *create_entry_(Arena *arena, t_entry *path, struct dirent *dp);
+static t_entry *create_entry_(free_list *fl, t_entry *path, struct dirent *dp);
 static int check_links(t_params *params, t_str *str, t_array *dir_entries,
                        struct stat *st, int *exit_code);
-static t_str *join_paths_(Arena *arena, const t_str *lhs, const t_str *rhs);
-static t_str *need_quote_(Arena *arena, t_str *str);
+static t_str *join_paths_(free_list *fl, const t_str *lhs, const t_str *rhs);
+static t_str *need_quote_(free_list *fl, t_str *str);
 static bool has_quote_char_(const t_str *str);
 static bool has_quoted_operands_(const t_array *array);
 static void clean_up_(t_params *params);
-static void print_err_(Arena *arena, t_str *str, int e, const char *prefix);
+static void print_err_(free_list *fl, t_str *str, int e, const char *prefix);
 
 typedef enum { SINGLE_QUOTE = '\'', DOUBLE_QUOTE = '\"', SPACE = ' ' } t_quote;
 
@@ -56,52 +53,18 @@ void process(t_args *args, t_array *array, int *exit_code) {
     ASSERT_NOTNULL(exit_code);
 
     const char *err_msg = NULL;
-    t_params params = {.args = args,
-                       .dirs_arena = ArenaAlloc(ARENA_SIZE),
-                       .files_arena = ArenaAlloc(ARENA_SIZE),
-                       .entries_arena = ArenaAlloc(ARENA_SIZE),
-                       .scratch_arena = ArenaAlloc(ARENA_SIZE)};
-    if (!params.dirs_arena) {
-        err_msg = "Failed to alloc arena for dirs";
-        goto failed;
-    }
+    unsigned char buffer[1024 * 8];
+    t_params params = {0};
+    params.args = args;
+    free_list_init(&params.fl, buffer, sizeof(buffer));
 
-    if (!params.files_arena) {
-        err_msg = "Failed to alloc arena for files";
-        goto failed;
-    }
+    params.dirs = init_array(&params.fl, ARRAY_SIZE);
+    params.files = init_array(&params.fl, ARRAY_SIZE);
+    params.entries = init_array(&params.fl, ARRAY_SIZE);
 
-    if (!params.entries_arena) {
-        err_msg = "Failed to alloc arena for entries";
-        goto failed;
-    }
-
-    if (!params.scratch_arena) {
-        err_msg = "Failed to alloc arena for scratch";
-        goto failed;
-    }
-
-    ArenaSetAutoAlign(params.dirs_arena, 8);
-    ArenaSetAutoAlign(params.files_arena, 8);
-    ArenaSetAutoAlign(params.entries_arena, 8);
-    ArenaSetAutoAlign(params.scratch_arena, 8);
-
-    params.dirs = init_array(params.dirs_arena, ARRAY_SIZE);
-    if (!params.dirs) {
-        err_msg = "Failed to alloc files";
-        goto failed;
-    }
-
-    params.files = init_array(params.files_arena, ARRAY_SIZE);
-    if (!params.files) {
-        err_msg = "Failed to alloc dirs";
-        goto failed;
-    }
-
-    params.entries = init_array(params.entries_arena, ARRAY_SIZE);
-    if (!params.entries) {
-        err_msg = "Failed to alloc entries";
-        goto failed;
+    if (!params.dirs || !params.files || !params.entries) {
+        *exit_code = 2;
+        return;
     }
 
     if (!run_(args, &params, array, exit_code)) {
@@ -141,11 +104,7 @@ static bool run_(t_args *args, t_params *params, t_array *array,
         printer(args, params->files, NULL, false, params->max_len_links,
                 params->max_len_sizes, has_quoted_operands);
         printed_files = true;
-        params->files = reset_array(params->files_arena);
-        if (!params->files) {
-            err_msg = "Failed to reset files array";
-            goto failed;
-        }
+        reset_array(&params->fl, params->files);
     }
 
     while (params->dirs->len) {
@@ -157,11 +116,7 @@ static bool run_(t_args *args, t_params *params, t_array *array,
         }
 
         if (!read_dir_(params, dir_path, exit_code)) {
-            params->files = reset_array(params->files_arena);
-            if (!params->files) {
-                err_msg = "Failed to reset files array";
-                goto failed;
-            }
+            reset_array(&params->fl, params->files);
             continue;
         }
 
@@ -170,7 +125,7 @@ static bool run_(t_args *args, t_params *params, t_array *array,
         }
 
         t_entry entry = {.name = dir_path->path};
-        entry.quoted = need_quote_(params->entries_arena, entry.name);
+        entry.quoted = need_quote_(&params->fl, entry.name);
         if (!entry.quoted) {
             err_msg = "Failed to get quote";
             goto failed;
@@ -179,11 +134,7 @@ static bool run_(t_args *args, t_params *params, t_array *array,
         t_entry *ent = print_dir_path ? &entry : NULL;
         printer(args, params->files, ent, true, 0, 0, false);
         printed_dir = true;
-        params->files = reset_array(params->files_arena);
-        if (!params->files) {
-            err_msg = "Failed to reset files array";
-            goto failed;
-        }
+        reset_array(&params->fl, params->files);
     }
 
     return true;
@@ -198,9 +149,7 @@ failed:
 static bool process_args_(t_params *params, t_array *array, int *exit_code) {
     ASSERT_NOTNULL(params);
     ASSERT_NOTNULL(params->args);
-    ASSERT_NOTNULL(params->dirs_arena);
-    ASSERT_NOTNULL(params->files_arena);
-    ASSERT_NOTNULL(params->scratch_arena);
+    // ASSERT_NOTNULL(params->fl);
     ASSERT_NOTNULL(params->dirs);
     ASSERT_NOTNULL(params->files);
     ASSERT_NOTNULL(array);
@@ -208,7 +157,11 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
 
     const char *err_msg = NULL;
     struct stat st;
-    t_array *dir_entries = init_array(params->files_arena, ARRAY_SIZE);
+    unsigned char buffer[1024 * 8];
+    free_list fl;
+    free_list_init(&fl, buffer, sizeof(buffer));
+    t_array *dir_entries = init_array(&fl, ARRAY_SIZE);
+
     if (!dir_entries) {
         err_msg = "Failed to init dir entries";
         goto failed;
@@ -226,12 +179,13 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
 
         if (S_ISDIR(st.st_mode)) {
             t_entry *dir_entry =
-                ArenaPush(params->files_arena, sizeof(*dir_entry));
+                free_list_alloc(&params->fl, sizeof(*dir_entry), 8);
             if (!dir_entry) {
                 err_msg = "Failed to alloc dir entry";
                 goto failed;
             }
 
+            *dir_entry = (t_entry){0};
             dir_entry->name = str;
             dir_entry->path = str;
             dir_entry->st = st;
@@ -242,13 +196,13 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
             continue;
         }
 
-        t_entry *entry = ArenaPush(params->files_arena, sizeof(*entry));
+        t_entry *entry = free_list_alloc(&params->fl, sizeof(*entry), 8);
         if (!entry) {
             err_msg = "Failed to alloc entry";
             goto failed;
         }
 
-        entry->quoted = need_quote_(params->files_arena, str);
+        entry->quoted = need_quote_(&params->fl, str);
         if (!entry->quoted) {
             err_msg = "Failed to create a quoted str";
             goto failed;
@@ -257,9 +211,10 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
         entry->name = str;
         entry->path = str;
         entry->st = st;
+        entry->is_escaped = false;
+        entry->is_operand = false;
         if (params->args->list) {
-            if (!get_file_info(params->files_arena, params->scratch_arena,
-                               entry)) {
+            if (!get_file_info(&params->fl, &fl, entry)) {
                 goto failed;
             }
         }
@@ -271,8 +226,7 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
     }
 
     if (dir_entries->len) {
-        sort(params->scratch_arena, dir_entries, params->args->reverse,
-             params->args->time);
+        sort(&params->fl, dir_entries, params->args->reverse, params->args->time);
         while (dir_entries->len) {
             t_entry *entry = pop_array(dir_entries);
             entry->is_operand = true;
@@ -290,35 +244,36 @@ failed:
     return false;
 }
 
-static t_entry *create_entry_(Arena *arena, t_entry *path, struct dirent *dp) {
-    ASSERT_NOTNULL(arena);
+static t_entry *create_entry_(free_list *fl, t_entry *path, struct dirent *dp) {
+    ASSERT_NOTNULL(fl);
     ASSERT_NOTNULL(path);
     ASSERT_NOTNULL(dp);
 
-    ArenaMark marker = ArenaGetMark(arena);
-    t_entry *entry = ArenaPush(arena, sizeof(*entry));
+    t_entry *entry = free_list_alloc(fl, sizeof(*entry), 8);
     if (!entry) {
         goto failed;
     }
 
-    entry->name = create_str(arena, dp->d_name);
+    entry->name = create_str(fl, dp->d_name);
     if (!entry->name) {
         goto failed;
     }
 
-    entry->path = join_paths_(arena, path->path, entry->name);
+    entry->path = join_paths_(fl, path->path, entry->name);
     if (!entry->path) {
         goto failed;
     }
 
-    entry->quoted = need_quote_(arena, entry->name);
+    entry->quoted = need_quote_(fl, entry->name);
     if (!entry->quoted) {
         goto failed;
     }
 
+    entry->is_escaped = false;
+    entry->is_operand = false;
+
     return entry;
 failed:
-    ArenaPopToMark(arena, marker);
     return NULL;
 }
 
@@ -328,7 +283,7 @@ static int check_links(t_params *params, t_str *str, t_array *dir_entries,
     if (lstat(str->str, st) == -1) {
         int e = errno;
         const char *prefix = "cannot access";
-        print_err_(params->files_arena, str, e, prefix);
+        print_err_(&params->fl, str, e, prefix);
         *exit_code = 2;
         return 0;
     }
@@ -347,16 +302,16 @@ static int check_links(t_params *params, t_str *str, t_array *dir_entries,
 
     bool is_dir_operand = S_ISDIR(st->st_mode);
     struct stat *st_dir = st;
+    struct stat st_target;
     if (S_ISLNK(st->st_mode)) {
-        struct stat *st_target = NULL;
-        if (stat(str->str, st_target) == 0 && S_ISDIR(st_target->st_mode)) {
+        if (stat(str->str, &st_target) == 0 && S_ISDIR(st_target.st_mode)) {
             is_dir_operand = true;
-            st_dir = st_target;
+            st_dir = &st_target;
         }
     }
 
     if (is_dir_operand && !params->args->list) {
-        t_entry *dir_entry = ArenaPush(params->files_arena, sizeof(*dir_entry));
+        t_entry *dir_entry = free_list_alloc(&params->fl, sizeof(*dir_entry), 8);
         if (!dir_entry) {
             err_msg = "Failed to alloc dir entry";
             goto failed;
@@ -384,10 +339,10 @@ failed:
 static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
     ASSERT_NOTNULL(params);
     ASSERT_NOTNULL(params->args);
-    ASSERT_NOTNULL(params->dirs_arena);
-    ASSERT_NOTNULL(params->files_arena);
-    ASSERT_NOTNULL(params->entries_arena);
-    ASSERT_NOTNULL(params->scratch_arena);
+    // ASSERT_NOTNULL(params->dirs_fl);
+    // ASSERT_NOTNULL(params->files_fl);
+    // ASSERT_NOTNULL(params->entries_fl);
+    // ASSERT_NOTNULL(params->scratch_fl);
     ASSERT_NOTNULL(params->dirs);
     ASSERT_NOTNULL(params->files);
     ASSERT_NOTNULL(path);
@@ -398,24 +353,25 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
     if (!d) {
         int e = errno;
         const char *prefix = "cannot open directory";
-        print_err_(params->files_arena, path->path, e, prefix);
+        print_err_(&params->fl, path->path, e, prefix);
         *exit_code = (path->is_operand ? 2 : 1);
         return false;
     }
 
-    params->entries = reset_array(params->entries_arena);
-    if (!params->entries) {
-        goto failed;
-    }
+    reset_array(&params->fl, params->entries);
 
     struct dirent *dp;
+    unsigned char buffer[1024 * 8];
+    free_list fl;
+    free_list_init(&fl, buffer, sizeof(buffer));
+
     while ((dp = readdir(d)) != NULL) {
         if (!params->args->all && dp->d_name[0] == '.' &&
             dp->d_name[1] != '/') {
             continue;
         }
 
-        t_entry *entry = create_entry_(params->entries_arena, path, dp);
+        t_entry *entry = create_entry_(&params->fl, path, dp);
         if (!entry) {
             goto failed;
         }
@@ -432,8 +388,7 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
         }
 
         if (params->args->list) {
-            if (!get_file_info(params->files_arena, params->scratch_arena,
-                               entry)) {
+            if (!get_file_info(&params->fl, &fl, entry)) {
                 goto failed;
             }
         }
@@ -444,18 +399,18 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
     closedir(d);
     d = NULL;
 
-    return walk_recurssive_(params);
+    return walk_recurssive_(params, &fl);
 failed:
     closedir(d);
     *exit_code = 2;
     return false;
 }
 
-static bool walk_recurssive_(t_params *params) {
+static bool walk_recurssive_(t_params *params, free_list *fl) {
     ASSERT_NOTNULL(params);
 
     if (params->args->recursive && params->entries->len) {
-        sort(params->scratch_arena, params->entries, params->args->reverse,
+        sort(fl, params->entries, params->args->reverse,
              params->args->time);
         size_t index = params->entries->len;
         while (index > 0) {
@@ -481,9 +436,13 @@ static bool walk_recurssive_(t_params *params) {
     return true;
 }
 
-static t_str *join_paths_(Arena *arena, const t_str *lhs, const t_str *rhs) {
+static t_str *join_paths_(free_list *fl, const t_str *lhs, const t_str *rhs) {
+    ASSERT_NOTNULL(fl);
+    ASSERT_NOTNULL(lhs);
+    ASSERT_NOTNULL(rhs);
+
     const size_t new_len = lhs->len + 1 + rhs->len + 1;
-    t_str *fullname = init_str(arena, new_len);
+    t_str *fullname = init_str(fl, new_len);
     if (!fullname) {
         return NULL;
     }
@@ -499,13 +458,13 @@ static t_str *join_paths_(Arena *arena, const t_str *lhs, const t_str *rhs) {
     return fullname;
 }
 
-static t_str *need_quote_(Arena *arena, t_str *str) {
-    ASSERT_NOTNULL(arena);
+static t_str *need_quote_(free_list *fl, t_str *str) {
+    ASSERT_NOTNULL(fl);
     ASSERT_NOTNULL(str);
     ASSERT_GE(str->len, 1);
     ASSERT_LT(str->pos, str->len);
 
-    t_str *quote = create_str(arena, " ");
+    t_str *quote = create_str(fl, " ");
     if (!quote) {
         return NULL;
     }
@@ -574,26 +533,13 @@ static bool has_quoted_operands_(const t_array *array) {
 static void clean_up_(t_params *params) {
     ASSERT_NOTNULL(params);
 
-    if (params->dirs_arena) {
-        ArenaRelease(params->dirs_arena);
-    }
+    free_list_free_all(&params->fl);
 
-    if (params->files_arena) {
-        ArenaRelease(params->files_arena);
-    }
-
-    if (params->entries_arena) {
-        ArenaRelease(params->entries_arena);
-    }
-
-    if (params->scratch_arena) {
-        ArenaRelease(params->scratch_arena);
-    }
 }
 
-static void print_err_(Arena *arena, t_str *str, int e, const char *prefix) {
+static void print_err_(free_list *fl, t_str *str, int e, const char *prefix) {
     const char *msg = strerror(e);
-    t_str *quote = need_quote_(arena, str);
+    t_str *quote = need_quote_(fl, str);
 
     if (quote && quote->len) {
         if (quote->str[0] == '"') {
@@ -602,7 +548,7 @@ static void print_err_(Arena *arena, t_str *str, int e, const char *prefix) {
             return;
         }
 
-        t_str *new_str = escape_str(arena, str);
+        t_str *new_str = escape_str(fl, str);
         if (new_str) {
             ft_fprintf(STDERR_FILENO, "ft_ls: %s %s%s%s: %s\n", prefix,
                        quote->str, new_str->str, quote->str, msg);

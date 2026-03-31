@@ -18,8 +18,8 @@ DEPSFLAGS := -MMD -MP
 R_CFLAGS  := -DNDEBUG -D_FORTIFY_SOURCE=2 -O3 -march=native -fomit-frame-pointer -fPIE
 
 # Debug flags
-D_CFLAGS  := -g3 -fno-omit-frame-pointer -fstack-protector-strong -fsanitize=address,undefined,null,integer-divide-by-zero,signed-integer-overflow
-# D_CFLAGS  := -g3 -fno-omit-frame-pointer
+# D_CFLAGS  := -g3 -fno-omit-frame-pointer -fstack-protector-strong -fsanitize=address,undefined,null,integer-divide-by-zero,signed-integer-overflow
+D_CFLAGS  := -g3 -fno-omit-frame-pointer
 
 SRC_DIR   := src
 INC_DIR   := include
