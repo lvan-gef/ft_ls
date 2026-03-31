@@ -448,6 +448,7 @@ def main() -> None:
 
     try:
         subprocess.run("make fclean", shell=True, capture_output=True)
+        subprocess.run("make debug", shell=True)
 
         if args.phase == "invalid":
             invalid_flags()

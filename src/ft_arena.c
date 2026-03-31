@@ -29,7 +29,7 @@ Arena *ArenaAlloc(uint64_t cap) {
 
     ASSERT_NOTNULL(arena);
     ASSERT_NOTNULL(arena->first);
-    ASSERT_NOTNULL(arena->curent);
+    ASSERT_NOTNULL(arena->current);
     ASSERT_EQ(arena->align, 0);
     ASSERT_EQ(arena->block_size, cap);
     return arena;

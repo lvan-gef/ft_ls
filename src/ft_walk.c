@@ -31,15 +31,12 @@ typedef struct {
     uint64_t max_len_sizes;
 } t_params;
 
-typedef struct s_dirjob {
-    t_str *path;
-    int is_operand;
-} t_dirjob;
-
 static bool run_(t_args *args, t_params *params, t_array *array,
                  int *exit_code);
-static bool read_dir_(t_params *params, t_dirjob *path, int *exit_code);
+static bool read_dir_(t_params *params, t_entry *path, int *exit_code);
+static bool walk_recurssive_(t_params *params);
 static bool process_args_(t_params *params, t_array *array, int *exit_code);
+static t_entry *create_entry_(Arena *arena, t_entry *path, struct dirent *dp);
 static int check_links(t_params *params, t_str *str, t_array *dir_entries,
                        struct stat *st, int *exit_code);
 static t_str *join_paths_(Arena *arena, const t_str *lhs, const t_str *rhs);
@@ -152,7 +149,7 @@ static bool run_(t_args *args, t_params *params, t_array *array,
     }
 
     while (params->dirs->len) {
-        t_dirjob *dir_path = pop_array(params->dirs);
+        t_entry *dir_path = pop_array(params->dirs);
 
         if (!inserted_files_dirs_gap && printed_files && dir_path->is_operand) {
             write(STDOUT_FILENO, "\n", 1);
@@ -278,16 +275,8 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
              params->args->time);
         while (dir_entries->len) {
             t_entry *entry = pop_array(dir_entries);
-
-            t_dirjob *dp = ArenaPush(params->dirs_arena, sizeof(*dp));
-            if (!dp) {
-                err_msg = "Failed to alloc space for dirjob";
-                goto failed;
-            }
-
-            dp->path = entry->path;
-            dp->is_operand = 1;
-            if (!append_array(params->dirs, dp)) {
+            entry->is_operand = true;
+            if (!append_array(params->dirs, entry)) {
                 err_msg = "Failed to append dir";
                 goto failed;
             }
@@ -299,6 +288,38 @@ failed:
     ft_fprintf(STDERR_FILENO, "Error: %s\n", err_msg);
     *exit_code = 2;
     return false;
+}
+
+static t_entry *create_entry_(Arena *arena, t_entry *path, struct dirent *dp) {
+    ASSERT_NOTNULL(arena);
+    ASSERT_NOTNULL(path);
+    ASSERT_NOTNULL(dp);
+
+    ArenaMark marker = ArenaGetMark(arena);
+    t_entry *entry = ArenaPush(arena, sizeof(*entry));
+    if (!entry) {
+        goto failed;
+    }
+
+    entry->name = create_str(arena, dp->d_name);
+    if (!entry->name) {
+        goto failed;
+    }
+
+    entry->path = join_paths_(arena, path->path, entry->name);
+    if (!entry->path) {
+        goto failed;
+    }
+
+    entry->quoted = need_quote_(arena, entry->name);
+    if (!entry->quoted) {
+        goto failed;
+    }
+
+    return entry;
+failed:
+    ArenaPopToMark(arena, marker);
+    return NULL;
 }
 
 static int check_links(t_params *params, t_str *str, t_array *dir_entries,
@@ -360,7 +381,7 @@ failed:
     return -1;
 }
 
-static bool read_dir_(t_params *params, t_dirjob *path, int *exit_code) {
+static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
     ASSERT_NOTNULL(params);
     ASSERT_NOTNULL(params->args);
     ASSERT_NOTNULL(params->dirs_arena);
@@ -387,31 +408,15 @@ static bool read_dir_(t_params *params, t_dirjob *path, int *exit_code) {
         goto failed;
     }
 
-    const struct dirent *dp;
+    struct dirent *dp;
     while ((dp = readdir(d)) != NULL) {
         if (!params->args->all && dp->d_name[0] == '.' &&
             dp->d_name[1] != '/') {
             continue;
         }
 
-        t_entry *entry = ArenaPush(params->entries_arena, sizeof(*entry));
+        t_entry *entry = create_entry_(params->entries_arena, path, dp);
         if (!entry) {
-            goto failed;
-        }
-
-        entry->name = create_str(params->entries_arena, dp->d_name);
-        if (!entry->name) {
-            goto failed;
-        }
-
-        entry->path =
-            join_paths_(params->entries_arena, path->path, entry->name);
-        if (!entry->path) {
-            goto failed;
-        }
-
-        entry->quoted = need_quote_(params->entries_arena, entry->name);
-        if (!entry->quoted) {
             goto failed;
         }
 
@@ -439,13 +444,23 @@ static bool read_dir_(t_params *params, t_dirjob *path, int *exit_code) {
     closedir(d);
     d = NULL;
 
+    return walk_recurssive_(params);
+failed:
+    closedir(d);
+    *exit_code = 2;
+    return false;
+}
+
+static bool walk_recurssive_(t_params *params) {
+    ASSERT_NOTNULL(params);
+
     if (params->args->recursive && params->entries->len) {
         sort(params->scratch_arena, params->entries, params->args->reverse,
              params->args->time);
         size_t index = params->entries->len;
         while (index > 0) {
             --index;
-            const t_entry *entry = pop_array(params->entries);
+            t_entry *entry = pop_array(params->entries);
             if (!entry->name) {
                 continue;
             }
@@ -456,59 +471,32 @@ static bool read_dir_(t_params *params, t_dirjob *path, int *exit_code) {
                 continue;
             }
 
-            t_dirjob *dj = ArenaPush(params->dirs_arena, sizeof(*dj));
-            if (!dj) {
-                goto failed;
-            }
-
-            dj->path = dup_str(params->dirs_arena, entry->path);
-            dj->is_operand = 0;
-            if (!dj->path) {
-                goto failed;
-            }
-
-            if (!append_array(params->dirs, dj)) {
-                goto failed;
+            entry->is_operand = false;
+            if (!append_array(params->dirs, entry)) {
+                return false;
             }
         }
     }
 
     return true;
-failed:
-    if (d) {
-        closedir(d);
-    }
-
-    *exit_code = 2;
-    return false;
 }
 
 static t_str *join_paths_(Arena *arena, const t_str *lhs, const t_str *rhs) {
-    const ArenaMark mark = ArenaGetMark(arena);
     const size_t new_len = lhs->len + 1 + rhs->len + 1;
     t_str *fullname = init_str(arena, new_len);
     if (!fullname) {
         return NULL;
     }
 
-    const ArenaMark scratch_mark = ArenaGetMark(arena);
-    const t_str *slash = create_str(arena, "/");
-    if (!slash) {
-        goto failed;
-    }
-
+    char slash_buffer[] = "/";
+    t_str slash = {.str = slash_buffer, .cap = 2, .len = 1, .pos = 0};
     (void)cat_str(fullname, lhs);
     if (fullname->str[fullname->len - 1] != '/') {
-        (void)cat_str(fullname, slash);
+        (void)cat_str(fullname, &slash);
     }
     (void)cat_str(fullname, rhs);
 
-    ArenaPopToMark(arena, scratch_mark);
     return fullname;
-
-failed:
-    ArenaPopToMark(arena, mark);
-    return NULL;
 }
 
 static t_str *need_quote_(Arena *arena, t_str *str) {
@@ -555,9 +543,11 @@ static bool has_quote_char_(const t_str *str) {
 
     for (uint64_t index = 0; index < str->len; ++index) {
         const char letter = str->str[index];
-        if (letter == SINGLE_QUOTE || letter == DOUBLE_QUOTE ||
-            letter == SPACE) {
-            return true;
+        switch (letter) {
+            case SINGLE_QUOTE:
+            case DOUBLE_QUOTE:
+            case SPACE: return true;
+            default: continue;
         }
     }
 

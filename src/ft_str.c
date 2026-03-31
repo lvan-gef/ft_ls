@@ -141,8 +141,8 @@ t_str *uint_to_str(Arena *arena, uint64_t nbr) {
     }
 
     ASSERT_NOTNULL(str);
-    ASSERT_LT(dst->len, dst->cap);
-    ASSERT_EQ(dst->pos, 0);
+    ASSERT_LT(str->len, str->cap);
+    ASSERT_EQ(str->pos, 0);
     return str;
 }
 
@@ -150,7 +150,7 @@ ssize_t append_chars_str(Arena *arena, t_str *dst, const char *src) {
     ASSERT_NOTNULL(arena);
     ASSERT_NOTNULL(dst);
     ASSERT_NOTNULL(src);
-    ASSERT_(*src->str, "%c can not be '\\0'", *src->str);
+    ASSERT_(*src, "%c can not be '\\0'", *src);
 
     const t_str *new_str = create_str(arena, src);
     if (!new_str) {

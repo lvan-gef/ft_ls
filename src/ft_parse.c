@@ -67,7 +67,6 @@ t_array *parse_args(Arena *arena, uint64_t argc, char **argv, t_args *args) {
         }
     }
 
-    ASSERT_NOTNULL(inputs);
     ASSERT_GE(inputs->len, 1);
     return inputs;
 }

@@ -15,7 +15,6 @@ CFLAGS    := -std=c11 -D_DEFAULT_SOURCE \
 			 -Wimplicit-fallthrough \
 			 -Wcast-qual \
 			 -Wvla -Walloca -Wold-style-definition \
-			 -Wimplicit-fallthrough \
 			 -DTERM_SIZE=$(TERM_SIZE)
 
 DEPSFLAGS := -MMD -MP
@@ -32,7 +31,7 @@ D_LDFLAGS  := $(SANITIZERS) -rdynamic
 
 SRC_DIR := src
 
-SRC_FILES := ft_arena.c ft_array.c ft_parse.c ft_printer.c ft_sort.c ft_str.c ft_walk.c main.c
+SRC_FILES := ft_arena.c ft_array.c ft_entry.c ft_helper.c ft_parse.c ft_printer.c ft_print_list.c ft_sort.c ft_str.c ft_walk.c main.c
 
 SRCS := $(addprefix $(SRC_DIR)/, $(SRC_FILES))
 

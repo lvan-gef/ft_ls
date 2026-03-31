@@ -181,8 +181,8 @@ static t_str *get_perm_(Arena *arena, Arena *scratch, const t_entry *entry) {
         }
     }
 
-    ASSERT_EQ(new_str->len, PERMISSION_SIZE - 1);
-    ASSERT_EQ(new_str->pos, 0);
+    ASSERT_EQ(str->len, PERMISSION_SIZE - 1);
+    ASSERT_EQ(str->pos, 0);
     return str;
 failed:
     ArenaPopToMark(arena, mark);
@@ -310,8 +310,6 @@ static bool get_symlink_(Arena *arena, const t_entry *entry, t_str **out) {
             new_str->len = (uint64_t)len;
             new_str->str[new_str->len] = '\0';
             *out = new_str;
-            ASSERT_EQ(*out->len, cap - 1);
-            ASSERT_EQ(*out->pos, 0);
             return true;
         }
 
