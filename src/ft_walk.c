@@ -6,10 +6,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "../include/ft_free_list.h"
+#include "../include/ft_arena.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
 #include "../include/ft_entry.h"
+#include "../include/ft_free_list.h"
 #include "../include/ft_helper.h"
 #include "../include/ft_printer.h"
 #include "../include/ft_sort.h"
@@ -17,10 +18,13 @@
 #include "../include/ft_walk.h"
 
 #include "../libft/include/ft_fprintf.h"
+#include "../libft/include/libft.h"
 
 typedef struct {
     t_args *args;
     free_list fl;
+    Arena *dirs_arena;
+    Arena *temp_arena;
     t_array *dirs;
     t_array *files;
     t_array *entries;
@@ -33,7 +37,12 @@ static bool run_(t_args *args, t_params *params, t_array *array,
 static bool read_dir_(t_params *params, t_entry *path, int *exit_code);
 static bool walk_recurssive_(t_params *params, free_list *fl);
 static bool process_args_(t_params *params, t_array *array, int *exit_code);
+static void clear_array_(t_array *array);
+static void clear_temp_dir_(t_params *params);
 static t_entry *create_entry_(free_list *fl, t_entry *path, struct dirent *dp);
+static t_str *dup_str_arena_(Arena *arena, const t_str *src);
+static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
+                                 bool is_operand);
 static int check_links(t_params *params, t_str *str, t_array *dir_entries,
                        struct stat *st, int *exit_code);
 static t_str *join_paths_(free_list *fl, const t_str *lhs, const t_str *rhs);
@@ -53,10 +62,25 @@ void process(t_args *args, t_array *array, int *exit_code) {
     ASSERT_NOTNULL(exit_code);
 
     const char *err_msg = NULL;
-    unsigned char buffer[1024 * 8];
+    unsigned char buffer[1024 * 1024];
     t_params params = {0};
     params.args = args;
     free_list_init(&params.fl, buffer, sizeof(buffer));
+    params.dirs_arena = ArenaAlloc(ARENA_SIZE);
+    if (!params.dirs_arena) {
+        *exit_code = 2;
+        return;
+    }
+
+    params.temp_arena = ArenaAlloc(UINT64_C(1024) * UINT64_C(1024));
+    if (!params.temp_arena) {
+        *exit_code = 2;
+        clean_up_(&params);
+        return;
+    }
+
+    ArenaSetAutoAlign(params.dirs_arena, 8);
+    ArenaSetAutoAlign(params.temp_arena, 8);
 
     params.dirs = init_array(&params.fl, ARRAY_SIZE);
     params.files = init_array(&params.fl, ARRAY_SIZE);
@@ -64,6 +88,7 @@ void process(t_args *args, t_array *array, int *exit_code) {
 
     if (!params.dirs || !params.files || !params.entries) {
         *exit_code = 2;
+        clean_up_(&params);
         return;
     }
 
@@ -116,7 +141,7 @@ static bool run_(t_args *args, t_params *params, t_array *array,
         }
 
         if (!read_dir_(params, dir_path, exit_code)) {
-            reset_array(&params->fl, params->files);
+            clear_temp_dir_(params);
             continue;
         }
 
@@ -134,7 +159,7 @@ static bool run_(t_args *args, t_params *params, t_array *array,
         t_entry *ent = print_dir_path ? &entry : NULL;
         printer(args, params->files, ent, true, 0, 0, false);
         printed_dir = true;
-        reset_array(&params->fl, params->files);
+        clear_temp_dir_(params);
     }
 
     return true;
@@ -178,17 +203,13 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
         }
 
         if (S_ISDIR(st.st_mode)) {
-            t_entry *dir_entry =
-                free_list_alloc(&params->fl, sizeof(*dir_entry), 8);
+            t_entry src = {.name = str, .path = str, .st = st};
+            t_entry *dir_entry = queue_dir_entry_(params, &src, true);
             if (!dir_entry) {
                 err_msg = "Failed to alloc dir entry";
                 goto failed;
             }
 
-            *dir_entry = (t_entry){0};
-            dir_entry->name = str;
-            dir_entry->path = str;
-            dir_entry->st = st;
             if (!append_array(dir_entries, dir_entry)) {
                 err_msg = "Failed to append dir entry";
                 goto failed;
@@ -226,7 +247,8 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
     }
 
     if (dir_entries->len) {
-        sort(&params->fl, dir_entries, params->args->reverse, params->args->time);
+        sort(&params->fl, dir_entries, params->args->reverse,
+             params->args->time);
         while (dir_entries->len) {
             t_entry *entry = pop_array(dir_entries);
             entry->is_operand = true;
@@ -311,15 +333,13 @@ static int check_links(t_params *params, t_str *str, t_array *dir_entries,
     }
 
     if (is_dir_operand && !params->args->list) {
-        t_entry *dir_entry = free_list_alloc(&params->fl, sizeof(*dir_entry), 8);
+        t_entry src = {.name = str, .path = str, .st = *st_dir};
+        t_entry *dir_entry = queue_dir_entry_(params, &src, true);
         if (!dir_entry) {
             err_msg = "Failed to alloc dir entry";
             goto failed;
         }
 
-        dir_entry->name = str;
-        dir_entry->path = str;
-        dir_entry->st = *st_dir;
         if (!append_array(dir_entries, dir_entry)) {
             err_msg = "Failed to append dir entry";
             goto failed;
@@ -358,9 +378,18 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
         return false;
     }
 
-    reset_array(&params->fl, params->entries);
+    clear_temp_dir_(params);
 
     struct dirent *dp;
+    free_list dir_fl;
+    void *dir_buffer =
+        ArenaPushNoZero(params->temp_arena, UINT64_C(1024) * UINT64_C(1024));
+    if (!dir_buffer) {
+        *exit_code = 2;
+        return false;
+    }
+
+    free_list_init(&dir_fl, dir_buffer, UINT64_C(1024) * UINT64_C(1024));
     unsigned char buffer[1024 * 8];
     free_list fl;
     free_list_init(&fl, buffer, sizeof(buffer));
@@ -371,7 +400,7 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
             continue;
         }
 
-        t_entry *entry = create_entry_(&params->fl, path, dp);
+        t_entry *entry = create_entry_(&dir_fl, path, dp);
         if (!entry) {
             goto failed;
         }
@@ -388,7 +417,7 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
         }
 
         if (params->args->list) {
-            if (!get_file_info(&params->fl, &fl, entry)) {
+            if (!get_file_info(&dir_fl, &fl, entry)) {
                 goto failed;
             }
         }
@@ -399,23 +428,42 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
     closedir(d);
     d = NULL;
 
-    return walk_recurssive_(params, &fl);
+    return walk_recurssive_(params, &dir_fl);
 failed:
     closedir(d);
     *exit_code = 2;
     return false;
 }
 
+static void clear_array_(t_array *array) {
+    ASSERT_NOTNULL(array);
+
+    while (array->len) {
+        (void)pop_array(array);
+    }
+}
+
+static void clear_temp_dir_(t_params *params) {
+    ASSERT_NOTNULL(params);
+    ASSERT_NOTNULL(params->files);
+    ASSERT_NOTNULL(params->entries);
+    ASSERT_NOTNULL(params->temp_arena);
+
+    clear_array_(params->files);
+    clear_array_(params->entries);
+    ArenaClear(params->temp_arena);
+}
+
 static bool walk_recurssive_(t_params *params, free_list *fl) {
     ASSERT_NOTNULL(params);
 
     if (params->args->recursive && params->entries->len) {
-        sort(fl, params->entries, params->args->reverse,
-             params->args->time);
+        sort(fl, params->entries, params->args->reverse, params->args->time);
         size_t index = params->entries->len;
         while (index > 0) {
             --index;
             t_entry *entry = pop_array(params->entries);
+            t_entry *dir_entry;
             if (!entry->name) {
                 continue;
             }
@@ -426,14 +474,71 @@ static bool walk_recurssive_(t_params *params, free_list *fl) {
                 continue;
             }
 
-            entry->is_operand = false;
-            if (!append_array(params->dirs, entry)) {
+            dir_entry = queue_dir_entry_(params, entry, false);
+            if (!dir_entry) {
+                return false;
+            }
+
+            if (!append_array(params->dirs, dir_entry)) {
                 return false;
             }
         }
     }
 
     return true;
+}
+
+static t_str *dup_str_arena_(Arena *arena, const t_str *src) {
+    ASSERT_NOTNULL(arena);
+    ASSERT_NOTNULL(src);
+    ASSERT_NOTNULL(src->str);
+
+    t_str *dst = ArenaPush(arena, sizeof(*dst));
+    char *buf;
+    if (!dst) {
+        return NULL;
+    }
+
+    buf = ArenaPushNoZero(arena, src->cap);
+    if (!buf) {
+        return NULL;
+    }
+
+    *dst = *src;
+    dst->str = buf;
+    dst->pos = 0;
+    ft_memcpy(dst->str, src->str, src->len + 1);
+    return dst;
+}
+
+static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
+                                 bool is_operand) {
+    ASSERT_NOTNULL(params);
+    ASSERT_NOTNULL(params->dirs_arena);
+    ASSERT_NOTNULL(src);
+    ASSERT_NOTNULL(src->path);
+
+    t_entry *entry = ArenaPush(params->dirs_arena, sizeof(*entry));
+    if (!entry) {
+        return NULL;
+    }
+
+    *entry = *src;
+    entry->name =
+        src->name ? dup_str_arena_(params->dirs_arena, src->name) : NULL;
+    if (src->name && !entry->name) {
+        return NULL;
+    }
+
+    entry->path = dup_str_arena_(params->dirs_arena, src->path);
+    if (!entry->path) {
+        return NULL;
+    }
+
+    entry->quoted = NULL;
+    entry->info = NULL;
+    entry->is_operand = is_operand;
+    return entry;
 }
 
 static t_str *join_paths_(free_list *fl, const t_str *lhs, const t_str *rhs) {
@@ -533,8 +638,17 @@ static bool has_quoted_operands_(const t_array *array) {
 static void clean_up_(t_params *params) {
     ASSERT_NOTNULL(params);
 
-    free_list_free_all(&params->fl);
+    if (params->dirs_arena) {
+        ArenaRelease(params->dirs_arena);
+        params->dirs_arena = NULL;
+    }
 
+    if (params->temp_arena) {
+        ArenaRelease(params->temp_arena);
+        params->temp_arena = NULL;
+    }
+
+    free_list_free_all(&params->fl);
 }
 
 static void print_err_(free_list *fl, t_str *str, int e, const char *prefix) {
