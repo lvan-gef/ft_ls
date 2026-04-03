@@ -1,9 +1,7 @@
-#include "ft_fprintf.h"
-#include "ft_str.h"
-#include <unistd.h>
 #define C_ASSERT_IMPLEMENTATION
 
 #include <stdint.h>
+#include <unistd.h>
 
 #include "../include/ft_free_list.h"
 #include "../include/ft_array.h"
@@ -22,7 +20,7 @@ int main(int argc, char *argv[]) {
     t_array *inputs = parse_args(&fl, (uint64_t)argc, argv, &args);
     if (!inputs) {
         clean_program_(&fl);
-        return 2;
+        return 1;
     }
 
     int exit_code = 0;
