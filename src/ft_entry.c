@@ -7,14 +7,14 @@
 #include <sys/xattr.h>
 #include <time.h>
 
-#include "../include/ft_free_list.h"
 #include "../include/ft_assert.h"
 #include "../include/ft_entry.h"
+#include "../include/ft_free_list.h"
 #include "../include/ft_str.h"
 
 #include "../libft/include/libft.h"
 
-static t_str *get_perm_(free_list *fl, free_list *scratch, const t_entry *entry);
+static t_str *get_perm_(free_list *fl, const t_entry *entry);
 static t_str *get_user_(free_list *fl, uid_t user_id);
 static t_str *get_group_(free_list *fl, gid_t group_id);
 static t_str *get_dt_(free_list *fl, const struct timespec *ctim);
@@ -43,21 +43,19 @@ static gid_t cached_gid = (gid_t)-1;
 static char cached_user[LOGIN_NAME_MAX] = "";
 static char cached_group[LOGIN_NAME_MAX] = "";
 
-bool get_file_info(free_list *fl, free_list *scratch, t_entry *entry) {
+bool get_file_info(free_list *fl, t_entry *entry) {
     ASSERT_NOTNULL(fl);
-    ASSERT_NOTNULL(scratch);
     ASSERT_NOTNULL(entry);
     ASSERT_NOTNULL(entry->path);
     ASSERT_GT(entry->path->cap, 0);
     ASSERT_LT(entry->path->len, entry->path->cap);
-
 
     t_file_info *info = free_list_alloc(fl, sizeof(*info), 8);
     if (!info) {
         goto failed;
     }
 
-    info->perm = get_perm_(fl, scratch, entry);
+    info->perm = get_perm_(fl, entry);
     if (!info->perm) {
         goto failed;
     }
@@ -87,6 +85,7 @@ bool get_file_info(free_list *fl, free_list *scratch, t_entry *entry) {
         goto failed;
     }
 
+    info->symlink = info->perm;
     if (!get_symlink_(fl, entry, &info->symlink)) {
         goto failed;
     }
@@ -96,14 +95,11 @@ bool get_file_info(free_list *fl, free_list *scratch, t_entry *entry) {
     entry->info = info;
     return true;
 failed:
-    free_list_free_all(scratch);
-
     return false;
 }
 
-static t_str *get_perm_(free_list *fl, free_list *scratch, const t_entry *entry) {
+static t_str *get_perm_(free_list *fl, const t_entry *entry) {
     ASSERT_NOTNULL(fl);
-    ASSERT_NOTNULL(scratch);
     ASSERT_NOTNULL(entry);
 
     t_str *str = init_str(fl, PERMISSION_SIZE);
@@ -115,67 +111,59 @@ static t_str *get_perm_(free_list *fl, free_list *scratch, const t_entry *entry)
         switch (index) {
             case P_LINK:
                 if ((entry->st.st_mode & S_IFMT) == S_IFLNK) {
-                    append_chars_str(scratch, str, "l");
+                    append_chars_str(str, "l");
                 }
                 break;
             case P_REG:
                 if ((entry->st.st_mode & S_IFMT) == S_IFREG) {
-                    append_chars_str(scratch, str, "-");
+                    append_chars_str(str, "-");
                 }
                 break;
             case P_DIR:
                 if ((entry->st.st_mode & S_IFMT) == S_IFDIR) {
-                    append_chars_str(scratch, str, "d");
+                    append_chars_str(str, "d");
                 }
                 break;
             case P_RUSER:
-                append_chars_str(scratch, str,
-                                 entry->st.st_mode & S_IRUSR ? "r" : "-");
+                append_chars_str(str, entry->st.st_mode & S_IRUSR ? "r" : "-");
                 break;
             case P_WUSER:
-                append_chars_str(scratch, str,
-                                 entry->st.st_mode & S_IWUSR ? "w" : "-");
+                append_chars_str(str, entry->st.st_mode & S_IWUSR ? "w" : "-");
                 break;
             case P_XUSER:
-                append_chars_str(scratch, str,
-                                 entry->st.st_mode & S_IXUSR ? "x" : "-");
+                append_chars_str(str, entry->st.st_mode & S_IXUSR ? "x" : "-");
                 break;
             case P_RGROUP:
-                append_chars_str(scratch, str,
-                                 entry->st.st_mode & S_IRGRP ? "r" : "-");
+                append_chars_str(str, entry->st.st_mode & S_IRGRP ? "r" : "-");
                 break;
             case P_WGROUP:
-                append_chars_str(scratch, str,
-                                 entry->st.st_mode & S_IWGRP ? "w" : "-");
+                append_chars_str(str, entry->st.st_mode & S_IWGRP ? "w" : "-");
                 break;
             case P_XGROUP:
-                append_chars_str(scratch, str,
-                                 entry->st.st_mode & S_IXGRP ? "x" : "-");
+                append_chars_str(str, entry->st.st_mode & S_IXGRP ? "x" : "-");
                 break;
             case P_ROTHER:
-                append_chars_str(scratch, str,
-                                 entry->st.st_mode & S_IROTH ? "r" : "-");
+                append_chars_str(str, entry->st.st_mode & S_IROTH ? "r" : "-");
                 break;
             case P_WOTHER:
-                append_chars_str(scratch, str,
-                                 entry->st.st_mode & S_IWOTH ? "w" : "-");
+                append_chars_str(str, entry->st.st_mode & S_IWOTH ? "w" : "-");
                 break;
             case P_XOTHER:
-                append_chars_str(scratch, str,
-                                 entry->st.st_mode & S_IXOTH ? "x" : "-");
+                append_chars_str(str, entry->st.st_mode & S_IXOTH ? "x" : "-");
                 break;
             case P_ATTR:
                 if (has_xattr_(entry->path->str, "system.posix_acl_access")) {
-                    append_chars_str(scratch, str, "+");
+                    append_chars_str(str, "+");
                 } else if (has_xattr_(entry->path->str, "security.selinux")) {
-                    append_chars_str(scratch, str, ".");
+                    append_chars_str(str, ".");
                 }
                 break;
             default: ASSERT_FALSE(true);
         }
     }
 
-    ASSERT_EQ(str->len, PERMISSION_SIZE - 1);
+    ASSERT_(str->len == UINT64_C(10) || str->len == UINT64_C(11),
+            "unexpected permission length: %llu", (unsigned long long)str->len);
     ASSERT_EQ(str->pos, 0);
     return str;
 failed:
