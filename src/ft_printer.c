@@ -1,16 +1,15 @@
+#include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <unistd.h>
 
-#include "../include/ft_free_list.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
 #include "../include/ft_entry.h"
 #include "../include/ft_helper.h"
-#include "../include/ft_parse.h"
 #include "../include/ft_print_list.h"
 #include "../include/ft_printer.h"
 #include "../include/ft_sort.h"
-#include "../include/ft_str.h"
 
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
@@ -23,6 +22,14 @@
 #define SPACE_GAP UINT64_C(2)
 #endif /* ifndef SPACE_GAP */
 
+#ifndef MIN_COLUMN_WIDTH
+#define MIN_COLUMN_WIDTH UINT64_C(3)
+#endif // !MIN_COLUMN_WIDTH
+
+#ifndef OUTPUT_BUFFER_CAP
+#define OUTPUT_BUFFER_CAP UINT64_C(4096)
+#endif // !OUTPUT_BUFFER_CAP
+
 typedef struct {
     uint64_t rows;
     uint64_t cols;
@@ -30,22 +37,26 @@ typedef struct {
 } t_map;
 
 typedef struct {
-    t_str *space;
-    t_str *tab;
-    t_str *new_line;
-    t_str *dubble_colon;
-} t_spacing;
+    uint64_t len;
+    char data[OUTPUT_BUFFER_CAP];
+} t_output;
 
-static void init_print_row_(free_list *fl, t_array *array, t_entry *dir_entry,
+static void init_print_row_(t_array *array, t_entry *dir_entry,
                             bool force_quote_padding);
-static void print_row_(t_array *array, t_str *buf, const t_map *map,
-                       const t_spacing *spacing, bool quoted,
-                       const uint64_t *col_starts);
-static uint64_t *calc_cols_(free_list *fl, t_array *array, t_map *map,
-                            bool quoted);
-static uint64_t calc_width_(free_list *fl, t_array *array, uint64_t num_cols,
+static uint64_t *calc_cols_(t_array *array, t_map *map, bool quoted);
+static uint64_t calc_width_(t_array *array, uint64_t num_cols,
                             uint64_t *col_widths, bool quoted);
+static bool print_row_(t_output *out, t_array *array, const t_map *map,
+                       const uint64_t *col_widths, bool quoted);
 static bool check_quoted_(t_array *array);
+static uint64_t display_name_len_(const t_entry *entry, bool pad_unquoted);
+static bool indent_(t_output *out, uint64_t from, uint64_t to);
+static bool flush_output_(t_output *out);
+static bool put_mem_(t_output *out, const char *src, uint64_t len);
+static bool put_char_(t_output *out, char c);
+static bool put_display_name_(t_output *out, const t_entry *entry,
+                              bool pad_unquoted);
+static bool write_mem_(void *ctx, const char *src, uint64_t len);
 
 void printer(const t_args *args, t_array *array, t_entry *dir_entry,
              bool print_total, uint64_t min_len_links, uint64_t min_len_sizes,
@@ -53,31 +64,24 @@ void printer(const t_args *args, t_array *array, t_entry *dir_entry,
     ASSERT_NOTNULL(args);
     ASSERT_NOTNULL(array);
 
-    unsigned char buffer[1024 * 8];
-    free_list fl;
-    free_list_init(&fl, buffer, sizeof(buffer));
-    // free_list *fl = free_listAlloc(fl_SIZE);
-    // if (!fl) {
-    //     ft_fprintf(STDERR_FILENO, "Failed to alloc fl for printer");
-    //     return;
-    // }
-    // free_listSetAutoAlign(fl, 8);
+    (void)print_total;
+    (void)min_len_links;
+    (void)min_len_sizes;
 
     if (array->len) {
-        sort(&fl, array, args->reverse, args->time);
+        sort(array, args->reverse, args->time);
     }
 
     if (args->list) {
         print_list(array, dir_entry, print_total, min_len_links, min_len_sizes,
                    force_quote_padding);
     } else {
-        init_print_row_(&fl, array, dir_entry, force_quote_padding);
+        init_print_row_(array, dir_entry, force_quote_padding);
     }
 }
 
-static void init_print_row_(free_list *fl, t_array *array, t_entry *dir_entry,
+static void init_print_row_(t_array *array, t_entry *dir_entry,
                             bool force_quote_padding) {
-    ASSERT_NOTNULL(fl);
     ASSERT_NOTNULL(array);
 
     uint64_t max_cols = (TERM_SIZE + SPACE_GAP) / (1 + SPACE_GAP);
@@ -89,172 +93,95 @@ static void init_print_row_(free_list *fl, t_array *array, t_entry *dir_entry,
                  .rows = array->len,
                  .max = array->len < max_cols ? array->len : max_cols};
 
-    bool quoted = force_quote_padding || check_quoted_(array);
+    const bool quoted = force_quote_padding || check_quoted_(array);
     const char *err_msg = NULL;
+    uint64_t *col_widths = calc_cols_(array, &map, quoted);
+    t_output out = {0};
 
-    uint64_t *col_widths = calc_cols_(fl, array, &map, quoted);
     if (!col_widths) {
         err_msg = "Failed to calc column leng";
         goto done;
     }
 
-    uint64_t *col_starts = free_list_alloc(fl, (map.cols + 1) * sizeof(*col_starts), 8);
-
-    col_starts[0] = 0;
-    for (uint64_t index = 0; index < map.cols; ++index) {
-        col_starts[index + 1] =
-            col_starts[index] + col_widths[index] + SPACE_GAP;
-    }
-
-    uint64_t row_width =
-        calc_width_(fl, array, map.cols, col_widths, quoted);
-    uint64_t buf_size = (row_width * map.rows) + map.rows + 1;
-
     if (dir_entry) {
-        dir_entry = escape_entry(fl, dir_entry);
-        if (!dir_entry) {
-            err_msg = "Failed to escape dir";
+        if (!put_display_name_(&out, dir_entry, false) ||
+            !put_mem_(&out, ":\n", 2)) {
+            err_msg = "Failed to write dir header";
             goto done;
         }
-
-        if (dir_entry->quoted && dir_entry->quoted->len) {
-            buf_size += 2;
-        }
-        buf_size += dir_entry->name->len + 3; // 1 for space, 1 for :, 1 for \n
     }
 
-    t_str *buf = init_str(fl, buf_size);
-    if (!buf) {
-        err_msg = "Failed to init t_str for buffer";
-        goto done;
+    if (!print_row_(&out, array, &map, col_widths, quoted) ||
+        !flush_output_(&out)) {
+        err_msg = "Failed to write output";
     }
 
-    char space_buf[] = " ";
-    char tab_buf[] = "\t";
-    char new_line_buf[] = "\n";
-    char dubble_colon_buf[] = ":";
-
-    t_str space = {.str = space_buf, .cap = 2, .len = 1, .pos = 0};
-    t_str tab = {.str = tab_buf, .cap = 2, .len = 1, .pos = 0};
-    t_str new_line = {.str = new_line_buf, .cap = 2, .len = 1, .pos = 0};
-    t_str dubble_colon = {
-        .str = dubble_colon_buf, .cap = 2, .len = 1, .pos = 0};
-
-    t_spacing spacing = {.space = &space,
-                         .tab = &tab,
-                         .new_line = &new_line,
-                         .dubble_colon = &dubble_colon};
-
-    if (dir_entry) {
-        if (dir_entry->quoted && dir_entry->quoted->len) {
-            cat_str(buf, dir_entry->quoted);
-            cat_str(buf, dir_entry->name);
-            cat_str(buf, dir_entry->quoted);
-        } else {
-            cat_str(buf, dir_entry->name);
-        }
-
-        cat_str(buf, spacing.dubble_colon);
-        cat_str(buf, spacing.new_line);
-    }
-
-    print_row_(array, buf, &map, &spacing, quoted, col_starts);
 done:
+    free(col_widths);
     if (err_msg) {
         ft_fprintf(STDERR_FILENO, "%s\n", err_msg);
     }
 }
 
-static void print_row_(t_array *array, t_str *buf, const t_map *map,
-                       const t_spacing *spacing, bool quoted,
-                       const uint64_t *col_starts) {
+static bool print_row_(t_output *out, t_array *array, const t_map *map,
+                       const uint64_t *col_widths, bool quoted) {
+    ASSERT_NOTNULL(out);
+    ASSERT_NOTNULL(array);
+    ASSERT_NOTNULL(map);
+    ASSERT_NOTNULL(col_widths);
+
     const uint64_t files_len = array->len;
-
     for (uint64_t row = 0; row < map->rows; ++row) {
-        uint64_t curr_pos = 0;
-        for (uint64_t col = 0; col < map->cols; ++col) {
-            uint64_t idx = row + col * map->rows;
-            if (idx >= files_len) {
+        uint64_t col = 0;
+        uint64_t filesno = row;
+        uint64_t pos = 0;
+
+        while (true) {
+            const t_entry *entry = array->data[filesno];
+            const uint64_t name_length = display_name_len_(entry, quoted);
+            const uint64_t max_name_length = col_widths[col++];
+
+            if (!put_display_name_(out, entry, quoted)) {
+                return false;
+            }
+
+            if (files_len - map->rows <= filesno) {
                 break;
             }
+            filesno += map->rows;
 
-            const t_entry *entry = array->data[idx];
-            bool is_last_col = (col == map->cols - 1) ||
-                               (row + (col + 1) * map->rows >= files_len);
-
-            if (entry->quoted->len) {
-                cat_str(buf, entry->quoted);
-                curr_pos += entry->quoted->len;
-            } else if (quoted) {
-                cat_str(buf, spacing->space);
-                curr_pos += 1;
+            if (!indent_(out, pos + name_length, pos + max_name_length)) {
+                return false;
             }
-
-            cat_str(buf, entry->name);
-            curr_pos += entry->name->len;
-
-            if (quoted && entry->quoted->len) {
-                cat_str(buf, entry->quoted);
-                curr_pos += entry->quoted->len;
-            }
-
-            if (is_last_col) {
-                break;
-            }
-
-            uint64_t target_pos = col_starts[col + 1];
-            uint64_t gap = target_pos - curr_pos;
-            uint64_t test_pos = curr_pos;
-            uint64_t num_tabs = 0;
-
-            while (test_pos < target_pos) {
-                uint64_t next_tab = ((test_pos / TABSIZE) + 1) * TABSIZE;
-                if (next_tab > target_pos) {
-                    break;
-                }
-
-                test_pos = next_tab;
-                ++num_tabs;
-            }
-
-            uint64_t spaces_after_tabs = target_pos - test_pos;
-            uint64_t chars_with_tabs = num_tabs + spaces_after_tabs;
-            bool use_tabs = (num_tabs > 0) && (chars_with_tabs < gap);
-
-            while (curr_pos < target_pos) {
-                uint64_t next_tab = ((curr_pos / TABSIZE) + 1) * TABSIZE;
-                if (use_tabs && next_tab <= target_pos) {
-                    cat_str(buf, spacing->tab);
-                    curr_pos = next_tab;
-                } else {
-                    cat_str(buf, spacing->space);
-                    curr_pos++;
-                }
-            }
+            pos += max_name_length;
         }
 
-        cat_str(buf, spacing->new_line);
+        if (!put_char_(out, '\n')) {
+            return false;
+        }
     }
 
-    (void)write(STDOUT_FILENO, buf->str, buf->len);
+    return true;
 }
 
-static uint64_t *calc_cols_(free_list *fl, t_array *array, t_map *map,
-                            bool quoted) {
-    ASSERT_NOTNULL(fl);
+static uint64_t *calc_cols_(t_array *array, t_map *map, bool quoted) {
     ASSERT_NOTNULL(array);
     ASSERT_NOTNULL(map);
 
-    if (map->max > TERM_SIZE / 2) {
-        map->max = TERM_SIZE / 2;
+    const uint64_t max_cols = TERM_SIZE / MIN_COLUMN_WIDTH;
+    if (map->max > max_cols) {
+        map->max = max_cols;
     }
 
-    uint64_t *col_widths = free_list_alloc(fl, (map->max + 1) * sizeof(*col_widths), 8);
+    const uint64_t width_count = map->max ? map->max : 1;
+    uint64_t *col_widths = malloc((size_t)width_count * sizeof(*col_widths));
+    if (!col_widths) {
+        return NULL;
+    }
 
     uint64_t try_cols = map->max;
     while (try_cols > 1) {
-        uint64_t width =
-            calc_width_(fl, array, try_cols, col_widths, quoted);
+        const uint64_t width = calc_width_(array, try_cols, col_widths, quoted);
         if (width < TERM_SIZE) {
             map->cols = try_cols;
             map->rows = (array->len + map->cols - 1) / map->cols;
@@ -263,61 +190,136 @@ static uint64_t *calc_cols_(free_list *fl, t_array *array, t_map *map,
         --try_cols;
     }
 
-    (void)calc_width_(fl, array, 1, col_widths, quoted);
+    (void)calc_width_(array, 1, col_widths, quoted);
     return col_widths;
 }
 
-static uint64_t calc_width_(free_list *fl, t_array *array, uint64_t num_cols,
+static uint64_t calc_width_(t_array *array, uint64_t num_cols,
                             uint64_t *col_widths, bool quoted) {
-    uint64_t num_rows = (array->len + num_cols - 1) / num_cols;
-    uint64_t index = 0;
+    ASSERT_NOTNULL(array);
+    ASSERT_NOTNULL(col_widths);
+    ASSERT_GT(num_cols, 0);
+    const uint64_t num_rows = (array->len + num_cols - 1) / num_cols;
+    uint64_t line_len = num_cols * MIN_COLUMN_WIDTH;
 
-    ft_memset(col_widths, 0, num_cols * sizeof(*col_widths));
+    for (uint64_t index = 0; index < num_cols; ++index) {
+        col_widths[index] = MIN_COLUMN_WIDTH;
+    }
 
-    for (uint64_t col = 0; col < num_cols; ++col) {
-        for (uint64_t row = 0; row < num_rows; ++row) {
-            index = row + col * num_rows;
-            if (index >= array->len) {
-                break;
-            }
+    for (uint64_t filesno = 0; filesno < array->len; ++filesno) {
+        const t_entry *entry = array->data[filesno];
+        ASSERT_NOTNULL(entry);
+        ASSERT_NOTNULL(entry->name);
 
-            t_entry *entry = array->data[index];
-            ASSERT_NOTNULL(entry);
-            ASSERT_GT(entry->name->len, 0);
+        const uint64_t idx = filesno / num_rows;
+        const uint64_t name_length = display_name_len_(entry, quoted);
+        const uint64_t real_length =
+            name_length + (idx == num_cols - 1 ? 0 : SPACE_GAP);
 
-            entry = escape_entry(fl, entry);
-            uint64_t len = entry->name->len;
-            if (entry->quoted->len) {
-                len += entry->quoted->len * 2;
-            } else if (quoted) {
-                len += 1;
-            }
-
-            if (len > col_widths[col]) {
-                col_widths[col] = len;
+        if (col_widths[idx] < real_length) {
+            line_len += real_length - col_widths[idx];
+            col_widths[idx] = real_length;
+            if (line_len >= TERM_SIZE) {
+                return line_len;
             }
         }
     }
 
-    uint64_t total = 0;
-    for (index = 0; index < num_cols; ++index) {
-        total += col_widths[index];
-        if (index < num_cols - 1) {
-            ASSERT_(total + SPACE_GAP > total, "total did overflow");
-            total += SPACE_GAP;
-        }
-    }
-
-    return total;
+    return line_len;
 }
 
 static bool check_quoted_(t_array *array) {
+    ASSERT_NOTNULL(array);
+
     for (uint64_t index = 0; index < array->len; ++index) {
         const t_entry *entry = array->data[index];
-        if (entry->quoted->len) {
+        if (entry->quote != '\0') {
             return true;
         }
     }
 
     return false;
+}
+
+static uint64_t display_name_len_(const t_entry *entry, bool pad_unquoted) {
+    ASSERT_NOTNULL(entry);
+    ASSERT_NOTNULL(entry->name);
+
+    return shell_display_len(entry->name, entry->quote, pad_unquoted);
+}
+
+static bool indent_(t_output *out, uint64_t from, uint64_t to) {
+    ASSERT_NOTNULL(out);
+    ASSERT_LE(from, to);
+
+    while (from < to) {
+        if (TABSIZE != 0 && to / TABSIZE > (from + 1) / TABSIZE) {
+            if (!put_char_(out, '\t')) {
+                return false;
+            }
+            from += TABSIZE - from % TABSIZE;
+        } else {
+            if (!put_char_(out, ' ')) {
+                return false;
+            }
+            ++from;
+        }
+    }
+
+    return true;
+}
+
+static bool flush_output_(t_output *out) {
+    ASSERT_NOTNULL(out);
+
+    uint64_t written = 0;
+    while (written < out->len) {
+        const ssize_t chunk = write(STDOUT_FILENO, out->data + written,
+                                    (size_t)(out->len - written));
+        if (chunk < 0) {
+            return false;
+        }
+        written += (uint64_t)chunk;
+    }
+
+    out->len = 0;
+    return true;
+}
+
+static bool put_mem_(t_output *out, const char *src, uint64_t len) {
+    ASSERT_NOTNULL(out);
+    ASSERT_NOTNULL(src);
+
+    while (len) {
+        if (out->len == OUTPUT_BUFFER_CAP && !flush_output_(out)) {
+            return false;
+        }
+
+        const uint64_t avail = OUTPUT_BUFFER_CAP - out->len;
+        const uint64_t to_copy = len < avail ? len : avail;
+        ft_memcpy(out->data + out->len, src, (size_t)to_copy);
+        out->len += to_copy;
+        src += to_copy;
+        len -= to_copy;
+    }
+
+    return true;
+}
+
+static bool put_char_(t_output *out, char c) {
+    return put_mem_(out, &c, 1);
+}
+
+static bool write_mem_(void *ctx, const char *src, uint64_t len) {
+    return put_mem_(ctx, src, len);
+}
+
+static bool put_display_name_(t_output *out, const t_entry *entry,
+                              bool pad_unquoted) {
+    ASSERT_NOTNULL(out);
+    ASSERT_NOTNULL(entry);
+    ASSERT_NOTNULL(entry->name);
+
+    return write_shell_escaped(out, write_mem_, entry->name, entry->quote,
+                               pad_unquoted);
 }
