@@ -9,7 +9,7 @@
 #include "../include/ft_parse.h"
 #include "../include/ft_walk.h"
 
-static void clean_program_(free_list *arena);
+static void clean_program_(free_list *fl);
 
 int main(int argc, char *argv[]) {
     t_args args = {0};
