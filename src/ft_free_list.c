@@ -1,9 +1,10 @@
-#include "../include/ft_free_list.h"
 #include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+
+#include "../include/ft_free_list.h"
 
 static size_t calc_padding_with_header(uintptr_t ptr, uintptr_t align,
                                        size_t header_size);
@@ -146,9 +147,11 @@ void free_list_free(free_list *fl, void *ptr) {
         prev_node = node;
         node = node->next;
     }
+
     if (node == NULL) {
         free_list_node_insert(&fl->head, prev_node, free_node);
     }
+
     fl->used -= free_node->block_size;
     free_list_coalescence(fl, prev_node, free_node);
 }
@@ -161,6 +164,7 @@ void free_list_coalescence(free_list *fl, free_list_node *prev_node,
         free_node->block_size += free_node->next->block_size;
         free_list_node_remove(&fl->head, free_node, free_node->next);
     }
+
     if (prev_node != NULL &&
         (void *)((char *)prev_node + prev_node->block_size) ==
             (void *)free_node) {
@@ -191,21 +195,20 @@ void free_list_node_remove(free_list_node **phead, free_list_node *prev_node,
 
 static size_t calc_padding_with_header(uintptr_t ptr, uintptr_t align,
                                        size_t header_size) {
-    uintptr_t p, a, modulo, padding, needed_space;
     assert(is_power_of_two(align));
     if (!is_power_of_two(align)) {
         return 0;
     }
 
-    p = ptr;
-    a = align;
-    modulo = p & (a - 1);
-    padding = 0;
-    needed_space = 0;
+    uintptr_t p = ptr;
+    uintptr_t a = align;
+    uintptr_t modulo = p & (a - 1);
+    uintptr_t padding = 0;
     if (modulo != 0) {
         padding = a - modulo;
     }
-    needed_space = (uintptr_t)header_size;
+
+    uintptr_t needed_space = (uintptr_t)header_size;
     if (padding < needed_space) {
         needed_space -= padding;
         if ((needed_space & (a - 1)) != 0) {
