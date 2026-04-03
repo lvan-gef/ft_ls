@@ -316,8 +316,6 @@ def create_sizes(path: Path) -> tuple[Path, list[Path]]:
     return sizes_path, out_files
 
 
-
-
 def create_xattrs(path: Path) -> tuple[Path, list[Path]]:
     """Create files with ACLs / xattrs to exercise ls -l marker behavior on Linux.
 
@@ -360,19 +358,23 @@ def create_xattrs(path: Path) -> tuple[Path, list[Path]]:
 def create_special_chars(path: Path) -> tuple[Path, list[Path]]:
     """Create directory with special character filenames.
 
-    Note: We avoid characters that trigger shell-escape quoting in ls
-    (tabs, multiple spaces, mixed quotes) since matching that quoting
-    logic is complex. Focus on simpler special chars.
+    This fixture mixes ordinary names with names that force shell-escape
+    quoting under ``LC_ALL=C``. That gives us coverage for punctuation,
+    apostrophes, non-ASCII bytes, and control characters.
     """
     special_path = path.joinpath("special_chars").absolute()
     special_path.mkdir(parents=True, exist_ok=True)
     out_files: list[Path] = []
-    names = ["-dashstart.txt",
-             "_underscore.txt", "__double.txt",
-             "123numbers.txt", "UPPERCASE.txt",
-             "MixedCase.txt", "file.name.ext",
-             "a" * 50 + ".txt"
-             ]
+    names = [
+        "-dashstart.txt",
+        "_underscore.txt",
+        "__double.txt",
+        "123numbers.txt",
+        "UPPERCASE.txt",
+        "MixedCase.txt",
+        "file.name.ext",
+        "a" * 50 + ".txt",
+    ]
 
     for name in names:
         file_path = special_path.joinpath(name)
@@ -380,6 +382,11 @@ def create_special_chars(path: Path) -> tuple[Path, list[Path]]:
         out_files.append(file_path)
 
     for name in quote_case_names():
+        file_path = special_path.joinpath(name)
+        file_path.touch()
+        out_files.append(file_path)
+
+    for name in control_char_case_names():
         file_path = special_path.joinpath(name)
         file_path.touch()
         out_files.append(file_path)
@@ -471,10 +478,16 @@ def create_sort_test(path: Path) -> tuple[Path, list[Path]]:
     sort_path.mkdir(parents=True, exist_ok=True)
     out_files: list[Path] = []
 
-    files = ["AAA.txt",  "aaa.txt",
-             "111.txt",  ".hidden_first",
-             "_underscore.txt",  "ZZZ.txt",
-             "zzz.txt",  "MidCase.txt" ]
+    files = [
+        "AAA.txt",
+        "aaa.txt",
+        "111.txt",
+        ".hidden_first",
+        "_underscore.txt",
+        "ZZZ.txt",
+        "zzz.txt",
+        "MidCase.txt",
+    ]
 
     for f in files:
         path_file = sort_path.joinpath(f)
@@ -486,9 +499,32 @@ def create_sort_test(path: Path) -> tuple[Path, list[Path]]:
 
 def quote_case_names() -> Generator[str, None, None]:
     """Return filename cases that require quotes in ls output."""
-    for elem in  ("space name", "single'quote",
-                  'double"quote', "space and 'single",
-                  'space and "double', "single'and\"double",
-                  'single\'and"double', 'single"and\'double',
-                  "all 'and\" together",):
+    for elem in (
+        "space name",
+        "single'quote",
+        "apostrophe's",
+        "many'apos'trophes",
+        'double"quote',
+        "space and 'single",
+        'space and "double',
+        "single'and\"double",
+        "single'and\"double",
+        "single\"and'double",
+        "all 'and\" together",
+        "[brackets]",
+        "!bang",
+        "equals=name",
+        "utf-\u00e9",
+        "cjk-\u6771",
+        "smart-\u2019",
+    ):
+        yield elem
+
+
+def control_char_case_names() -> Generator[str, None, None]:
+    """Return cases with control characters that should be shell-escaped."""
+    for elem in (
+        "Icon\r",
+        "carriage\rreturn",
+    ):
         yield elem
