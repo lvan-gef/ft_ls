@@ -9,7 +9,6 @@
 #include "../include/ft_assert.h"
 
 #include "../libft/include/libft.h"
-#include "ft_fprintf.h"
 
 static bool realloc_arr_(t_array *array);
 
