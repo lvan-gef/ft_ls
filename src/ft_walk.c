@@ -16,6 +16,7 @@
 #include "../include/ft_sort.h"
 #include "../include/ft_str.h"
 #include "../include/ft_walk.h"
+#include "../include/ft_shell_escape.h"
 
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
@@ -32,22 +33,20 @@ typedef struct {
     uint64_t max_len_sizes;
 } t_params;
 
-static bool run_(t_args *args, t_params *params, t_array *array,
+static bool run_(const t_args *args, t_params *params, t_array *array,
                  int *exit_code);
 static bool read_dir_(t_params *params, t_entry *path, int *exit_code);
 static bool walk_recurssive_(t_params *params, free_list *fl);
 static bool process_args_(t_params *params, t_array *array, int *exit_code);
 static void clear_array_(t_array *array);
 static void clear_temp_dir_(t_params *params);
-static t_entry *create_entry_(free_list *fl, t_entry *path, struct dirent *dp);
+static t_entry *create_entry_(free_list *fl, const t_entry *path, const struct dirent *dp);
 static t_str *dup_str_arena_(Arena *arena, const t_str *src);
 static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
                                  bool is_operand);
 static int check_links(t_params *params, t_str *str, t_array *dir_entries,
                        struct stat *st, int *exit_code);
 static t_str *join_paths_(free_list *fl, const t_str *lhs, const t_str *rhs);
-static char need_quote_(const t_str *str);
-static bool has_quote_char_(const t_str *str);
 static bool has_quoted_operands_(const t_array *array);
 static void clean_up_(t_params *params);
 static void print_err_(free_list *fl, t_str *str, int e, const char *prefix);
@@ -106,7 +105,7 @@ failed:
     clean_up_(&params);
 }
 
-static bool run_(t_args *args, t_params *params, t_array *array,
+static bool run_(const t_args *args, t_params *params, t_array *array,
                  int *exit_code) {
     ASSERT_NOTNULL(args);
     ASSERT_NOTNULL(params);
@@ -150,12 +149,12 @@ static bool run_(t_args *args, t_params *params, t_array *array,
         }
 
         t_entry entry = {.name = dir_path->path};
-        entry.quote = need_quote_(entry.name);
+        entry.quote = shell_quote_style(entry.name);
         if (entry.quote == '\0' && ft_strchr(entry.name->str, ':')) {
             entry.quote = '\'';
         }
 
-        t_entry *ent = print_dir_path ? &entry : NULL;
+        const t_entry *ent = print_dir_path ? &entry : NULL;
         printer(args, params->files, ent, true, 0, 0, false);
         printed_dir = true;
         clear_temp_dir_(params);
@@ -222,7 +221,7 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
             goto failed;
         }
 
-        entry->quote = need_quote_(str);
+        entry->quote = shell_quote_style(str);
         entry->name = str;
         entry->path = str;
         entry->st = st;
@@ -259,7 +258,7 @@ failed:
     return false;
 }
 
-static t_entry *create_entry_(free_list *fl, t_entry *path, struct dirent *dp) {
+static t_entry *create_entry_(free_list *fl, const t_entry *path, const struct dirent *dp) {
     ASSERT_NOTNULL(fl);
     ASSERT_NOTNULL(path);
     ASSERT_NOTNULL(dp);
@@ -279,7 +278,7 @@ static t_entry *create_entry_(free_list *fl, t_entry *path, struct dirent *dp) {
         goto failed;
     }
 
-    entry->quote = need_quote_(entry->name);
+    entry->quote = shell_quote_style(entry->name);
     entry->is_escaped = false;
     entry->is_operand = false;
 
@@ -369,7 +368,7 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
 
     clear_temp_dir_(params);
 
-    struct dirent *dp;
+    const struct dirent *dp;
     free_list dir_fl;
     void *dir_buffer =
         ArenaPushNoZero(params->temp_arena, UINT64_C(1024) * UINT64_C(1024));
@@ -449,7 +448,7 @@ static bool walk_recurssive_(t_params *params, free_list *fl) {
         size_t index = params->entries->len;
         while (index > 0) {
             --index;
-            t_entry *entry = pop_array(params->entries);
+            const t_entry *entry = pop_array(params->entries);
             t_entry *dir_entry;
             if (!entry->name) {
                 continue;
@@ -550,14 +549,6 @@ static t_str *join_paths_(free_list *fl, const t_str *lhs, const t_str *rhs) {
     return fullname;
 }
 
-static char need_quote_(const t_str *str) {
-    return shell_quote_style(str);
-}
-
-static bool has_quote_char_(const t_str *str) {
-    return has_shell_quote_char(str);
-}
-
 static bool has_quoted_operands_(const t_array *array) {
     ASSERT_NOTNULL(array);
 
@@ -567,7 +558,7 @@ static bool has_quoted_operands_(const t_array *array) {
             continue;
         }
 
-        if (has_quote_char_(operand)) {
+        if (has_shell_quote_char(operand)) {
             return true;
         }
     }
@@ -593,7 +584,7 @@ static void clean_up_(t_params *params) {
 
 static void print_err_(free_list *fl, t_str *str, int e, const char *prefix) {
     const char *msg = strerror(e);
-    const char quote = need_quote_(str);
+    const char quote = shell_quote_style(str);
 
     if (quote != '\0') {
         t_str *new_str = shell_escape_str(fl, str, quote);
