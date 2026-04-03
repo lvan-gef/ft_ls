@@ -1,7 +1,7 @@
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 
-#include "../include/ft_free_list.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
 #include "../include/ft_entry.h"
@@ -9,7 +9,7 @@
 
 typedef int (*t_cmp_entry)(const t_entry *a, const t_entry *b);
 
-static void merge_sort_(free_list *fl, t_array *array, t_cmp_entry cmp);
+static void merge_sort_(t_array *array, t_cmp_entry cmp);
 static uint64_t add_capped_(uint64_t lhs, uint64_t rhs, uint64_t cap);
 static void merge_(void **data, void **tmp, uint64_t left, uint64_t mid,
                    uint64_t right, t_cmp_entry cmp);
@@ -19,8 +19,7 @@ static int compare_(const t_str *lhs, const t_str *rhs);
 static int compare_time_(const struct timespec *a, const struct timespec *b);
 static void reverse_(t_array *array);
 
-void sort(free_list *fl, t_array *array, bool reverse, bool sort_time) {
-    ASSERT_NOTNULL(fl);
+void sort(t_array *array, bool reverse, bool sort_time) {
     ASSERT_NOTNULL(array);
 
     if (array->len <= 1) {
@@ -28,15 +27,14 @@ void sort(free_list *fl, t_array *array, bool reverse, bool sort_time) {
     }
 
     const t_cmp_entry cmp = sort_time ? cmp_time_entry_ : cmp_name_entry_;
-    merge_sort_(fl, array, cmp);
+    merge_sort_(array, cmp);
 
     if (reverse) {
         reverse_(array);
     }
 }
 
-static void merge_sort_(free_list *fl, t_array *array, t_cmp_entry cmp) {
-    ASSERT_NOTNULL(fl);
+static void merge_sort_(t_array *array, t_cmp_entry cmp) {
     ASSERT_NOTNULL(array);
     ASSERT_NOTNULL(cmp);
 
@@ -45,8 +43,7 @@ static void merge_sort_(free_list *fl, t_array *array, t_cmp_entry cmp) {
         return;
     }
 
-    void **tmp =
-        (void **)free_list_alloc(fl, (uint64_t)array->len * sizeof(void *), 8);
+    void **tmp = malloc((size_t)array->len * sizeof(*tmp));
     if (!tmp) {
         return;
     }
@@ -70,7 +67,7 @@ static void merge_sort_(free_list *fl, t_array *array, t_cmp_entry cmp) {
 
         width += width;
     }
-
+    free(tmp);
 }
 
 static uint64_t add_capped_(uint64_t lhs, uint64_t rhs, uint64_t cap) {
