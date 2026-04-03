@@ -3,12 +3,18 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
+
 static size_t calc_padding_with_header(uintptr_t ptr, uintptr_t align,
                                        size_t header_size);
 static bool is_power_of_two(uintptr_t x);
 static size_t align_up(size_t x, size_t a);
+static void free_extra_allocs_(free_list *fl);
+static void *alloc_extra_block_(free_list *fl, size_t size, size_t align);
+static void free_extra_block_(free_list *fl, free_list_header *header);
 
 void free_list_free_all(free_list *fl) {
+    free_extra_allocs_(fl);
     fl->used = 0;
     free_list_node *first_node = (free_list_node *)fl->data;
     first_node->block_size = fl->size;
@@ -19,6 +25,7 @@ void free_list_free_all(free_list *fl) {
 void free_list_init(free_list *fl, void *data, size_t size) {
     fl->data = data;
     fl->size = size;
+    fl->extra_allocs = NULL;
     free_list_free_all(fl);
 }
 
@@ -75,8 +82,16 @@ void *free_list_alloc(free_list *fl, size_t size, size_t align) {
     }
 
     assert(is_power_of_two(align));
+    if (!is_power_of_two(align)) {
+        return NULL;
+    }
+
     node = free_list_find_best(fl, size, align, &padding, &prev_node);
     if (node == NULL) {
+        void *extra = alloc_extra_block_(fl, size, align);
+        if (extra != NULL) {
+            return extra;
+        }
         assert(0 && "Free list has no free memory");
         return NULL;
     }
@@ -112,7 +127,13 @@ void free_list_free(free_list *fl, void *ptr) {
     if (ptr == NULL) {
         return;
     }
+
     header = (free_list_header *)((uintptr_t)ptr - sizeof(free_list_header));
+    if (header->allocation_base != NULL) {
+        free_extra_block_(fl, header);
+        return;
+    }
+
     free_node = (free_list_node *)((uintptr_t)header - header->padding);
     free_node->block_size = header->block_size;
     free_node->next = NULL;
@@ -172,6 +193,10 @@ static size_t calc_padding_with_header(uintptr_t ptr, uintptr_t align,
                                        size_t header_size) {
     uintptr_t p, a, modulo, padding, needed_space;
     assert(is_power_of_two(align));
+    if (!is_power_of_two(align)) {
+        return 0;
+    }
+
     p = ptr;
     a = align;
     modulo = p & (a - 1);
@@ -198,4 +223,55 @@ static bool is_power_of_two(uintptr_t x) {
 
 static size_t align_up(size_t x, size_t a) {
     return (x + (a - 1)) & ~(a - 1);
+}
+
+static void free_extra_allocs_(free_list *fl) {
+    free_list_header *header = fl->extra_allocs;
+    while (header != NULL) {
+        free_list_header *next = header->next_extra;
+        free(header->allocation_base);
+        header = next;
+    }
+
+    fl->extra_allocs = NULL;
+}
+
+static void *alloc_extra_block_(free_list *fl, size_t size, size_t align) {
+    if (size > SIZE_MAX - sizeof(free_list_header) - (align - 1)) {
+        return NULL;
+    }
+
+    const size_t total_size = size + sizeof(free_list_header) + (align - 1);
+    void *base = malloc(total_size);
+    if (base == NULL) {
+        return NULL;
+    }
+
+    const uintptr_t payload_addr =
+        align_up((size_t)((uintptr_t)base + sizeof(free_list_header)), align);
+    free_list_header *header =
+        (free_list_header *)(payload_addr - sizeof(free_list_header));
+    header->block_size = total_size;
+    header->padding = 0;
+    header->allocation_base = base;
+    header->next_extra = fl->extra_allocs;
+    fl->extra_allocs = header;
+    fl->used += total_size;
+    return (void *)payload_addr;
+}
+
+static void free_extra_block_(free_list *fl, free_list_header *header) {
+    free_list_header **slot = &fl->extra_allocs;
+    while (*slot != NULL && *slot != header) {
+        slot = &(*slot)->next_extra;
+    }
+
+    assert(*slot == header);
+    if (*slot != header) {
+        return;
+    }
+
+    *slot = header->next_extra;
+    fl->used -= header->block_size;
+    free(header->allocation_base);
 }

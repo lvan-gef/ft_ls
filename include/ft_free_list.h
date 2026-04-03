@@ -7,6 +7,8 @@ typedef struct free_list_header free_list_header;
 struct free_list_header {
     size_t block_size;
     size_t padding;
+    void *allocation_base;
+    free_list_header *next_extra;
 };
 
 typedef struct free_list_node free_list_node;
@@ -22,6 +24,7 @@ struct free_list {
     size_t used;
 
     free_list_node *head;
+    free_list_header *extra_allocs;
 };
 
 typedef struct free_list_node_align_helper {
@@ -29,9 +32,7 @@ typedef struct free_list_node_align_helper {
     free_list_node member;
 } free_list_node_align_helper;
 
-enum {
-    FREE_LIST_NODE_ALIGN = offsetof(free_list_node_align_helper, member)
-};
+enum { FREE_LIST_NODE_ALIGN = offsetof(free_list_node_align_helper, member) };
 
 void free_list_free_all(free_list *fl);
 void free_list_init(free_list *fl, void *data, size_t size);
