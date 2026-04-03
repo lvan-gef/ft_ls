@@ -52,50 +52,48 @@ bool get_file_info(free_list *fl, t_entry *entry) {
 
     t_file_info *info = free_list_alloc(fl, sizeof(*info), 8);
     if (!info) {
-        goto failed;
+        return false;
     }
 
     info->perm = get_perm_(fl, entry);
     if (!info->perm) {
-        goto failed;
+        return false;
     }
 
     info->links = uint_to_str(fl, entry->st.st_nlink);
     if (!info->links) {
-        goto failed;
+        return false;
     }
 
     info->username = get_user_(fl, entry->st.st_uid);
     if (!info->username) {
-        goto failed;
+        return false;
     }
 
     info->groupname = get_group_(fl, entry->st.st_gid);
     if (!info->groupname) {
-        goto failed;
+        return false;
     }
 
     info->size = uint_to_str(fl, (uint64_t)entry->st.st_size);
     if (!info->size) {
-        goto failed;
+        return false;
     }
 
     info->dt = get_dt_(fl, &entry->st.st_mtim);
     if (!info->dt) {
-        goto failed;
+        return false;
     }
 
     info->symlink = info->perm;
     if (!get_symlink_(fl, entry, &info->symlink)) {
-        goto failed;
+        return false;
     }
 
     info->blocks = (uint64_t)entry->st.st_blocks;
 
     entry->info = info;
     return true;
-failed:
-    return false;
 }
 
 static t_str *get_perm_(free_list *fl, const t_entry *entry) {
