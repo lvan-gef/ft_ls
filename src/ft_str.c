@@ -6,9 +6,9 @@
 #include "../include/ft_helper.h"
 #include "../include/ft_str.h"
 
+#include "../include/ft_free_list.h"
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
-#include "../include/ft_free_list.h"
 
 static uint64_t strlcpy_(t_str *dst, const t_str *src, uint64_t dstsize);
 
@@ -148,19 +148,19 @@ t_str *uint_to_str(free_list *fl, uint64_t nbr) {
     return str;
 }
 
-ssize_t append_chars_str(free_list *fl, t_str *dst, const char *src) {
-    ASSERT_NOTNULL(fl);
+ssize_t append_chars_str(t_str *dst, const char *src) {
     ASSERT_NOTNULL(dst);
     ASSERT_NOTNULL(src);
     ASSERT_(*src, "%c can not be '\\0'", *src);
 
-    const t_str *new_str = create_str(fl, src);
-    if (!new_str) {
+    const size_t src_len = ft_strlen(src);
+    if ((uint64_t)src_len >= dst->cap - dst->len) {
         return -1;
     }
 
-    uint64_t len = cat_str(dst, new_str);
-    return (ssize_t)len;
+    ft_memcpy(dst->str + dst->len, src, src_len + 1);
+    dst->len += (uint64_t)src_len;
+    return (ssize_t)src_len;
 }
 
 bool has_next_str(const t_str *s) {

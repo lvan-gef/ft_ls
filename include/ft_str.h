@@ -23,7 +23,7 @@ uint64_t cat_l_str(t_str *dst, const t_str *src, uint64_t size);
 t_str *uint_to_str(free_list *fl, uint64_t nbr);
 void free_str(free_list *fl, t_str *str);
 
-ssize_t append_chars_str(free_list *fl, t_str *dst, const char *src);
+ssize_t append_chars_str(t_str *dst, const char *src);
 
 bool has_next_str(const t_str *s);
 char peek_str(t_str *s);
