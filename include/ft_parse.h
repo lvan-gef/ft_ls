@@ -15,6 +15,6 @@ typedef struct {
     bool time;
 } t_args;
 
-t_array *parse_args(free_list *arena, uint64_t argc, char **argv, t_args *args);
+t_array *parse_args(free_list *fl, uint64_t argc, char **argv, t_args *args);
 
 #endif // !FT_PARSE_H
