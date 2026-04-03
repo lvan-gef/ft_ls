@@ -46,7 +46,7 @@ static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
 static int check_links(t_params *params, t_str *str, t_array *dir_entries,
                        struct stat *st, int *exit_code);
 static t_str *join_paths_(free_list *fl, const t_str *lhs, const t_str *rhs);
-static t_str *need_quote_(free_list *fl, t_str *str);
+static char need_quote_(const t_str *str);
 static bool has_quote_char_(const t_str *str);
 static bool has_quoted_operands_(const t_array *array);
 static void clean_up_(t_params *params);
@@ -150,10 +150,9 @@ static bool run_(t_args *args, t_params *params, t_array *array,
         }
 
         t_entry entry = {.name = dir_path->path};
-        entry.quoted = need_quote_(&params->fl, entry.name);
-        if (!entry.quoted) {
-            err_msg = "Failed to get quote";
-            goto failed;
+        entry.quote = need_quote_(entry.name);
+        if (entry.quote == '\0' && ft_strchr(entry.name->str, ':')) {
+            entry.quote = '\'';
         }
 
         t_entry *ent = print_dir_path ? &entry : NULL;
@@ -223,19 +222,14 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
             goto failed;
         }
 
-        entry->quoted = need_quote_(&params->fl, str);
-        if (!entry->quoted) {
-            err_msg = "Failed to create a quoted str";
-            goto failed;
-        }
-
+        entry->quote = need_quote_(str);
         entry->name = str;
         entry->path = str;
         entry->st = st;
         entry->is_escaped = false;
         entry->is_operand = false;
         if (params->args->list) {
-            if (!get_file_info(&params->fl, &fl, entry)) {
+            if (!get_file_info(&params->fl, entry)) {
                 goto failed;
             }
         }
@@ -247,8 +241,7 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
     }
 
     if (dir_entries->len) {
-        sort(&params->fl, dir_entries, params->args->reverse,
-             params->args->time);
+        sort(dir_entries, params->args->reverse, params->args->time);
         while (dir_entries->len) {
             t_entry *entry = pop_array(dir_entries);
             entry->is_operand = true;
@@ -286,11 +279,7 @@ static t_entry *create_entry_(free_list *fl, t_entry *path, struct dirent *dp) {
         goto failed;
     }
 
-    entry->quoted = need_quote_(fl, entry->name);
-    if (!entry->quoted) {
-        goto failed;
-    }
-
+    entry->quote = need_quote_(entry->name);
     entry->is_escaped = false;
     entry->is_operand = false;
 
@@ -390,9 +379,6 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
     }
 
     free_list_init(&dir_fl, dir_buffer, UINT64_C(1024) * UINT64_C(1024));
-    unsigned char buffer[1024 * 8];
-    free_list fl;
-    free_list_init(&fl, buffer, sizeof(buffer));
 
     while ((dp = readdir(d)) != NULL) {
         if (!params->args->all && dp->d_name[0] == '.' &&
@@ -417,7 +403,7 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
         }
 
         if (params->args->list) {
-            if (!get_file_info(&dir_fl, &fl, entry)) {
+            if (!get_file_info(&dir_fl, entry)) {
                 goto failed;
             }
         }
@@ -458,7 +444,8 @@ static bool walk_recurssive_(t_params *params, free_list *fl) {
     ASSERT_NOTNULL(params);
 
     if (params->args->recursive && params->entries->len) {
-        sort(fl, params->entries, params->args->reverse, params->args->time);
+        (void)fl;
+        sort(params->entries, params->args->reverse, params->args->time);
         size_t index = params->entries->len;
         while (index > 0) {
             --index;
@@ -535,7 +522,7 @@ static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
         return NULL;
     }
 
-    entry->quoted = NULL;
+    entry->quote = '\0';
     entry->info = NULL;
     entry->is_operand = is_operand;
     return entry;
@@ -563,59 +550,12 @@ static t_str *join_paths_(free_list *fl, const t_str *lhs, const t_str *rhs) {
     return fullname;
 }
 
-static t_str *need_quote_(free_list *fl, t_str *str) {
-    ASSERT_NOTNULL(fl);
-    ASSERT_NOTNULL(str);
-    ASSERT_GE(str->len, 1);
-    ASSERT_LT(str->pos, str->len);
-
-    t_str *quote = create_str(fl, " ");
-    if (!quote) {
-        return NULL;
-    }
-
-    const uint64_t cur_pos = str->pos;
-    bool found_double = false;
-    while (has_next_str(str)) {
-        const char lttr = next_str(str);
-        switch (lttr) {
-            case SINGLE_QUOTE: quote->str[0] = '"'; break;
-            case DOUBLE_QUOTE:
-                found_double = true;
-                quote->str[0] = '\'';
-                break;
-            case SPACE: quote->str[0] = '\''; break;
-            default: break;
-        }
-    }
-
-    if (quote->str[0] == '"' && found_double) {
-        quote->str[0] = '\'';
-    }
-
-    str->pos = cur_pos;
-    if (peek_str(quote) == ' ') {
-        quote->len = 0;
-    }
-
-    return quote;
+static char need_quote_(const t_str *str) {
+    return shell_quote_style(str);
 }
 
 static bool has_quote_char_(const t_str *str) {
-    ASSERT_NOTNULL(str);
-    ASSERT_NOTNULL(str->str);
-
-    for (uint64_t index = 0; index < str->len; ++index) {
-        const char letter = str->str[index];
-        switch (letter) {
-            case SINGLE_QUOTE:
-            case DOUBLE_QUOTE:
-            case SPACE: return true;
-            default: continue;
-        }
-    }
-
-    return false;
+    return has_shell_quote_char(str);
 }
 
 static bool has_quoted_operands_(const t_array *array) {
@@ -653,19 +593,13 @@ static void clean_up_(t_params *params) {
 
 static void print_err_(free_list *fl, t_str *str, int e, const char *prefix) {
     const char *msg = strerror(e);
-    t_str *quote = need_quote_(fl, str);
+    const char quote = need_quote_(str);
 
-    if (quote && quote->len) {
-        if (quote->str[0] == '"') {
-            ft_fprintf(STDERR_FILENO, "ft_ls: %s %s%s%s: %s\n", prefix,
-                       quote->str, str->str, quote->str, msg);
-            return;
-        }
-
-        t_str *new_str = escape_str(fl, str);
+    if (quote != '\0') {
+        t_str *new_str = shell_escape_str(fl, str, quote);
         if (new_str) {
-            ft_fprintf(STDERR_FILENO, "ft_ls: %s %s%s%s: %s\n", prefix,
-                       quote->str, new_str->str, quote->str, msg);
+            ft_fprintf(STDERR_FILENO, "ft_ls: %s %s: %s\n", prefix,
+                       new_str->str, msg);
             return;
         }
     }
