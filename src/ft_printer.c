@@ -6,10 +6,10 @@
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
 #include "../include/ft_entry.h"
-#include "../include/ft_shell_escape.h"
 #include "../include/ft_print_list.h"
 #include "../include/ft_printer.h"
 #include "../include/ft_printer_helper.h"
+#include "../include/ft_shell_escape.h"
 #include "../include/ft_sort.h"
 
 #include "../libft/include/ft_fprintf.h"
@@ -72,7 +72,7 @@ static void init_print_row_(t_array *array, const t_entry *dir_entry,
     }
 
     if (dir_entry) {
-        if (!write_shell_escaped_to_str(&out, dir_entry->name, dir_entry->quote,
+        if (!write_shell_escaped_to_out(&out, dir_entry->name, dir_entry->quote,
                                         false) ||
             !put_mem(&out, ":\n", 2)) {
             err_msg = "Failed to write dir header";
@@ -113,7 +113,7 @@ static bool print_row_(t_str *out, t_array *array, const t_map *map,
             const uint64_t name_length = display_name_len_(entry, quoted);
             const uint64_t max_name_length = col_widths[col++];
 
-            if (!write_shell_escaped_to_str(out, entry->name, entry->quote,
+            if (!write_shell_escaped_to_out(out, entry->name, entry->quote,
                                             quoted)) {
                 return false;
             }

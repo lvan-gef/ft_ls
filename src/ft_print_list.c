@@ -4,9 +4,9 @@
 
 #include "../include/ft_assert.h"
 #include "../include/ft_entry.h"
-#include "../include/ft_shell_escape.h"
 #include "../include/ft_print_list.h"
 #include "../include/ft_printer_helper.h"
+#include "../include/ft_shell_escape.h"
 #include "../include/ft_str.h"
 
 #include "../libft/include/ft_fprintf.h"
@@ -43,7 +43,7 @@ void print_list(t_array *array, const t_entry *dir_entry, bool print_total,
     get_sizes_(array, &sizes);
 
     if (dir_entry) {
-        if (!write_shell_escaped_to_str(&out, dir_entry->name, dir_entry->quote,
+        if (!write_shell_escaped_to_out(&out, dir_entry->name, dir_entry->quote,
                                         false) ||
             !put_mem(&out, ":\n", 2)) {
             err_msg = "Failed to write dir header";
@@ -95,7 +95,7 @@ static bool printer_(t_str *out, t_array *array, const t_sizes *sizes) {
             !put_mem(out, " ", 1) ||
             !put_mem(out, entry->info->dt->str, entry->info->dt->len) ||
             !put_mem(out, " ", 1) ||
-            !write_shell_escaped_to_str(out, entry->name, entry->quote,
+            !write_shell_escaped_to_out(out, entry->name, entry->quote,
                                         sizes->have_quote)) {
             return false;
         }

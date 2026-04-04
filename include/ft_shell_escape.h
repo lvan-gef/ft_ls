@@ -6,7 +6,10 @@
 #include "./ft_free_list.h"
 #include "./ft_str.h"
 
-bool write_shell_escaped_to_str(t_str *dst, const t_str *str, char quote, bool pad_unquoted);
+bool write_shell_escaped_to_str(t_str *dst, const t_str *str, char quote,
+                                bool pad_unquoted);
+bool write_shell_escaped_to_out(t_str *dst, const t_str *str, char quote,
+                                bool pad_unquoted);
 t_str *shell_escape_str(free_list *fl, const t_str *str, char quote);
 uint64_t shell_display_len(const t_str *str, char quote, bool pad_unquoted);
 char shell_quote_style(const t_str *str);

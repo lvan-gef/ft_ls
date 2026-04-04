@@ -2,6 +2,7 @@
 #include <stdint.h>
 
 #include "../include/ft_assert.h"
+#include "../include/ft_printer_helper.h"
 #include "../include/ft_shell_escape.h"
 #include "../include/ft_str.h"
 
@@ -44,6 +45,23 @@ bool write_shell_escaped_to_str(t_str *dst, const t_str *str, char quote,
 
     ASSERT_EQ(quote, '\'');
     return append_single_shell_escaped_(dst, str);
+}
+
+bool write_shell_escaped_to_out(t_str *dst, const t_str *str, char quote,
+                                bool pad_unquoted) {
+    ASSERT_NOTNULL(dst);
+    ASSERT_NOTNULL(str);
+
+    const uint64_t need = shell_display_len(str, quote, pad_unquoted);
+    if (need > dst->cap - 1) {
+        return false;
+    }
+
+    if (dst->cap - 1 - dst->len < need && !flush_str(dst)) {
+        return false;
+    }
+
+    return write_shell_escaped_to_str(dst, str, quote, pad_unquoted);
 }
 
 t_str *shell_escape_str(free_list *fl, const t_str *str, char quote) {
@@ -162,12 +180,17 @@ static uint64_t single_shell_escaped_len_(const t_str *str) {
     ASSERT_NOTNULL(str);
     ASSERT_NOTNULL(str->str);
 
-    uint64_t out = 2; /* opening ' + closing ' */
+    uint64_t out = 1; /* opening ' */
+    bool in_single = true;
 
     for (uint64_t index = 0; index < str->len;) {
         const unsigned char c = (unsigned char)str->str[index];
 
         if (ft_isprint(c) && c != '\'') {
+            if (!in_single) {
+                ++out;
+                in_single = true;
+            }
             ++out;
             ++index;
             continue;
@@ -175,8 +198,14 @@ static uint64_t single_shell_escaped_len_(const t_str *str) {
 
         if (c == '\'') {
             out += 4; /* '\'' */
+            in_single = true;
             ++index;
             continue;
+        }
+
+        if (in_single) {
+            ++out;
+            in_single = false;
         }
 
         const uint64_t start = index;
@@ -189,6 +218,10 @@ static uint64_t single_shell_escaped_len_(const t_str *str) {
         }
 
         out += ansi_c_segment_len_(str->str + start, index - start);
+    }
+
+    if (in_single) {
+        ++out;
     }
 
     return out;
