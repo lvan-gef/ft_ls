@@ -18,8 +18,8 @@ from create_test_folders import create_test_folders, Paths, quote_case_names
 
 ALLOWED_FLAGS = ["R", "a", "l", "r", "t"]
 DEBUG = True
-TERMINAL_MIN = 80  # include
-TERMINAL_MAX = 513  # exclude
+TERMINAL_MIN = 40   # include
+TERMINAL_MAX = 120  # exclude
 own_bin = "./ft_ls"
 if DEBUG:
     own_bin = f"{own_bin}_d"
@@ -34,25 +34,20 @@ def main() -> None:
 
     # Phase 1: Invalid flags (no terminal width dependency)
     subprocess.run("make fclean", shell=True, capture_output=True)
-    compile_ls()
+    compile_ls(term_size=80)
     print("=" * 60)
     print("Phase 1: Invalid Flags")
     print("=" * 60)
     invalid_flags()
 
-    # Phase 2-5: Flag combination and feature tests
-    print("=" * 60)
-    print("Phase 2-5: Flag Combinations and Feature Tests")
-    print("=" * 60)
-    flag_combination_tests(test_path)
-    subprocess.run("make fclean", shell=True, capture_output=True)
-
-    # Phase 6: Terminal width tests
-    for term_size in range(TERMINAL_MIN, TERMINAL_MAX):
-        compile_ls(term_size=term_size)
-        print("-" * 10, "Test column width:", term_size, "-" * 10)
-        simple_tests(term_size=term_size, test_files=test_files)
+    for term_size in range(TERMINAL_MIN, TERMINAL_MAX, 5):
+        # Phase 2-5: Flag combination and feature tests
         subprocess.run("make fclean", shell=True, capture_output=True)
+        compile_ls(term_size=term_size)
+        print("=" * 60)
+        print("Phase 2-5: Flag Combinations and Feature Tests")
+        print("=" * 60)
+        flag_combination_tests(test_path, term_size=term_size)
 
     remove_test_root(test_path)
     print("=" * 60)
@@ -80,7 +75,7 @@ def remove_test_root(test_path: Path) -> None:
     shutil.rmtree(test_path)
 
 
-def compile_ls(term_size: int = 80) -> None:
+def compile_ls(term_size: int) -> None:
     print("", "-" * 5, "Compile with column width:", term_size, "-" * 5)
     if DEBUG:
         result = subprocess.run(
@@ -110,7 +105,7 @@ def invalid_flags() -> None:
     print(f"  Tested {52} invalid flags: all passed")
 
 
-def flag_combination_tests(test_path: Path) -> None:
+def flag_combination_tests(test_path: Path, term_size: int) -> None:
     """Phase 2-5: Test all flag combinations against test fixtures."""
     # Generate all flag combinations
     flag_combos = generate_flag_combinations()
@@ -137,7 +132,7 @@ def flag_combination_tests(test_path: Path) -> None:
     single_flags = ["", "-R", "-a", "-l", "-r", "-t"]
     for flags in single_flags:
         for test_dir in test_dirs:
-            compare_output(flags, str(test_dir))
+            compare_output(flags=flags, path=str(test_dir), cols=term_size)
     print(f"    Tested {len(single_flags)} flag variants x {len(test_dirs)} dirs")
 
     # Phase 3: Flag combinations (2-5 flags)
@@ -145,17 +140,17 @@ def flag_combination_tests(test_path: Path) -> None:
     combo_count = 0
     for flags in flag_combos:
         for test_dir in test_dirs:
-            compare_output(flags, str(test_dir))
+            compare_output(flags=flags, path=str(test_dir), cols=term_size)
             combo_count += 1
     print(f"    Tested {len(flag_combos)} combinations x {len(test_dirs)} dirs")
 
     # Phase 4: Feature-specific tests
     print("\n  Phase 4: Feature-Specific Tests")
-    feature_specific_tests(test_path)
+    feature_specific_tests(test_path=test_path, term_size=term_size)
 
     # Phase 5: Edge case tests
     print("\n  Phase 5: Edge Case Tests")
-    edge_case_tests(test_path)
+    edge_case_tests(test_path=test_path, term_size=term_size)
 
 
 def generate_flag_combinations() -> list[str]:
@@ -180,10 +175,10 @@ def get_all_flags() -> list[str]:
     return all_flags
 
 
-def assert_output_match(ft_cmd: list[str], ls_cmd: list[str], msg: str) -> str:
+def assert_output_match(ft_cmd: list[str], ls_cmd: list[str], msg: str, tern_size: int) -> str:
     """Assert ft_ls output matches ls output, showing diff on failure."""
-    ft_output = run_with_pty(cmd=ft_cmd)
-    ls_output = run_with_pty(cmd=ls_cmd)
+    ft_output = run_with_pty(cmd=ft_cmd, cols=tern_size)
+    ls_output = run_with_pty(cmd=ls_cmd, cols=tern_size)
     if ft_output != ls_output:
         print(f"\nMismatch for: {' '.join(ft_cmd)}", file=sys.stderr)
         print(f"ls output:", file=sys.stderr)
@@ -215,14 +210,14 @@ def assert_not_contains(output: str, needle: str, cmd: list[str], msg: str) -> N
         raise AssertionError(f"{msg}: {' '.join(cmd)}")
 
 
-def feature_specific_tests(test_path: Path) -> None:
+def feature_specific_tests(test_path: Path, term_size: int) -> None:
     """Phase 4: Test specific features in detail."""
 
     # 4.1 Hidden files (-a) test
     hidden_dir = test_path / "hidden"
     # Without -a: should not show hidden files
     cmd_no_a = [own_bin, str(hidden_dir)]
-    output_no_a = run_with_pty(cmd=cmd_no_a)
+    output_no_a = run_with_pty(cmd=cmd_no_a, cols=term_size)
     assert_not_contains(
         output_no_a, ".hidden1", cmd_no_a, "Hidden files should not appear without -a"
     )
@@ -232,7 +227,7 @@ def feature_specific_tests(test_path: Path) -> None:
 
     # With -a: should show hidden files
     cmd_with_a = [own_bin, "-a", str(hidden_dir)]
-    output_with_a = run_with_pty(cmd=cmd_with_a)
+    output_with_a = run_with_pty(cmd=cmd_with_a, cols=term_size)
     assert_contains(
         output_with_a, ".hidden1", cmd_with_a, "Hidden files should appear with -a"
     )
@@ -243,18 +238,20 @@ def feature_specific_tests(test_path: Path) -> None:
     # 4.2 Time sorting (-t) test
     ts_dir = test_path / "timestamps"
     assert_output_match(
-        [own_bin, "-t", str(ts_dir)],
-        ["ls", "-t", str(ts_dir)],
-        "Time sorting should match ls -t",
+        ft_cmd=[own_bin, "-t", str(ts_dir)],
+        ls_cmd=["ls", "-t", str(ts_dir)],
+        msg="Time sorting should match ls -t",
+        tern_size=term_size
     )
     print("    4.2 Time sorting (-t): passed")
 
     # 4.3 Reverse sorting (-r) test
     simple_dir = test_path / "simple"
     assert_output_match(
-        [own_bin, "-r", str(simple_dir)],
-        ["ls", "-r", str(simple_dir)],
-        "Reverse sorting should match ls -r",
+        ft_cmd=[own_bin, "-r", str(simple_dir)],
+        ls_cmd=["ls", "-r", str(simple_dir)],
+        msg="Reverse sorting should match ls -r",
+        tern_size=term_size
     )
     print("    4.3 Reverse sorting (-r): passed")
 
@@ -262,7 +259,10 @@ def feature_specific_tests(test_path: Path) -> None:
     rec_dir = test_path / "recursive"
     cmd_R = [own_bin, "-R", str(rec_dir)]
     output_R = assert_output_match(
-        cmd_R, ["ls", "-R", str(rec_dir)], "Recursive listing should match ls -R"
+        ft_cmd=cmd_R,
+        ls_cmd=["ls", "-R", str(rec_dir)],
+        msg="Recursive listing should match ls -R",
+        tern_size=term_size
     )
     # Verify all levels are traversed
     assert_contains(output_R, "level1_a", cmd_R, "level1_a should appear in -R output")
@@ -279,7 +279,10 @@ def feature_specific_tests(test_path: Path) -> None:
     perm_dir = test_path / "permissions"
     cmd_l = [own_bin, "-l", str(perm_dir)]
     output_l = assert_output_match(
-        cmd_l, ["ls", "-l", str(perm_dir)], "Long format should match ls -l"
+        ft_cmd=cmd_l,
+        ls_cmd=["ls", "-l", str(perm_dir)],
+        msg="Long format should match ls -l",
+        tern_size=term_size
     )
     # Verify permission columns appear
     assert_contains(
@@ -296,9 +299,10 @@ def feature_specific_tests(test_path: Path) -> None:
     # If not (no setfacl/ACL support), we skip the marker assertion but still require output match.
     if ft_out != ls_out:
         assert_output_match(
-            cmd_acl,
-            ["ls", "-l", str(xattrs_dir)],
-            "ACL dir long format should match ls -l",
+            ft_cmd=cmd_acl,
+            ls_cmd=["ls", "-l", str(xattrs_dir)],
+            msg="ACL dir long format should match ls -l",
+            tern_size=term_size
         )
 
     # Only assert the marker when ls actually prints it (depends on setfacl + fs support).
@@ -324,14 +328,15 @@ def feature_specific_tests(test_path: Path) -> None:
 
     rec_dir = test_path / "recursive"
     assert_output_match(
-        [own_bin, "-Rt", str(rec_dir)],
-        ["ls", "-Rt", str(rec_dir)],
-        "Recursive time sort should match ls -Rt",
+        ft_cmd=[own_bin, "-Rt", str(rec_dir)],
+        ls_cmd=["ls", "-Rt", str(rec_dir)],
+        msg="Recursive time sort should match ls -Rt",
+        tern_size=term_size
     )
     print("    4.6 Recursive time sort (-Rt): passed")
 
 
-def edge_case_tests(test_path: Path) -> None:
+def edge_case_tests(test_path: Path, term_size: int) -> None:
     """Phase 5: Test edge cases."""
     all_flags = get_all_flags()
     quote_cases = list(quote_case_names())
@@ -342,7 +347,10 @@ def edge_case_tests(test_path: Path) -> None:
         ft_cmd = [own_bin] + ([flags] if flags else []) + [str(sym_dir)]
         ls_cmd = ["ls"] + ([flags] if flags else []) + [str(sym_dir)]
         assert_output_match(
-            ft_cmd, ls_cmd, f"Symlink dir with {flags or 'no flags'} should match"
+            ft_cmd=ft_cmd,
+            ls_cmd=ls_cmd,
+            msg=f"Symlink dir with {flags or 'no flags'} should match",
+            tern_size=term_size
         )
     print(f"    5.1 Symlinks directory ({len(all_flags)} flag combos): passed")
 
@@ -358,7 +366,10 @@ def edge_case_tests(test_path: Path) -> None:
         ft_cmd = [own_bin] + ([flags] if flags else []) + [str(link_to_file)]
         ls_cmd = ["ls"] + ([flags] if flags else []) + [str(link_to_file)]
         assert_output_match(
-            ft_cmd, ls_cmd, f"Symlink to file with {flags or 'no flags'} should match"
+            ft_cmd=ft_cmd,
+            ls_cmd=ls_cmd,
+            msg=f"Symlink to file with {flags or 'no flags'} should match",
+            tern_size=term_size
         )
     print(f"    5.2a Symlink to file ({len(all_flags)} flag combos): passed")
 
@@ -367,7 +378,10 @@ def edge_case_tests(test_path: Path) -> None:
         ft_cmd = [own_bin] + ([flags] if flags else []) + [str(link_to_dir)]
         ls_cmd = ["ls"] + ([flags] if flags else []) + [str(link_to_dir)]
         assert_output_match(
-            ft_cmd, ls_cmd, f"Symlink to dir with {flags or 'no flags'} should match"
+            ft_cmd=ft_cmd,
+            ls_cmd=ls_cmd,
+            msg=f"Symlink to dir with {flags or 'no flags'} should match",
+            tern_size=term_size
         )
     print(f"    5.2b Symlink to directory ({len(all_flags)} flag combos): passed")
 
@@ -397,7 +411,10 @@ def edge_case_tests(test_path: Path) -> None:
             ["ls"] + ([flags] if flags else []) + [str(link_to_file), str(regular_file)]
         )
         assert_output_match(
-            ft_cmd, ls_cmd, f"Symlink+file with {flags or 'no flags'} should match"
+            ft_cmd=ft_cmd,
+            ls_cmd=ls_cmd,
+            msg=f"Symlink+file with {flags or 'no flags'} should match",
+            tern_size=term_size
         )
     print(
         f"    5.2d Symlink to file + regular file ({len(all_flags)} flag combos): passed"
@@ -414,7 +431,10 @@ def edge_case_tests(test_path: Path) -> None:
             ["ls"] + ([flags] if flags else []) + [str(link_to_dir), str(regular_dir)]
         )
         assert_output_match(
-            ft_cmd, ls_cmd, f"Symlink+dir with {flags or 'no flags'} should match"
+            ft_cmd=ft_cmd,
+            ls_cmd=ls_cmd,
+            msg=f"Symlink+dir with {flags or 'no flags'} should match",
+            tern_size=term_size
         )
     print(
         f"    5.2e Symlink to dir + regular dir ({len(all_flags)} flag combos): passed"
@@ -433,9 +453,10 @@ def edge_case_tests(test_path: Path) -> None:
             + [str(link_to_file), str(link_to_dir), str(regular_file), str(regular_dir)]
         )
         assert_output_match(
-            ft_cmd,
-            ls_cmd,
-            f"Mixed symlinks+regular with {flags or 'no flags'} should match",
+            ft_cmd=ft_cmd,
+            ls_cmd=ls_cmd,
+            msg=f"Mixed symlinks+regular with {flags or 'no flags'} should match",
+            tern_size=term_size
         )
     print(f"    5.2f Mixed symlinks + regular ({len(all_flags)} flag combos): passed")
 
@@ -479,7 +500,10 @@ def edge_case_tests(test_path: Path) -> None:
         ft_cmd = [own_bin] + ([flags] if flags else []) + [str(special_dir)]
         ls_cmd = ["ls"] + ([flags] if flags else []) + [str(special_dir)]
         assert_output_match(
-            ft_cmd, ls_cmd, f"Special chars with {flags or 'no flags'} should match"
+            ft_cmd=ft_cmd,
+            ls_cmd=ls_cmd,
+            msg=f"Special chars with {flags or 'no flags'} should match",
+            tern_size=term_size
         )
     print(f"    5.3 Special characters ({len(all_flags)} flag combos): passed")
 
@@ -489,7 +513,10 @@ def edge_case_tests(test_path: Path) -> None:
         ft_cmd = [own_bin] + ([flags] if flags else []) + [str(empty_dir)]
         ls_cmd = ["ls"] + ([flags] if flags else []) + [str(empty_dir)]
         assert_output_match(
-            ft_cmd, ls_cmd, f"Empty dir with {flags or 'no flags'} should match"
+            ft_cmd=ft_cmd,
+            ls_cmd=ls_cmd,
+            msg=f"Empty dir with {flags or 'no flags'} should match",
+            tern_size=term_size
         )
     print(f"    5.4 Empty directory ({len(all_flags)} flag combos): passed")
 
@@ -500,7 +527,10 @@ def edge_case_tests(test_path: Path) -> None:
         ft_cmd = [own_bin] + ([flags] if flags else []) + [str(dir_a), str(dir_b)]
         ls_cmd = ["ls"] + ([flags] if flags else []) + [str(dir_a), str(dir_b)]
         assert_output_match(
-            ft_cmd, ls_cmd, f"Multiple dirs with {flags or 'no flags'} should match"
+            ft_cmd=ft_cmd,
+            ls_cmd=ls_cmd,
+            msg=f"Multiple dirs with {flags or 'no flags'} should match",
+            tern_size=term_size
         )
     print(f"    5.5 Multiple directories ({len(all_flags)} flag combos): passed")
 
@@ -557,7 +587,10 @@ def edge_case_tests(test_path: Path) -> None:
         ft_cmd = [own_bin] + ([flags] if flags else []) + [str(regular_file)]
         ls_cmd = ["ls"] + ([flags] if flags else []) + [str(regular_file)]
         assert_output_match(
-            ft_cmd, ls_cmd, f"Single file with {flags or 'no flags'} should match"
+            ft_cmd=ft_cmd,
+            ls_cmd=ls_cmd,
+            msg=f"Single file with {flags or 'no flags'} should match",
+            tern_size=term_size
         )
     print(f"    5.8 Single file argument ({len(all_flags)} flag combos): passed")
 
@@ -575,7 +608,10 @@ def edge_case_tests(test_path: Path) -> None:
             ["ls"] + ([flags] if flags else []) + [str(file1), str(file2), str(file3)]
         )
         assert_output_match(
-            ft_cmd, ls_cmd, f"Multiple files with {flags or 'no flags'} should match"
+            ft_cmd=ft_cmd,
+            ls_cmd=ls_cmd,
+            msg=f"Multiple files with {flags or 'no flags'} should match",
+            tern_size=term_size
         )
     print(f"    5.9 Multiple file arguments ({len(all_flags)} flag combos): passed")
 
@@ -585,7 +621,10 @@ def edge_case_tests(test_path: Path) -> None:
         ft_cmd = [own_bin] + ([flags] if flags else []) + [str(sort_dir)]
         ls_cmd = ["ls"] + ([flags] if flags else []) + [str(sort_dir)]
         assert_output_match(
-            ft_cmd, ls_cmd, f"Sort test with {flags or 'no flags'} should match"
+            ft_cmd=ft_cmd,
+            ls_cmd=ls_cmd,
+            msg=f"Sort test with {flags or 'no flags'} should match",
+            tern_size=term_size
         )
     print(f"    5.10 Sort edge cases ({len(all_flags)} flag combos): passed")
 
@@ -595,7 +634,10 @@ def edge_case_tests(test_path: Path) -> None:
         ft_cmd = [own_bin] + ([flags] if flags else []) + [str(sizes_dir)]
         ls_cmd = ["ls"] + ([flags] if flags else []) + [str(sizes_dir)]
         assert_output_match(
-            ft_cmd, ls_cmd, f"Sizes with {flags or 'no flags'} should match"
+            ft_cmd=ft_cmd,
+            ls_cmd=ls_cmd,
+            msg=f"Sizes with {flags or 'no flags'} should match",
+            tern_size=term_size
         )
     print(f"    5.11 Sizes directory ({len(all_flags)} flag combos): passed")
 
@@ -605,9 +647,10 @@ def edge_case_tests(test_path: Path) -> None:
         ft_cmd = [own_bin] + ([flags] if flags else []) + [str(quote_paths_dir)]
         ls_cmd = ["ls"] + ([flags] if flags else []) + [str(quote_paths_dir)]
         assert_output_match(
-            ft_cmd,
-            ls_cmd,
-            f"Quote-required paths with {flags or 'no flags'} should match",
+            ft_cmd=ft_cmd,
+            ls_cmd=ls_cmd,
+            msg=f"Quote-required paths with {flags or 'no flags'} should match",
+            tern_size=term_size
         )
     print(f"    5.12 Quote-required paths ({len(all_flags)} flag combos): passed")
 
@@ -617,9 +660,10 @@ def edge_case_tests(test_path: Path) -> None:
         ft_cmd = [own_bin] + ([flags] if flags else []) + [str(quote_files_dir)]
         ls_cmd = ["ls"] + ([flags] if flags else []) + [str(quote_files_dir)]
         assert_output_match(
-            ft_cmd,
-            ls_cmd,
-            f"Quote-required files with {flags or 'no flags'} should match",
+            ft_cmd=ft_cmd,
+            ls_cmd=ls_cmd,
+            msg=f"Quote-required files with {flags or 'no flags'} should match",
+            tern_size=term_size
         )
     print(f"    5.13 Quote-required files ({len(all_flags)} flag combos): passed")
 
@@ -637,9 +681,10 @@ def edge_case_tests(test_path: Path) -> None:
             + [str(path_arg) for path_arg in quote_path_args]
         )
         assert_output_match(
-            ft_cmd,
-            ls_cmd,
-            f"Quote-required path args with {flags or 'no flags'} should match",
+            ft_cmd=ft_cmd,
+            ls_cmd=ls_cmd,
+            msg=f"Quote-required path args with {flags or 'no flags'} should match",
+            tern_size=term_size
         )
     print(f"    5.14 Quote path arguments ({len(all_flags)} flag combos): passed")
 
@@ -659,9 +704,10 @@ def edge_case_tests(test_path: Path) -> None:
             + [str(file_arg) for file_arg in quote_file_args]
         )
         assert_output_match(
-            ft_cmd,
-            ls_cmd,
-            f"Quote-required file args with {flags or 'no flags'} should match",
+            ft_cmd=ft_cmd,
+            ls_cmd=ls_cmd,
+            msg=f"Quote-required file args with {flags or 'no flags'} should match",
+            tern_size=term_size
         )
     print(f"    5.15 Quote file arguments ({len(all_flags)} flag combos): passed")
 
@@ -676,8 +722,13 @@ def edge_case_tests(test_path: Path) -> None:
         else:
             ft_cmd = [own_bin, "-R", str(p)]
             ls_cmd = ["ls", "-R", str(p)]
-            assert_output_match(ft_cmd, ls_cmd, f"Recursive {p} with -R should match")
-            print("    5.16 Recursive /mnt/bulk (-R): passed")
+            assert_output_match(
+                    ft_cmd=ft_cmd,
+                    ls_cmd=ls_cmd,
+                    msg=f"Recursive {p} with -R should match",
+                    tern_size=term_size
+                    )
+            print(f"    5.16{string.ascii_lowercase[i]} Recursive {p} (-R): passed")
 
 
 def compare_output(flags: str, path: str, cols: int = 80) -> None:
@@ -713,40 +764,6 @@ def compare_output(flags: str, path: str, cols: int = 80) -> None:
                 print(f"Delete:\n'{ft_output[a0:a1]}'", file=sys.stderr)
 
         raise AssertionError(f"Output mismatch for: {' '.join(ft_cmd)}")
-
-
-def simple_tests(term_size: int, test_files: Paths) -> None:
-    """Phase 6: Terminal width tests across all fixtures."""
-    paths = ["", ".", "..", "src", "include", "tester"]
-    for p in [*test_files.paths, *test_files.files]:
-        paths.append(str(p))
-
-    for p in paths:
-        if p == "":
-            ls_output = run_with_pty(cmd=["ls"], cols=term_size)
-            ft_ls_output = run_with_pty(cmd=[own_bin], cols=term_size)
-        else:
-            ls_output = run_with_pty(cmd=["ls", p], cols=term_size)
-            ft_ls_output = run_with_pty(cmd=[own_bin, p], cols=term_size)
-
-        if ls_output != ft_ls_output:
-            print(f"Path: {p}", file=sys.stderr)
-            print(f"ls:\n{ls_output}", file=sys.stderr)
-            print("-" * term_size, file=sys.stderr)
-            print(f"ft_ls:\n{ft_ls_output}", file=sys.stderr)
-            print("-" * term_size, file=sys.stderr)
-            seqm = difflib.SequenceMatcher(None, ft_ls_output, ls_output)
-            for opcode, a0, a1, b0, b1 in seqm.get_opcodes():
-                if opcode == "replace":
-                    print(
-                        f"Replace:\n{ft_ls_output[a0:a1]}\nWith:\n{ls_output[b0:b1]}",
-                        file=sys.stderr,
-                    )
-                elif opcode == "insert":
-                    print(f"Insert:\n{ls_output[b0:b1]}", file=sys.stderr)
-                elif opcode == "delete":
-                    print(f"Delete:\n{ft_ls_output[a0:a1]}", file=sys.stderr)
-            raise AssertionError(f"Output mismatch for path: {p}")
 
 
 def run_with_pty(cmd: list[str], cols: int = 80) -> str:
