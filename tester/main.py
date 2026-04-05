@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 
+from create_test_folders import create_test_folders
 from pathlib import Path
 import difflib
 import fcntl
@@ -44,13 +45,14 @@ def main() -> None:
     invalid_flags()
 
     try:
+        data = create_test_folders(path=test_path)
         for term_size in range(TERMINAL_MIN, TERMINAL_MAX, 5):
             subprocess.run("make fclean", shell=True, capture_output=True)
             compile_ls(term_size=term_size)
             print("=" * 60)
             print("Phase 2-5: Flag Combinations and Feature Tests")
             print("=" * 60)
-            for args in gen_data(path=test_path):
+            for args in gen_data(paths=data):
                 assert_output_match(
                     ft_cmd=[own_bin, *args],
                     ls_cmd=["ls", *args],
@@ -126,36 +128,53 @@ def assert_output_match(ft_cmd: list[str], ls_cmd: list[str], tern_size: int) ->
     ls = run_with_pty(cmd=ls_cmd, cols=tern_size)
 
     try:
-        assert ft.stdout == ls.stdout
-    except AssertionError:
-        seqm = difflib.SequenceMatcher(None, ft.stdout, ls.stdout)
-        for opcode, a0, a1, b0, b1 in seqm.get_opcodes():
-            if opcode == "replace":
-                print(
-                    f"Replace:\n'{ft.stdout[a0:a1]}'\nWith:\n'{ls.stdout[b0:b1]}'",
-                    file=sys.stderr,
-                )
-            elif opcode == "insert":
-                print(f"Insert:\n'{ls.stdout[b0:b1]}'", file=sys.stderr)
-            elif opcode == "delete":
-                print(f"Delete:\n'{ft.stdout[a0:a1]}'", file=sys.stderr)
-        raise AssertionError(f"Output stdout mismatch for: {' '.join(ft_cmd)}")
+        output_differ(ft_out=ft.stdout, ls_out=ls.stdout, cmd=ft_cmd, kind_output='stdout')
+        # stdout = ft.stdout
+        # if ft.stdout.startswith('ft_ls_d'):
+        #     stdout = ft.stdout.replace('ft_ls_d', 'ls', 1)
+        # elif ft.stdout.startswith('ft_ls'):
+        #     stdout = ft.stdout.replace('ft_ls', 'ls', 1)
+        # assert stdout == ls.stdout
+    except AssertionError as ae:
+        print(ae)
+        raise(ae)
+
+        # seqm = difflib.SequenceMatcher(None, ft.stdout, ls.stdout)
+        # for opcode, a0, a1, b0, b1 in seqm.get_opcodes():
+        #     if opcode == "replace":
+        #         print(
+        #             f"Replace:\n'{ft.stdout[a0:a1]}'\nWith:\n'{ls.stdout[b0:b1]}'",
+        #             file=sys.stderr,
+        #         )
+        #     elif opcode == "insert":
+        #         print(f"Insert:\n'{ls.stdout[b0:b1]}'", file=sys.stderr)
+        #     elif opcode == "delete":
+        #         print(f"Delete:\n'{ft.stdout[a0:a1]}'", file=sys.stderr)
+        # raise AssertionError(f"Output stdout mismatch for: {' '.join(ft_cmd)}")
 
     try:
-        assert ft.stderr == ls.stderr
-    except AssertionError:
-        seqm = difflib.SequenceMatcher(None, ft.stderr, ls.stderr)
-        for opcode, a0, a1, b0, b1 in seqm.get_opcodes():
-            if opcode == "replace":
-                print(
-                    f"Replace:\n'{ft.stderr[a0:a1]}'\nWith:\n'{ls.stderr[b0:b1]}'",
-                    file=sys.stderr,
-                )
-            elif opcode == "insert":
-                print(f"Insert:\n'{ls.stderr[b0:b1]}'", file=sys.stderr)
-            elif opcode == "delete":
-                print(f"Delete:\n'{ft.stderr[a0:a1]}'", file=sys.stderr)
-        raise AssertionError(f"Output stderr mismatch for: {' '.join(ft_cmd)}")
+        output_differ(ft_out=ft.stderr, ls_out=ls.stderr, cmd=ft_cmd, kind_output='stderr')
+        # stderr = ft.stderr
+        # if ft.stderr.startswith('ft_ls_d'):
+        #     stderr = ft.stderr.replace('ft_ls_d', 'ls', 1)
+        # elif ft.stderr.startswith('ft_ls'):
+        #     stderr = ft.stderr.replace('ft_ls', 'ls', 1)
+        # assert stderr == ls.stderr
+    except AssertionError as ae:
+        print(ae)
+        raise(ae)
+        # seqm = difflib.SequenceMatcher(None, ft.stderr, ls.stderr)
+        # for opcode, a0, a1, b0, b1 in seqm.get_opcodes():
+        #     if opcode == "replace":
+        #         print(
+        #             f"Replace:\n'{ft.stderr[a0:a1]}'\nWith:\n'{ls.stderr[b0:b1]}'",
+        #             file=sys.stderr,
+        #         )
+        #     elif opcode == "insert":
+        #         print(f"Insert:\n'{ls.stderr[b0:b1]}'", file=sys.stderr)
+        #     elif opcode == "delete":
+        #         print(f"Delete:\n'{ft.stderr[a0:a1]}'", file=sys.stderr)
+        # raise AssertionError(f"Output stderr mismatch for: {' '.join(ft_cmd)}")
 
     try:
         assert ft.returncode == ls.returncode
@@ -165,6 +184,31 @@ def assert_output_match(ft_cmd: list[str], ls_cmd: list[str], tern_size: int) ->
             file=sys.stderr,
         )
         raise AssertionError(f"Returncode mismatch for: {' '.join(ft_cmd)}")
+
+
+def output_differ(ft_out: str, ls_out: str, cmd: list[str], kind_output: str) -> None:
+    ft_stdout_cpy = ft_out
+    try:
+        if ft_out.startswith('ft_ls_d'):
+            ft_stdout_cpy = ft_out.replace('ft_ls_d', 'ls', 1)
+        elif ft_out.startswith('ft_ls'):
+            ft_stdout_cpy = ft_out.replace('ft_ls', 'ls', 1)
+
+        assert ft_stdout_cpy == ls_out
+    except AssertionError:
+        seqm = difflib.SequenceMatcher(None, ft_stdout_cpy, ls_out)
+        for opcode, a0, a1, b0, b1 in seqm.get_opcodes():
+            if opcode == "replace":
+                print(
+                    f"Replace:\n'{ft_stdout_cpy[a0:a1]}'\nWith:\n'{ls_out[b0:b1]}'",
+                    file=sys.stderr,
+                )
+            elif opcode == "insert":
+                print(f"Insert:\n'{ls_out[b0:b1]}'", file=sys.stderr)
+            elif opcode == "delete":
+                print(f"Delete:\n'{ft_stdout_cpy[a0:a1]}'", file=sys.stderr)
+        raise AssertionError(f"Output {kind_output} mismatch for: {' '.join(cmd)}")
+    pass
 
 
 def run_with_pty(cmd: list[str], cols: int = 80) -> PtyResult:
