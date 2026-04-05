@@ -1,20 +1,20 @@
 #! /usr/bin/env python3
 
-from create_test_folders import create_test_folders
-from pathlib import Path
 import difflib
 import fcntl
 import os
 import pty
+import selectors
+import shutil
 import string
 import struct
 import subprocess
 import sys
 import termios
-import shutil
-import selectors
+from pathlib import Path
 from typing import NamedTuple
 
+from create_test_folders import create_test_folders
 from gen_data import ALLOWED_FLAGS, gen_data
 
 
@@ -128,14 +128,18 @@ def assert_output_match(ft_cmd: list[str], ls_cmd: list[str], tern_size: int) ->
     ls = run_with_pty(cmd=ls_cmd, cols=tern_size)
 
     try:
-        output_differ(ft_out=ft.stdout, ls_out=ls.stdout, cmd=ft_cmd, kind_output='stdout')
+        output_differ(
+            ft_out=ft.stdout, ls_out=ls.stdout, cmd=ft_cmd, kind_output="stdout"
+        )
     except AssertionError as ae:
-        raise(ae)
+        raise (ae)
 
     try:
-        output_differ(ft_out=ft.stderr, ls_out=ls.stderr, cmd=ft_cmd, kind_output='stderr')
+        output_differ(
+            ft_out=ft.stderr, ls_out=ls.stderr, cmd=ft_cmd, kind_output="stderr"
+        )
     except AssertionError as ae:
-        raise(ae)
+        raise (ae)
     try:
         assert ft.returncode == ls.returncode
     except AssertionError:
@@ -146,27 +150,36 @@ def assert_output_match(ft_cmd: list[str], ls_cmd: list[str], tern_size: int) ->
         raise AssertionError(f"Returncode mismatch for: {' '.join(ft_cmd)}")
 
 
-def output_differ(ft_out: str, ls_out: str, cmd: list[str], kind_output: str) -> None:
-    ft_stdout_cpy = ft_out
-    try:
-        if ft_out.startswith('ft_ls_d'):
-            ft_stdout_cpy = ft_out.replace('ft_ls_d', 'ls', 1)
-        elif ft_out.startswith('ft_ls'):
-            ft_stdout_cpy = ft_out.replace('ft_ls', 'ls', 1)
+def normalize_program_name(output: str) -> str:
+    lines: list[str] = []
 
-        assert ft_stdout_cpy == ls_out
+    for line in output.splitlines(keepends=True):
+        if line.startswith("ft_ls_d"):
+            lines.append(line.replace("ft_ls_d", "ls", 1))
+        elif line.startswith("ft_ls"):
+            lines.append(line.replace("ft_ls", "ls", 1))
+        else:
+            lines.append(line)
+
+    return "".join(lines)
+
+
+def output_differ(ft_out: str, ls_out: str, cmd: list[str], kind_output: str) -> None:
+    ft_out_cpy = normalize_program_name(ft_out)
+    try:
+        assert ft_out_cpy == ls_out
     except AssertionError:
-        seqm = difflib.SequenceMatcher(None, ft_stdout_cpy, ls_out)
+        seqm = difflib.SequenceMatcher(None, ft_out_cpy, ls_out)
         for opcode, a0, a1, b0, b1 in seqm.get_opcodes():
             if opcode == "replace":
                 print(
-                    f"Replace:\n'{ft_stdout_cpy[a0:a1]}'\nWith:\n'{ls_out[b0:b1]}'",
+                    f"Replace:\n'{ft_out_cpy[a0:a1]}'\nWith:\n'{ls_out[b0:b1]}'",
                     file=sys.stderr,
                 )
             elif opcode == "insert":
                 print(f"Insert:\n'{ls_out[b0:b1]}'", file=sys.stderr)
             elif opcode == "delete":
-                print(f"Delete:\n'{ft_stdout_cpy[a0:a1]}'", file=sys.stderr)
+                print(f"Delete:\n'{ft_out_cpy[a0:a1]}'", file=sys.stderr)
         raise AssertionError(f"Output {kind_output} mismatch for: {' '.join(cmd)}")
     pass
 

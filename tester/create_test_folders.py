@@ -11,6 +11,7 @@ from typing import NamedTuple
 class Paths(NamedTuple):
     paths: list[Path]
     files: list[Path]
+    cases: list[list[Path]]
 
 
 def create_test_folders(path: Path) -> Paths:
@@ -87,7 +88,30 @@ def create_test_folders(path: Path) -> Paths:
     out_paths.append(new_path)
     out_files.extend(files)
 
-    return Paths(paths=out_paths, files=out_files)
+    return Paths(
+        paths=out_paths,
+        files=out_files,
+        cases=create_curated_cases(path=path),
+    )
+
+
+def create_curated_cases(path: Path) -> list[list[Path]]:
+    """Return targeted operand combinations for shell-escape edge cases."""
+    return [
+        [path.joinpath("missing space")],
+        [
+            path.joinpath("quote_paths", "plain"),
+            path.joinpath("quote_paths", "space name"),
+        ],
+        [
+            path.joinpath("quote_files", "plain.txt"),
+            path.joinpath("quote_files", "space name.txt"),
+        ],
+        [
+            path.joinpath("quote_paths", "plain"),
+            path.joinpath("recursive", "colon:dir"),
+        ],
+    ]
 
 
 def create_simple(path: Path) -> tuple[Path, list[Path]]:
@@ -198,6 +222,18 @@ def create_recursive(path: Path) -> tuple[Path, list[Path]]:
     level1_c = rec_path.joinpath("level1_c")
     level1_c.mkdir(exist_ok=True)
 
+    quoted_dir = rec_path.joinpath("space dir")
+    quoted_dir.mkdir(exist_ok=True)
+    file_path = quoted_dir.joinpath("inside.txt")
+    file_path.touch()
+    out_files.append(file_path)
+
+    colon_dir = rec_path.joinpath("colon:dir")
+    colon_dir.mkdir(exist_ok=True)
+    file_path = colon_dir.joinpath("inside.txt")
+    file_path.touch()
+    out_files.append(file_path)
+
     # Set different mtimes on directories for -Rt testing
     # level1_c = oldest, level1_b = middle, level1_a = newest
     base_time = time.time()
@@ -278,6 +314,12 @@ def create_permissions(path: Path) -> tuple[list[Path], list[Path]]:
     restricted.joinpath("secret.txt").touch()
     restricted.chmod(0o000)
     out_paths.append(restricted)
+
+    restricted_quoted = perm_path.joinpath("restricted dir")
+    restricted_quoted.mkdir(exist_ok=True)
+    restricted_quoted.joinpath("secret.txt").touch()
+    restricted_quoted.chmod(0o000)
+    out_paths.append(restricted_quoted)
 
     return out_paths, out_files
 

@@ -5,6 +5,7 @@ from typing import Generator
 
 ALLOWED_FLAGS = ("R", "a", "l", "r", "t")
 
+
 def gen_data(paths: Paths) -> Generator[list[str], None, None]:
     for size in range(1, len(ALLOWED_FLAGS) + 1):
         for combo in combinations(ALLOWED_FLAGS, size):
@@ -19,3 +20,6 @@ def gen_data(paths: Paths) -> Generator[list[str], None, None]:
             for dir_entry in paths.paths:
                 for file_entry in paths.files:
                     yield [flags, str(dir_entry), str(file_entry)]
+
+            for case in paths.cases:
+                yield [flags, *(str(entry) for entry in case)]
