@@ -129,53 +129,13 @@ def assert_output_match(ft_cmd: list[str], ls_cmd: list[str], tern_size: int) ->
 
     try:
         output_differ(ft_out=ft.stdout, ls_out=ls.stdout, cmd=ft_cmd, kind_output='stdout')
-        # stdout = ft.stdout
-        # if ft.stdout.startswith('ft_ls_d'):
-        #     stdout = ft.stdout.replace('ft_ls_d', 'ls', 1)
-        # elif ft.stdout.startswith('ft_ls'):
-        #     stdout = ft.stdout.replace('ft_ls', 'ls', 1)
-        # assert stdout == ls.stdout
     except AssertionError as ae:
-        print(ae)
         raise(ae)
-
-        # seqm = difflib.SequenceMatcher(None, ft.stdout, ls.stdout)
-        # for opcode, a0, a1, b0, b1 in seqm.get_opcodes():
-        #     if opcode == "replace":
-        #         print(
-        #             f"Replace:\n'{ft.stdout[a0:a1]}'\nWith:\n'{ls.stdout[b0:b1]}'",
-        #             file=sys.stderr,
-        #         )
-        #     elif opcode == "insert":
-        #         print(f"Insert:\n'{ls.stdout[b0:b1]}'", file=sys.stderr)
-        #     elif opcode == "delete":
-        #         print(f"Delete:\n'{ft.stdout[a0:a1]}'", file=sys.stderr)
-        # raise AssertionError(f"Output stdout mismatch for: {' '.join(ft_cmd)}")
 
     try:
         output_differ(ft_out=ft.stderr, ls_out=ls.stderr, cmd=ft_cmd, kind_output='stderr')
-        # stderr = ft.stderr
-        # if ft.stderr.startswith('ft_ls_d'):
-        #     stderr = ft.stderr.replace('ft_ls_d', 'ls', 1)
-        # elif ft.stderr.startswith('ft_ls'):
-        #     stderr = ft.stderr.replace('ft_ls', 'ls', 1)
-        # assert stderr == ls.stderr
     except AssertionError as ae:
-        print(ae)
         raise(ae)
-        # seqm = difflib.SequenceMatcher(None, ft.stderr, ls.stderr)
-        # for opcode, a0, a1, b0, b1 in seqm.get_opcodes():
-        #     if opcode == "replace":
-        #         print(
-        #             f"Replace:\n'{ft.stderr[a0:a1]}'\nWith:\n'{ls.stderr[b0:b1]}'",
-        #             file=sys.stderr,
-        #         )
-        #     elif opcode == "insert":
-        #         print(f"Insert:\n'{ls.stderr[b0:b1]}'", file=sys.stderr)
-        #     elif opcode == "delete":
-        #         print(f"Delete:\n'{ft.stderr[a0:a1]}'", file=sys.stderr)
-        # raise AssertionError(f"Output stderr mismatch for: {' '.join(ft_cmd)}")
-
     try:
         assert ft.returncode == ls.returncode
     except AssertionError:
