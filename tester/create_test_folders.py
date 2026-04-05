@@ -402,8 +402,9 @@ def create_quote_paths(path: Path) -> tuple[list[Path], list[Path]]:
     out_paths: list[Path] = []
     out_paths.append(quote_paths)
 
-    quote_paths.joinpath("plain").mkdir(exist_ok=True)
-    out_paths.append(quote_paths)
+    plain_dir = quote_paths.joinpath("plain")
+    plain_dir.mkdir(exist_ok=True)
+    out_paths.append(plain_dir)
 
     for dirname in quote_case_names():
         case_dir = quote_paths.joinpath(dirname)
@@ -455,7 +456,7 @@ def create_multi_path(path: Path) -> tuple[list[Path], list[Path]]:
     out_paths.append(dir_a)
     files = ["a1.txt", "a2.txt", "a3.txt"]
     for file in files:
-        path_file = dir_a.joinpath()
+        path_file = dir_a.joinpath(file)
         path_file.touch()
         out_files.append(path_file)
 
@@ -465,7 +466,7 @@ def create_multi_path(path: Path) -> tuple[list[Path], list[Path]]:
     out_paths.append(dir_b)
     files = ["b1.txt", "b2.txt", "b3.txt"]
     for file in files:
-        path_file = dir_a.joinpath()
+        path_file = dir_b.joinpath(file)
         path_file.touch()
         out_files.append(path_file)
 
@@ -507,7 +508,6 @@ def quote_case_names() -> Generator[str, None, None]:
         'double"quote',
         "space and 'single",
         'space and "double',
-        "single'and\"double",
         "single'and\"double",
         "single\"and'double",
         "all 'and\" together",
