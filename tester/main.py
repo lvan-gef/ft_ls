@@ -1,16 +1,20 @@
 #! /usr/bin/env python3
 
+import argparse
 import difflib
 import fcntl
 import os
 import pty
 import selectors
+import shlex
 import shutil
 import string
 import struct
 import subprocess
 import sys
 import termios
+from itertools import islice
+from multiprocessing import get_context
 from pathlib import Path
 from typing import NamedTuple
 
@@ -24,15 +28,30 @@ class PtyResult(NamedTuple):
     returncode: int
 
 
+class TestBatch(NamedTuple):
+    term_size: int
+    ft_bin: str
+    cases: list[list[str]]
+
+
+class TestFailure(NamedTuple):
+    term_size: int
+    cmd: list[str]
+    kind: str
+    diff: str
+
+
 DEBUG = True
 TERMINAL_MIN = 40  # include
 TERMINAL_MAX = 120  # exclude
+BATCH_SIZE = 32
 own_bin = "./ft_ls"
 if DEBUG:
     own_bin = f"{own_bin}_d"
 
 
 def main() -> None:
+    args = parse_args()
     test_path = Path.cwd().joinpath("ft_ls_tester")
     if test_path.exists():
         remove_test_root(test_path)
@@ -46,18 +65,24 @@ def main() -> None:
 
     try:
         data = create_test_folders(path=test_path)
+        cases = list(gen_data(paths=data))
         for term_size in range(TERMINAL_MIN, TERMINAL_MAX, 5):
             subprocess.run("make fclean", shell=True, capture_output=True)
             compile_ls(term_size=term_size)
             print("=" * 60)
-            print("Phase 2-5: Flag Combinations and Feature Tests")
+            print(
+                "Phase 2-5: Flag Combinations and Feature Tests",
+                f"(jobs={args.jobs})",
+            )
             print("=" * 60)
-            for args in gen_data(paths=data):
-                assert_output_match(
-                    ft_cmd=[own_bin, *args],
-                    ls_cmd=["ls", *args],
-                    tern_size=term_size,
-                )
+            failure = run_cases_parallel(
+                cases=cases,
+                term_size=term_size,
+                jobs=args.jobs,
+            )
+            if failure is not None:
+                print(format_failure(failure), file=sys.stderr)
+                sys.exit(1)
     except Exception as e:
         print(e, file=sys.stderr)
         sys.exit(1)
@@ -67,6 +92,30 @@ def main() -> None:
     print("=" * 60)
     print("All tests passed!")
     print("=" * 60)
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-j",
+        "--jobs",
+        type=positive_int,
+        default=default_jobs(),
+        help="worker processes to use for test execution",
+    )
+    return parser.parse_args()
+
+
+def positive_int(value: str) -> int:
+    jobs = int(value)
+    if jobs < 1:
+        raise argparse.ArgumentTypeError("jobs must be at least 1")
+    return jobs
+
+
+def default_jobs() -> int:
+    cpu_count = os.cpu_count() or 1
+    return max(1, cpu_count // 2)
 
 
 def remove_test_root(test_path: Path) -> None:
@@ -122,32 +171,75 @@ def invalid_flags() -> None:
     print(f"  Tested {52} invalid flags: all passed")
 
 
-def assert_output_match(ft_cmd: list[str], ls_cmd: list[str], tern_size: int) -> None:
-    """Assert ft_ls output matches ls output, showing diff on failure."""
-    ft = run_with_pty(cmd=ft_cmd, cols=tern_size)
-    ls = run_with_pty(cmd=ls_cmd, cols=tern_size)
+def run_cases_parallel(
+    cases: list[list[str]], term_size: int, jobs: int
+) -> TestFailure | None:
+    if jobs == 1:
+        return run_case_batch(
+            TestBatch(term_size=term_size, ft_bin=own_bin, cases=cases)
+        )
 
-    try:
-        output_differ(
-            ft_out=ft.stdout, ls_out=ls.stdout, cmd=ft_cmd, kind_output="stdout"
+    ctx = get_context("fork")
+    with ctx.Pool(processes=jobs) as pool:
+        batches = iter_case_batches(
+            cases=cases,
+            term_size=term_size,
+            ft_bin=own_bin,
+            batch_size=BATCH_SIZE,
         )
-    except AssertionError as ae:
-        raise (ae)
+        for failure in pool.imap_unordered(run_case_batch, batches, chunksize=1):
+            if failure is not None:
+                pool.terminate()
+                return failure
 
-    try:
-        output_differ(
-            ft_out=ft.stderr, ls_out=ls.stderr, cmd=ft_cmd, kind_output="stderr"
+    return None
+
+
+def iter_case_batches(
+    cases: list[list[str]], term_size: int, ft_bin: str, batch_size: int
+):
+    iterator = iter(cases)
+    while True:
+        batch_cases = list(islice(iterator, batch_size))
+        if not batch_cases:
+            return
+        yield TestBatch(term_size=term_size, ft_bin=ft_bin, cases=batch_cases)
+
+
+def run_case_batch(batch: TestBatch) -> TestFailure | None:
+    for args in batch.cases:
+        failure = compare_case(
+            term_size=batch.term_size, ft_bin=batch.ft_bin, args=args
         )
-    except AssertionError as ae:
-        raise (ae)
-    try:
-        assert ft.returncode == ls.returncode
-    except AssertionError:
-        print(
-            f"ft_ls returncode: {ft.returncode}\nls returncode: {ls.returncode}",
-            file=sys.stderr,
+        if failure is not None:
+            return failure
+    return None
+
+
+def compare_case(term_size: int, ft_bin: str, args: list[str]) -> TestFailure | None:
+    ft_cmd = [ft_bin, *args]
+    ls_cmd = ["ls", *args]
+
+    ft = run_with_pty(cmd=ft_cmd, cols=term_size)
+    ls = run_with_pty(cmd=ls_cmd, cols=term_size)
+
+    diff = diff_output(ft.stdout, ls.stdout)
+    if diff is not None:
+        return TestFailure(term_size=term_size, cmd=ft_cmd, kind="stdout", diff=diff)
+
+    diff = diff_output(ft.stderr, ls.stderr)
+    if diff is not None:
+        return TestFailure(term_size=term_size, cmd=ft_cmd, kind="stderr", diff=diff)
+
+    if ft.returncode != ls.returncode:
+        return TestFailure(
+            term_size=term_size,
+            cmd=ft_cmd,
+            kind="returncode",
+            diff=(f"ft_ls returncode: {ft.returncode}\nls returncode: {ls.returncode}"),
         )
-        raise AssertionError(f"Returncode mismatch for: {' '.join(ft_cmd)}")
+
+    return None
 
 
 def normalize_program_name(output: str) -> str:
@@ -164,24 +256,36 @@ def normalize_program_name(output: str) -> str:
     return "".join(lines)
 
 
-def output_differ(ft_out: str, ls_out: str, cmd: list[str], kind_output: str) -> None:
+def diff_output(ft_out: str, ls_out: str) -> str | None:
     ft_out_cpy = normalize_program_name(ft_out)
-    try:
-        assert ft_out_cpy == ls_out
-    except AssertionError:
-        seqm = difflib.SequenceMatcher(None, ft_out_cpy, ls_out)
-        for opcode, a0, a1, b0, b1 in seqm.get_opcodes():
-            if opcode == "replace":
-                print(
-                    f"Replace:\n'{ft_out_cpy[a0:a1]}'\nWith:\n'{ls_out[b0:b1]}'",
-                    file=sys.stderr,
-                )
-            elif opcode == "insert":
-                print(f"Insert:\n'{ls_out[b0:b1]}'", file=sys.stderr)
-            elif opcode == "delete":
-                print(f"Delete:\n'{ft_out_cpy[a0:a1]}'", file=sys.stderr)
-        raise AssertionError(f"Output {kind_output} mismatch for: {' '.join(cmd)}")
-    pass
+    if ft_out_cpy == ls_out:
+        return None
+
+    diff = "".join(
+        difflib.unified_diff(
+            ft_out_cpy.splitlines(keepends=True),
+            ls_out.splitlines(keepends=True),
+            fromfile="ft_ls",
+            tofile="ls",
+        )
+    )
+    if diff:
+        return diff
+    return f"ft_ls: {ft_out_cpy!r}\nls: {ls_out!r}"
+
+
+def format_failure(failure: TestFailure) -> str:
+    lines = [
+        "=" * 60,
+        "Test failed",
+        f"TERM_SIZE: {failure.term_size}",
+        f"CMD: {shlex.join(failure.cmd)}",
+        f"KIND: {failure.kind}",
+        "DIFF:",
+        failure.diff.rstrip("\n"),
+        "=" * 60,
+    ]
+    return "\n".join(lines)
 
 
 def run_with_pty(cmd: list[str], cols: int = 80) -> PtyResult:
