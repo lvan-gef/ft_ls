@@ -3,44 +3,46 @@ NAME_D := libft_d.a
 MAKEFLAGS += -j
 
 CC        ?= cc
-CFLAGS    := -std=c11 -D_DEFAULT_SOURCE \
-			 -Wall -Wextra -Werror -Wshadow -Wpedantic \
-			 -Wconversion -Wsign-conversion -Wdouble-promotion \
-			 -Wformat=2 -Wformat-security \
-			 -Wnull-dereference -Wcast-align -Wswitch-enum -Wundef \
-			 -Wstrict-prototypes -Wmissing-prototypes \
-			 -Wredundant-decls -Wwrite-strings \
+CFLAGS    := -std=c11 -D_DEFAULT_SOURCE                                        \
+			 -Wall -Wextra -Werror -Wshadow -Wpedantic                         \
+			 -Wconversion -Wsign-conversion -Wdouble-promotion                 \
+			 -Wformat=2 -Wformat-security                                      \
+			 -Wnull-dereference -Wcast-align -Wswitch-enum -Wundef             \
+			 -Wstrict-prototypes -Wmissing-prototypes                          \
+			 -Wredundant-decls -Wwrite-strings                                 \
 			 -Wimplicit-fallthrough
 
 DEPSFLAGS := -MMD -MP
 
 # Release flags (with hardening)
-R_CFLAGS  := -DNDEBUG -D_FORTIFY_SOURCE=2 -O3 -march=native -fomit-frame-pointer -fPIE
+R_CFLAGS  := -DNDEBUG -D_FORTIFY_SOURCE=2 -O3                                  \
+			 -march=native -fomit-frame-pointer -fPIE
 
 # Debug flags
-# D_CFLAGS  := -g3 -fno-omit-frame-pointer -fstack-protector-strong -fsanitize=address,undefined,null,integer-divide-by-zero,signed-integer-overflow
-D_CFLAGS  := -g3 -fno-omit-frame-pointer
+D_CFLAGS  := -g3 -fno-omit-frame-pointer -fstack-protector-strong              \
+			 -fsanitize=address,undefined,null,integer-divide-by-zero,signed-integer-overflow
+# D_CFLAGS  := -g3 -fno-omit-frame-pointer
 
 SRC_DIR   := src
 INC_DIR   := include
 
 MODULES := ll mem printer str gnl ft_printf ft_fprintf
 
-ll_SRC      := ft_lstnew_bonus.c ft_lstadd_front_bonus.c ft_lstsize_bonus.c \
-               ft_lstlast_bonus.c ft_lstadd_back_bonus.c ft_lstdelone_bonus.c \
+ll_SRC      := ft_lstnew_bonus.c ft_lstadd_front_bonus.c ft_lstsize_bonus.c    \
+               ft_lstlast_bonus.c ft_lstadd_back_bonus.c ft_lstdelone_bonus.c  \
                ft_lstclear_bonus.c ft_lstiter_bonus.c ft_lstmap_bonus.c
 
-mem_SRC     := ft_bzero.c ft_calloc.c ft_memchr.c ft_memcmp.c ft_memcpy.c \
+mem_SRC     := ft_bzero.c ft_calloc.c ft_memchr.c ft_memcmp.c ft_memcpy.c      \
                ft_memmove.c ft_memset.c
 
 printer_SRC := ft_putchar_fd.c ft_putendl_fd.c ft_putnbr_fd.c ft_putstr_fd.c
 
-str_SRC     := ft_strjoin.c ft_strlcat.c ft_itoa.c ft_atoi.c ft_isdigit.c \
+str_SRC     := ft_strjoin.c ft_strlcat.c ft_itoa.c ft_atoi.c ft_isdigit.c      \
                ft_strlcpy.c ft_strdup.c ft_strncmp.c ft_tolower.c ft_strnstr.c \
-               ft_strchr.c ft_striteri.c ft_isascii.c ft_isalnum.c ft_split.c \
+               ft_strchr.c ft_striteri.c ft_isascii.c ft_isalnum.c ft_split.c  \
                ft_isalpha.c ft_strrchr.c ft_strlen.c ft_isprint.c ft_strtrim.c \
-               ft_substr.c ft_strmapi.c ft_toupper.c ft_atoli.c ft_atoui.c \
-			   ft_iswhitespace.c ft_split_ws.c ft_atof.c ft_uitoa.c \
+               ft_substr.c ft_strmapi.c ft_toupper.c ft_atoli.c ft_atoui.c     \
+			   ft_iswhitespace.c ft_split_ws.c ft_atof.c ft_uitoa.c            \
 			   ft_strncasecmp.c ft_str_to_lower.c
 gnl_SRC     := get_next_line.c get_next_line_utils.c
 
@@ -50,24 +52,24 @@ ft_fprintf_SRC := ft_fformatter.c ft_fprintf.c ft_fwriters.c
 # Release objects
 R_OBJ_DIR := obj
 R_OBJ_DIRS := $(addprefix $(R_OBJ_DIR)/, $(MODULES))
-R_OBJECTS := $(ll_SRC:%.c=$(R_OBJ_DIR)/ll/%.o) \
-             $(mem_SRC:%.c=$(R_OBJ_DIR)/mem/%.o) \
-             $(printer_SRC:%.c=$(R_OBJ_DIR)/printer/%.o) \
-             $(str_SRC:%.c=$(R_OBJ_DIR)/str/%.o) \
-             $(gnl_SRC:%.c=$(R_OBJ_DIR)/gnl/%.o) \
-             $(ft_printf_SRC:%.c=$(R_OBJ_DIR)/ft_printf/%.o) \
+R_OBJECTS := $(ll_SRC:%.c=$(R_OBJ_DIR)/ll/%.o)                                 \
+             $(mem_SRC:%.c=$(R_OBJ_DIR)/mem/%.o)                               \
+             $(printer_SRC:%.c=$(R_OBJ_DIR)/printer/%.o)                       \
+             $(str_SRC:%.c=$(R_OBJ_DIR)/str/%.o)                               \
+             $(gnl_SRC:%.c=$(R_OBJ_DIR)/gnl/%.o)                               \
+             $(ft_printf_SRC:%.c=$(R_OBJ_DIR)/ft_printf/%.o)                   \
              $(ft_fprintf_SRC:%.c=$(R_OBJ_DIR)/ft_fprintf/%.o)
 R_DEPS := $(R_OBJECTS:.o=.d)
 
 # Debug objects
 D_OBJ_DIR := obj_debug
 D_OBJ_DIRS := $(addprefix $(D_OBJ_DIR)/, $(MODULES))
-D_OBJECTS := $(ll_SRC:%.c=$(D_OBJ_DIR)/ll/%.o) \
-             $(mem_SRC:%.c=$(D_OBJ_DIR)/mem/%.o) \
-             $(printer_SRC:%.c=$(D_OBJ_DIR)/printer/%.o) \
-             $(str_SRC:%.c=$(D_OBJ_DIR)/str/%.o) \
-             $(gnl_SRC:%.c=$(D_OBJ_DIR)/gnl/%.o) \
-             $(ft_printf_SRC:%.c=$(D_OBJ_DIR)/ft_printf/%.o) \
+D_OBJECTS := $(ll_SRC:%.c=$(D_OBJ_DIR)/ll/%.o)                                 \
+             $(mem_SRC:%.c=$(D_OBJ_DIR)/mem/%.o)                               \
+             $(printer_SRC:%.c=$(D_OBJ_DIR)/printer/%.o)                       \
+             $(str_SRC:%.c=$(D_OBJ_DIR)/str/%.o)                               \
+             $(gnl_SRC:%.c=$(D_OBJ_DIR)/gnl/%.o)                               \
+             $(ft_printf_SRC:%.c=$(D_OBJ_DIR)/ft_printf/%.o)                   \
              $(ft_fprintf_SRC:%.c=$(D_OBJ_DIR)/ft_fprintf/%.o)
 D_DEPS := $(D_OBJECTS:.o=.d)
 

@@ -5,16 +5,16 @@ MAKEFLAGS += -j
 TERM_SIZE ?= 80
 
 CC        := cc
-CFLAGS    := -std=c11 -D_DEFAULT_SOURCE \
-			 -Wall -Wextra -Werror -Wshadow -Wpedantic \
-			 -Wconversion -Wsign-conversion -Wdouble-promotion \
-			 -Wformat=2 -Wformat-security \
-			 -Wnull-dereference -Wcast-align -Wswitch-enum -Wundef \
-			 -Wstrict-prototypes -Wmissing-prototypes \
-			 -Wredundant-decls -Wwrite-strings \
-			 -Wimplicit-fallthrough \
-			 -Wcast-qual \
-			 -Wvla -Walloca -Wold-style-definition \
+CFLAGS    := -std=c11 -D_DEFAULT_SOURCE                                        \
+			 -Wall -Wextra -Werror -Wshadow -Wpedantic                         \
+			 -Wconversion -Wsign-conversion -Wdouble-promotion                 \
+			 -Wformat=2 -Wformat-security                                      \
+			 -Wnull-dereference -Wcast-align -Wswitch-enum -Wundef             \
+			 -Wstrict-prototypes -Wmissing-prototypes                          \
+			 -Wredundant-decls -Wwrite-strings                                 \
+			 -Wimplicit-fallthrough                                            \
+			 -Wcast-qual                                                       \
+			 -Wvla -Walloca -Wold-style-definition                             \
 			 -DTERM_SIZE=$(TERM_SIZE)
 
 DEPSFLAGS := -MMD -MP
@@ -24,14 +24,16 @@ R_CFLAGS  := -DNDEBUG -O3 -march=native -fomit-frame-pointer -fPIE -fstack-clash
 R_LDFLAGS := -pie -Wl,-z,relro,-z,now
 
 # Debug flags
-# SANITIZERS := -fsanitize=address,undefined,null,leak,integer-divide-by-zero,signed-integer-overflow
-SANITIZERS :=
+SANITIZERS := -fsanitize=address,undefined,null,leak,integer-divide-by-zero,signed-integer-overflow
+# SANITIZERS :=
 D_CFLAGS   := -g3 -fno-omit-frame-pointer -fstack-protector-strong $(SANITIZERS)
 D_LDFLAGS  := $(SANITIZERS) -rdynamic
 
 SRC_DIR := src
 
-SRC_FILES := ft_arena.c ft_array.c ft_entry.c ft_free_list.c ft_helper.c ft_parse.c ft_printer.c ft_printer_helper.c ft_print_list.c ft_shell_escape.c ft_sort.c ft_str.c ft_walk.c main.c
+SRC_FILES := ft_arena.c ft_array.c ft_entry.c ft_free_list.c ft_helper.c       \
+			 ft_parse.c ft_printer.c ft_printer_helper.c ft_print_list.c       \
+			 ft_shell_escape.c ft_sort.c ft_str.c ft_walk.c main.c
 
 SRCS := $(addprefix $(SRC_DIR)/, $(SRC_FILES))
 
@@ -64,7 +66,7 @@ debug: $(NAME_D)  ## Build debug version with ASAN
 
 .PHONY: tester
 tester:  ## run the tester
-	python3 ./tester/main.py
+	python3 ./tester/main.py -d
 
 .PHONY: clean
 clean:  ## Clean object files
