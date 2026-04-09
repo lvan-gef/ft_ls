@@ -28,7 +28,6 @@ t_array *parse_args(free_list *fl, uint64_t argc, char **argv, t_args *args) {
         const size_t len = ft_strlen(argv[index]);
         if (!ft_strncmp("--", argv[index], len)) {
             is_flag = false;
-            ++index;
             continue;
         }
 
