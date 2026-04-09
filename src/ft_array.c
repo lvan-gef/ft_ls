@@ -16,12 +16,12 @@ t_array *init_array(free_list *fl, uint64_t size) {
     ASSERT_NOTNULL(fl);
     ASSERT_GT(size, 0);
 
-    t_array *array = free_list_alloc(fl, 1 * sizeof(*array), 8);
+    t_array *array = fl_alloc(fl, 1 * sizeof(*array), 8);
     if (!array) {
         return NULL;
     }
 
-    array->data = (void **)free_list_alloc(fl, size * sizeof(*array->data), 8);
+    array->data = (void **)fl_alloc(fl, size * sizeof(*array->data), 8);
     if (!array->data) {
         return NULL;
     }
@@ -66,7 +66,7 @@ void reset_array(free_list *fl, t_array *array) {
 
     while (array->len) {
         void *elem = pop_array(array);
-        free_list_free(fl, elem);
+        fl_free(fl, elem);
     }
 
     ASSERT_EQ(array->len, 0);
@@ -84,7 +84,7 @@ static bool realloc_arr_(t_array *array) {
 
     void **old_data = array->data;
     void **new_data =
-        (void **)free_list_alloc(array->fl, new_cap * sizeof(*new_data), 8);
+        (void **)fl_alloc(array->fl, new_cap * sizeof(*new_data), 8);
     if (!new_data) {
         return false;
     }

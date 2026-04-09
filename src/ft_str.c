@@ -17,7 +17,7 @@ t_str *init_str(free_list *fl, uint64_t cap) {
     ASSERT_GT(cap, 0);
 
     const char *err_msg = NULL;
-    t_str *str = free_list_alloc(fl, sizeof(*str), 8);
+    t_str *str = fl_alloc(fl, sizeof(*str), 8);
     if (!str) {
         err_msg = "ArenaPushNoZero failed";
         goto failed;
@@ -28,7 +28,7 @@ t_str *init_str(free_list *fl, uint64_t cap) {
         goto failed;
     }
 
-    str->str = free_list_alloc(fl, cap + 1, 8);
+    str->str = fl_alloc(fl, cap + 1, 8);
     if (!str->str) {
         err_msg = "ArenaPushNoZero failed";
         goto failed;
@@ -61,7 +61,7 @@ t_str *create_str(free_list *fl, const char *str) {
         return NULL;
     }
 
-    t_str *new_str = init_str(fl, len + 1);
+    t_str *new_str = init_str(fl, len);
     if (!new_str) {
         return NULL;
     }
@@ -185,10 +185,10 @@ void free_str(free_list *fl, t_str *str) {
     ASSERT_NOTNULL(str);
 
     if (str->str) {
-        free_list_free(fl, str->str);
+        fl_free(fl, str->str);
     }
 
-    free_list_free(fl, str);
+    fl_free(fl, str);
 }
 
 static uint64_t strlcpy_(t_str *dst, const t_str *src, uint64_t dstsize) {

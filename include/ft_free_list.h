@@ -34,18 +34,17 @@ typedef struct free_list_node_align_helper {
 
 enum { FREE_LIST_NODE_ALIGN = offsetof(free_list_node_align_helper, member) };
 
-void free_list_free_all(free_list *fl);
-void free_list_init(free_list *fl, void *data, size_t size);
-free_list_node *free_list_find_best(free_list *fl, size_t size, size_t align,
-                                    size_t *padding_,
-                                    free_list_node **prev_node_);
-void *free_list_alloc(free_list *fl, size_t size, size_t align);
-void free_list_free(free_list *fl, void *ptr);
-void free_list_coalescence(free_list *fl, free_list_node *prev_node,
-                           free_list_node *free_node);
-void free_list_node_insert(free_list_node **phead, free_list_node *prev_node,
-                           free_list_node *new_node);
-void free_list_node_remove(free_list_node **phead, free_list_node *prev_node,
-                           free_list_node *del_node);
+void fl_free_all(free_list *fl);
+void fl_init(free_list *fl, void *data, size_t size);
+free_list_node *fl_find_best(free_list *fl, size_t size, size_t align,
+                             size_t *padding_, free_list_node **prev_node_);
+void *fl_alloc(free_list *fl, size_t size, size_t align);
+void fl_free(free_list *fl, void *ptr);
+void fl_coalescence(free_list *fl, free_list_node *prev_node,
+                    free_list_node *free_node);
+void fl_node_insert(free_list_node **phead, free_list_node *prev_node,
+                    free_list_node *new_node);
+void fl_node_remove(free_list_node **phead, free_list_node *prev_node,
+                    free_list_node *del_node);
 
 #endif // !FT_FREE_LIST

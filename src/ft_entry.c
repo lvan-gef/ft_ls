@@ -50,7 +50,7 @@ bool get_file_info(free_list *fl, t_entry *entry) {
     ASSERT_GT(entry->path->cap, 0);
     ASSERT_LT(entry->path->len, entry->path->cap);
 
-    t_file_info *info = free_list_alloc(fl, sizeof(*info), 8);
+    t_file_info *info = fl_alloc(fl, sizeof(*info), 8);
     if (!info) {
         return false;
     }

@@ -13,9 +13,9 @@ static void clean_program_(free_list *fl);
 
 int main(int argc, char *argv[]) {
     t_args args = {0};
-    unsigned char buffer[1024 * 8];
+    unsigned char buffer[1024];
     free_list fl;
-    free_list_init(&fl, buffer, sizeof(buffer));
+    fl_init(&fl, buffer, sizeof(buffer));
 
     t_array *inputs = parse_args(&fl, (uint64_t)argc, argv, &args);
     if (!inputs) {
@@ -33,5 +33,5 @@ int main(int argc, char *argv[]) {
 static void clean_program_(free_list *fl) {
     ASSERT_NOTNULL(fl);
 
-    free_list_free_all(fl);
+    fl_free_all(fl);
 }

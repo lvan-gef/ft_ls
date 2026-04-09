@@ -61,10 +61,10 @@ void process(t_args *args, t_array *array, int *exit_code) {
     ASSERT_NOTNULL(exit_code);
 
     const char *err_msg = NULL;
-    unsigned char buffer[1024 * 1024];
+    unsigned char buffer[1024];
     t_params params = {0};
     params.args = args;
-    free_list_init(&params.fl, buffer, sizeof(buffer));
+    fl_init(&params.fl, buffer, sizeof(buffer));
     params.dirs_arena = ArenaAlloc(ARENA_SIZE);
     if (!params.dirs_arena) {
         *exit_code = 2;
@@ -180,9 +180,9 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
 
     const char *err_msg = NULL;
     struct stat st;
-    unsigned char buffer[1024 * 8];
+    unsigned char buffer[1024];
     free_list fl;
-    free_list_init(&fl, buffer, sizeof(buffer));
+    fl_init(&fl, buffer, sizeof(buffer));
     t_array *dir_entries = init_array(&fl, ARRAY_SIZE);
 
     if (!dir_entries) {
@@ -215,7 +215,7 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
             continue;
         }
 
-        t_entry *entry = free_list_alloc(&params->fl, sizeof(*entry), 8);
+        t_entry *entry = fl_alloc(&params->fl, sizeof(*entry), 8);
         if (!entry) {
             err_msg = "Failed to alloc entry";
             goto failed;
@@ -263,7 +263,7 @@ static t_entry *create_entry_(free_list *fl, const t_entry *path, const struct d
     ASSERT_NOTNULL(path);
     ASSERT_NOTNULL(dp);
 
-    t_entry *entry = free_list_alloc(fl, sizeof(*entry), 8);
+    t_entry *entry = fl_alloc(fl, sizeof(*entry), 8);
     if (!entry) {
         goto failed;
     }
@@ -377,7 +377,7 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
         return false;
     }
 
-    free_list_init(&dir_fl, dir_buffer, UINT64_C(1024) * UINT64_C(1024));
+    fl_init(&dir_fl, dir_buffer, UINT64_C(1024) * UINT64_C(1024));
 
     while ((dp = readdir(d)) != NULL) {
         if (!params->args->all && dp->d_name[0] == '.' &&
@@ -579,7 +579,7 @@ static void clean_up_(t_params *params) {
         params->temp_arena = NULL;
     }
 
-    free_list_free_all(&params->fl);
+    fl_free_all(&params->fl);
 }
 
 static void print_err_(free_list *fl, t_str *str, int e, const char *prefix) {
