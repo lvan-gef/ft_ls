@@ -315,6 +315,7 @@ static bool append_single_shell_escaped_(t_str *dst, const t_str *str) {
             if (next == '\'' || ft_isprint(next)) {
                 break;
             }
+
             ++index;
         }
 
