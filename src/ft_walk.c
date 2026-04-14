@@ -13,10 +13,10 @@
 #include "../include/ft_free_list.h"
 #include "../include/ft_helper.h"
 #include "../include/ft_printer.h"
+#include "../include/ft_shell_escape.h"
 #include "../include/ft_sort.h"
 #include "../include/ft_str.h"
 #include "../include/ft_walk.h"
-#include "../include/ft_shell_escape.h"
 
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
@@ -40,7 +40,8 @@ static bool walk_recurssive_(t_params *params, free_list *fl);
 static bool process_args_(t_params *params, t_array *array, int *exit_code);
 static void clear_array_(t_array *array);
 static void clear_temp_dir_(t_params *params);
-static t_entry *create_entry_(free_list *fl, const t_entry *path, const struct dirent *dp);
+static t_entry *create_entry_(free_list *fl, const t_entry *path,
+                              const struct dirent *dp);
 static t_str *dup_str_arena_(Arena *arena, const t_str *src);
 static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
                                  bool is_operand);
@@ -258,7 +259,8 @@ failed:
     return false;
 }
 
-static t_entry *create_entry_(free_list *fl, const t_entry *path, const struct dirent *dp) {
+static t_entry *create_entry_(free_list *fl, const t_entry *path,
+                              const struct dirent *dp) {
     ASSERT_NOTNULL(fl);
     ASSERT_NOTNULL(path);
     ASSERT_NOTNULL(dp);

@@ -3,8 +3,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "../include/ft_free_list.h"
 #include "../include/ft_assert.h"
+#include "../include/ft_free_list.h"
 
 static size_t calc_padding_(uintptr_t ptr, uintptr_t align, size_t header_size);
 static bool is_power_of_two_(uintptr_t x);
@@ -183,12 +183,14 @@ void fl_coalescence(free_list *fl, free_list_node *prev_node,
         return;
     }
 
-    if ((void *)((char *)free_node + free_node->block_size) == (void *)free_node->next) {
+    if ((void *)((char *)free_node + free_node->block_size) ==
+        (void *)free_node->next) {
         free_node->block_size += free_node->next->block_size;
         fl_node_remove(&fl->head, free_node, free_node->next);
     }
 
-    if ( (void *)((char *)prev_node + prev_node->block_size) == (void *)free_node) {
+    if ((void *)((char *)prev_node + prev_node->block_size) ==
+        (void *)free_node) {
         prev_node->block_size += free_node->block_size;
         fl_node_remove(&fl->head, prev_node, free_node);
     }

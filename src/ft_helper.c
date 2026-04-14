@@ -17,4 +17,3 @@ uint64_t len_of_nbr(uint64_t nbr) {
 
     return len;
 }
-

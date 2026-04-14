@@ -3,9 +3,9 @@
 #include <stdint.h>
 #include <unistd.h>
 
-#include "../include/ft_free_list.h"
 #include "../include/ft_array.h"
 #include "../include/ft_assert.h"
+#include "../include/ft_free_list.h"
 #include "../include/ft_parse.h"
 #include "../include/ft_walk.h"
 
