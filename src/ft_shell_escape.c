@@ -297,6 +297,7 @@ static bool append_single_shell_escaped_(t_str *dst, const t_str *str) {
             if (!append_bytes_(dst, "'\\''", 4)) {
                 return false;
             }
+
             in_single = true;
             ++index;
             continue;
@@ -306,6 +307,7 @@ static bool append_single_shell_escaped_(t_str *dst, const t_str *str) {
             if (!append_bytes_(dst, "\'", 1)) {
                 return false;
             }
+
             in_single = false;
         }
 
