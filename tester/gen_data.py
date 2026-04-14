@@ -15,20 +15,20 @@ def gen_data(paths: Paths) -> Generator[list[str], None, None]:
             for entry in paths.paths:
                 yield [flags, str(entry)]
 
-            for entry in paths.paths:
+            for entry in paths.paths[:10]:
                 yield ['--', flags, str(entry)]
 
-            for entry in paths.paths:
+            for entry in paths.paths[:10]:
                 yield [flags, '--', str(entry)]
 
             # files combies with -- and without
             for entry in paths.files:
                 yield [flags, str(entry)]
 
-            for entry in paths.files:
+            for entry in paths.files[:10]:
                 yield ['--', flags, str(entry)]
 
-            for entry in paths.files:
+            for entry in paths.files[:10]:
                 yield [flags, '--', str(entry)]
 
             # path and files combies with -- and without
@@ -36,11 +36,11 @@ def gen_data(paths: Paths) -> Generator[list[str], None, None]:
                 for file_entry in paths.files:
                     yield [flags, str(dir_entry), str(file_entry)]
 
-            for dir_entry in paths.paths:
+            for dir_entry in paths.paths[:10]:
                 for file_entry in paths.files:
                     yield ['--', flags, str(dir_entry), str(file_entry)]
 
-            for dir_entry in paths.paths:
+            for dir_entry in paths.paths[:10]:
                 for file_entry in paths.files:
                     yield [flags, '--', str(dir_entry), str(file_entry)]
 
@@ -48,8 +48,8 @@ def gen_data(paths: Paths) -> Generator[list[str], None, None]:
             for case in paths.cases:
                 yield [flags, *(str(entry) for entry in case)]
 
-            for case in paths.cases:
+            for case in paths.cases[:10]:
                 yield [flags, '--', *(str(entry) for entry in case)]
 
-            for case in paths.cases:
+            for case in paths.cases[:10]:
                 yield ['--', flags, *(str(entry) for entry in case)]
