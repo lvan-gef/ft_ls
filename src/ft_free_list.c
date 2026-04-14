@@ -176,8 +176,12 @@ void fl_free(free_list *fl, void *ptr) {
 void fl_coalescence(free_list *fl, free_list_node *prev_node,
                     free_list_node *free_node) {
     ASSERT_NOTNULL(fl);
-    ASSERT_NOTNULL(prev_node);
+    // ASSERT_NOTNULL(prev_node);
     ASSERT_NOTNULL(free_node);
+
+    if (!prev_node) {
+        return;
+    }
 
     if ((void *)((char *)free_node + free_node->block_size) == (void *)free_node->next) {
         free_node->block_size += free_node->next->block_size;
