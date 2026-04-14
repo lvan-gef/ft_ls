@@ -214,6 +214,7 @@ static uint64_t single_shell_escaped_len_(const t_str *str) {
             if (next == '\'' || ft_isprint(next)) {
                 break;
             }
+
             ++index;
         }
 
@@ -289,6 +290,7 @@ static bool append_single_shell_escaped_(t_str *dst, const t_str *str) {
             if (!append_bytes_(dst, str->str + index, 1)) {
                 return false;
             }
+
             ++index;
             continue;
         }
