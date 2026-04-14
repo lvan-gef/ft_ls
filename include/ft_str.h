@@ -7,6 +7,7 @@
 #include <stdio.h>
 
 #include "./ft_free_list.h"
+#include "./ft_arena.h"
 
 typedef struct {
     char *str;
@@ -18,6 +19,7 @@ typedef struct {
 t_str *init_str(free_list *fl, uint64_t cap);
 t_str *create_str(free_list *fl, const char *str);
 t_str *dup_str(free_list *fl, const t_str *str);
+t_str *dup_str_arena(Arena *arena, const t_str *src);
 uint64_t cat_str(t_str *dst, const t_str *src);
 uint64_t cat_l_str(t_str *dst, const t_str *src, uint64_t size);
 t_str *uint_to_str(free_list *fl, uint64_t nbr);

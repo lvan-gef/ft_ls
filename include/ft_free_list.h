@@ -3,6 +3,10 @@
 
 #include <stddef.h>
 
+#ifndef FL_DEFAULT_SIZE
+#define FL_DEFAULT_SIZE UINT64_C(1024)
+#endif // !FL_DEFAULT_SIZE
+
 typedef struct free_list_header free_list_header;
 struct free_list_header {
     size_t block_size;

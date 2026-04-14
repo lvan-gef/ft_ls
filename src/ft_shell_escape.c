@@ -138,6 +138,8 @@ char shell_quote_style(const t_str *str) {
 }
 
 bool has_shell_quote_char(const t_str *str) {
+    ASSERT_NOTNULL(str);
+
     return shell_quote_style(str) != '\0';
 }
 
@@ -337,9 +339,8 @@ static bool append_single_shell_escaped_(t_str *dst, const t_str *str) {
 
 static bool needs_raw_quote_(unsigned char c, uint64_t index,
                              bool *assignment_candidate) {
-    bool needs_quote = false;
-
     ASSERT_NOTNULL(assignment_candidate);
+    bool needs_quote = false;
 
     switch (c) {
         case ' ':

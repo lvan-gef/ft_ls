@@ -13,7 +13,7 @@ static void clean_program_(free_list *fl);
 
 int main(int argc, char *argv[]) {
     t_args args = {0};
-    unsigned char buffer[1024];
+    unsigned char buffer[FL_DEFAULT_SIZE];
     free_list fl;
     fl_init(&fl, buffer, sizeof(buffer));
 

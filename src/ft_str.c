@@ -9,6 +9,7 @@
 #include "../include/ft_free_list.h"
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
+#include "ft_arena.h"
 
 static uint64_t strlcpy_(t_str *dst, const t_str *src, uint64_t dstsize);
 
@@ -98,6 +99,30 @@ t_str *dup_str(free_list *fl, const t_str *str) {
     ASSERT_EQ(new_str->len, str->len);
 
     return new_str;
+}
+
+
+t_str *dup_str_arena(Arena *arena, const t_str *src) {
+    ASSERT_NOTNULL(arena);
+    ASSERT_NOTNULL(src);
+    ASSERT_NOTNULL(src->str);
+
+    t_str *dst = ArenaPush(arena, sizeof(*dst));
+    char *buf;
+    if (!dst) {
+        return NULL;
+    }
+
+    buf = ArenaPushNoZero(arena, src->cap);
+    if (!buf) {
+        return NULL;
+    }
+
+    *dst = *src;
+    dst->str = buf;
+    dst->pos = 0;
+    ft_memcpy(dst->str, src->str, src->len + 1);
+    return dst;
 }
 
 uint64_t cat_str(t_str *dst, const t_str *src) {

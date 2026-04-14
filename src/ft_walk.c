@@ -42,7 +42,6 @@ static void clear_array_(t_array *array);
 static void clear_temp_dir_(t_params *params);
 static t_entry *create_entry_(free_list *fl, const t_entry *path,
                               const struct dirent *dp);
-static t_str *dup_str_arena_(Arena *arena, const t_str *src);
 static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
                                  bool is_operand);
 static int check_links(t_params *params, t_str *str, t_array *dir_entries,
@@ -64,6 +63,7 @@ void process(t_args *args, t_array *array, int *exit_code) {
     const char *err_msg = NULL;
     unsigned char buffer[1024];
     t_params params = {0};
+
     params.args = args;
     fl_init(&params.fl, buffer, sizeof(buffer));
     params.dirs_arena = ArenaAlloc(ARENA_SIZE);
@@ -72,7 +72,7 @@ void process(t_args *args, t_array *array, int *exit_code) {
         return;
     }
 
-    params.temp_arena = ArenaAlloc(UINT64_C(1024) * UINT64_C(1024));
+    params.temp_arena = ArenaAlloc(ARENA_SIZE);
     if (!params.temp_arena) {
         *exit_code = 2;
         clean_up_(&params);
@@ -88,8 +88,7 @@ void process(t_args *args, t_array *array, int *exit_code) {
 
     if (!params.dirs || !params.files || !params.entries) {
         *exit_code = 2;
-        clean_up_(&params);
-        return;
+        goto failed;
     }
 
     if (!run_(args, &params, array, exit_code)) {
@@ -181,7 +180,7 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
 
     const char *err_msg = NULL;
     struct stat st;
-    unsigned char buffer[1024];
+    unsigned char buffer[FL_DEFAULT_SIZE];
     free_list fl;
     fl_init(&fl, buffer, sizeof(buffer));
     t_array *dir_entries = init_array(&fl, ARRAY_SIZE);
@@ -356,6 +355,8 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
     ASSERT_NOTNULL(params->dirs);
     ASSERT_NOTNULL(params->files);
     ASSERT_NOTNULL(path);
+    ASSERT_NOTNULL(path->path);
+    ASSERT_NOTNULL(path->path->str);
     ASSERT_NOTNULL(exit_code);
 
     errno = 0;
@@ -369,17 +370,15 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
     }
 
     clear_temp_dir_(params);
-
     const struct dirent *dp;
     free_list dir_fl;
-    void *dir_buffer =
-        ArenaPushNoZero(params->temp_arena, UINT64_C(1024) * UINT64_C(1024));
-    if (!dir_buffer) {
+    void *buffer = ArenaPushNoZero(params->temp_arena, FL_DEFAULT_SIZE);
+    if (!buffer) {
         *exit_code = 2;
         return false;
     }
 
-    fl_init(&dir_fl, dir_buffer, UINT64_C(1024) * UINT64_C(1024));
+    fl_init(&dir_fl, buffer, FL_DEFAULT_SIZE);
 
     while ((dp = readdir(d)) != NULL) {
         if (!params->args->all && dp->d_name[0] == '.' &&
@@ -476,29 +475,6 @@ static bool walk_recurssive_(t_params *params, free_list *fl) {
     return true;
 }
 
-static t_str *dup_str_arena_(Arena *arena, const t_str *src) {
-    ASSERT_NOTNULL(arena);
-    ASSERT_NOTNULL(src);
-    ASSERT_NOTNULL(src->str);
-
-    t_str *dst = ArenaPush(arena, sizeof(*dst));
-    char *buf;
-    if (!dst) {
-        return NULL;
-    }
-
-    buf = ArenaPushNoZero(arena, src->cap);
-    if (!buf) {
-        return NULL;
-    }
-
-    *dst = *src;
-    dst->str = buf;
-    dst->pos = 0;
-    ft_memcpy(dst->str, src->str, src->len + 1);
-    return dst;
-}
-
 static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
                                  bool is_operand) {
     ASSERT_NOTNULL(params);
@@ -513,12 +489,12 @@ static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
 
     *entry = *src;
     entry->name =
-        src->name ? dup_str_arena_(params->dirs_arena, src->name) : NULL;
+        src->name ? dup_str_arena(params->dirs_arena, src->name) : NULL;
     if (src->name && !entry->name) {
         return NULL;
     }
 
-    entry->path = dup_str_arena_(params->dirs_arena, src->path);
+    entry->path = dup_str_arena(params->dirs_arena, src->path);
     if (!entry->path) {
         return NULL;
     }
