@@ -101,7 +101,6 @@ t_str *dup_str(free_list *fl, const t_str *str) {
     return new_str;
 }
 
-
 t_str *dup_str_arena(Arena *arena, const t_str *src) {
     ASSERT_NOTNULL(arena);
     ASSERT_NOTNULL(src);

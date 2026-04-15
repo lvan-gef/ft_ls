@@ -6,8 +6,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "./ft_free_list.h"
 #include "./ft_arena.h"
+#include "./ft_free_list.h"
 
 typedef struct {
     char *str;
