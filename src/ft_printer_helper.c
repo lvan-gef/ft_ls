@@ -31,14 +31,8 @@ bool put_mem(t_str *out, const char *src, uint64_t len) {
 bool flush_str(t_str *out) {
     ASSERT_NOTNULL(out);
 
-    uint64_t written = 0;
-    while (written < out->len) {
-        const ssize_t chunk = write(STDOUT_FILENO, out->str + written,
-                                    (size_t)(out->len - written));
-        if (chunk < 0) {
-            return false;
-        }
-        written += (uint64_t)chunk;
+    if (write(STDOUT_FILENO, out->str, out->len) < 0) {
+        return false;
     }
 
     out->len = 0;

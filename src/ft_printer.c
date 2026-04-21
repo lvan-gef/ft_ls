@@ -25,8 +25,8 @@ static void init_print_row_(t_array *array, const t_entry *dir_entry,
 static uint64_t *calc_cols_(t_array *array, t_map *map, bool quoted);
 static uint64_t calc_width_(t_array *array, uint64_t num_cols,
                             uint64_t *col_widths, bool quoted);
-static bool print_row_(t_str *out, t_array *array, const t_map *map,
-                       const uint64_t *col_widths, bool quoted);
+static bool create_row_(t_str *out, t_array *array, const t_map *map,
+                        const uint64_t *col_widths, bool quoted);
 static bool check_quoted_(t_array *array);
 static uint64_t display_name_len_(const t_entry *entry, bool pad_unquoted);
 static bool indent_(t_str *out, uint64_t from, uint64_t to);
@@ -72,19 +72,17 @@ static void init_print_row_(t_array *array, const t_entry *dir_entry,
     }
 
     if (dir_entry) {
-        if (!write_shell_escaped_to_out(&out, dir_entry->name, dir_entry->quote,
-                                        false) ||
+        if (!escaped_out(&out, dir_entry->name, dir_entry->quote, false) ||
             !put_mem(&out, ":\n", 2)) {
             err_msg = "Failed to write dir header";
             goto done;
         }
     }
 
-    if (!print_row_(&out, array, &map, col_widths, quoted) ||
+    if (!create_row_(&out, array, &map, col_widths, quoted) ||
         !flush_str(&out)) {
         err_msg = "Failed to write output";
     }
-
 done:
     if (col_widths) {
         free(col_widths);
@@ -95,8 +93,8 @@ done:
     }
 }
 
-static bool print_row_(t_str *out, t_array *array, const t_map *map,
-                       const uint64_t *col_widths, bool quoted) {
+static bool create_row_(t_str *out, t_array *array, const t_map *map,
+                        const uint64_t *col_widths, bool quoted) {
     ASSERT_NOTNULL(out);
     ASSERT_NOTNULL(array);
     ASSERT_NOTNULL(map);
@@ -113,8 +111,7 @@ static bool print_row_(t_str *out, t_array *array, const t_map *map,
             const uint64_t name_length = display_name_len_(entry, quoted);
             const uint64_t max_name_length = col_widths[col++];
 
-            if (!write_shell_escaped_to_out(out, entry->name, entry->quote,
-                                            quoted)) {
+            if (!escaped_out(out, entry->name, entry->quote, quoted)) {
                 return false;
             }
 

@@ -43,7 +43,7 @@ static void merge_sort_(t_array *array, t_cmp_entry cmp) {
         return;
     }
 
-    void **tmp = malloc((size_t)array->len * sizeof(*tmp));
+    void **tmp = (void **)malloc((size_t)array->len * sizeof(*tmp));
     if (!tmp) {
         return;
     }
@@ -67,7 +67,7 @@ static void merge_sort_(t_array *array, t_cmp_entry cmp) {
 
         width += width;
     }
-    free(tmp);
+    free((void *)tmp);
 }
 
 static uint64_t add_capped_(uint64_t lhs, uint64_t rhs, uint64_t cap) {

@@ -41,10 +41,8 @@ void print_list(t_array *array, const t_entry *dir_entry, bool print_total,
     const char *err_msg = NULL;
 
     get_sizes_(array, &sizes);
-
     if (dir_entry) {
-        if (!write_shell_escaped_to_out(&out, dir_entry->name, dir_entry->quote,
-                                        false) ||
+        if (!escaped_out(&out, dir_entry->name, dir_entry->quote, false) ||
             !put_mem(&out, ":\n", 2)) {
             err_msg = "Failed to write dir header";
             goto done;
@@ -95,8 +93,7 @@ static bool printer_(t_str *out, t_array *array, const t_sizes *sizes) {
             !put_mem(out, " ", 1) ||
             !put_mem(out, entry->info->dt->str, entry->info->dt->len) ||
             !put_mem(out, " ", 1) ||
-            !write_shell_escaped_to_out(out, entry->name, entry->quote,
-                                        sizes->have_quote)) {
+            !escaped_out(out, entry->name, entry->quote, sizes->have_quote)) {
             return false;
         }
 

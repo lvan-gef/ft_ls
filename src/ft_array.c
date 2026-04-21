@@ -73,6 +73,14 @@ void reset_array(free_list *fl, t_array *array) {
     ASSERT_LT(array->len, array->cap);
 }
 
+void clear_array(t_array *array) {
+    ASSERT_NOTNULL(array);
+
+    while (array->len) {
+        (void)pop_array(array);
+    }
+}
+
 static bool realloc_arr_(t_array *array) {
     ASSERT_NOTNULL(array);
 

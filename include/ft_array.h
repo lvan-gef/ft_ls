@@ -22,5 +22,6 @@ t_array *init_array(free_list *fl, uint64_t size);
 bool append_array(t_array *array, void *content);
 void *pop_array(t_array *array);
 void reset_array(free_list *fl, t_array *array);
+void clear_array(t_array *array);
 
 #endif // !FT_ARRAY_H

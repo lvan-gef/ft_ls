@@ -10,19 +10,18 @@
 
 static bool append_bytes_(t_str *dst, const char *src, uint64_t len);
 static uint64_t ansi_byte_len_(unsigned char byte);
-static uint64_t ansi_c_segment_len_(const char *src, uint64_t len);
-static uint64_t single_shell_escaped_len_(const t_str *str);
+static uint64_t ansi_len_(const char *src, uint64_t len);
+static uint64_t escaped_len_(const t_str *str);
 static bool append_ansi_byte_(t_str *dst, unsigned char byte);
-static bool append_ansi_c_segment_(t_str *dst, const char *src, uint64_t len);
-static bool append_single_shell_escaped_(t_str *dst, const t_str *str);
+static bool append_ansi_segment_(t_str *dst, const char *src, uint64_t len);
+static bool shell_escaped_(t_str *dst, const t_str *str);
 static bool needs_raw_quote_(unsigned char c, uint64_t index,
                              bool *assignment_candidate);
-static bool is_raw_safe_punct_(unsigned char c, uint64_t index);
+static bool is_safe_punct_(unsigned char c, uint64_t index);
 static bool name_start_(unsigned char c);
 static bool name_continue_(unsigned char c);
 
-bool write_shell_escaped_to_str(t_str *dst, const t_str *str, char quote,
-                                bool pad_unquoted) {
+bool escape_str(t_str *dst, const t_str *str, char quote, bool pad_unquoted) {
     ASSERT_NOTNULL(dst);
     ASSERT_NOTNULL(dst->str);
     ASSERT_NOTNULL(str);
@@ -44,11 +43,10 @@ bool write_shell_escaped_to_str(t_str *dst, const t_str *str, char quote,
     }
 
     ASSERT_EQ(quote, '\'');
-    return append_single_shell_escaped_(dst, str);
+    return shell_escaped_(dst, str);
 }
 
-bool write_shell_escaped_to_out(t_str *dst, const t_str *str, char quote,
-                                bool pad_unquoted) {
+bool escaped_out(t_str *dst, const t_str *str, char quote, bool pad_unquoted) {
     ASSERT_NOTNULL(dst);
     ASSERT_NOTNULL(str);
 
@@ -61,7 +59,7 @@ bool write_shell_escaped_to_out(t_str *dst, const t_str *str, char quote,
         return false;
     }
 
-    return write_shell_escaped_to_str(dst, str, quote, pad_unquoted);
+    return escape_str(dst, str, quote, pad_unquoted);
 }
 
 t_str *shell_escape_str(free_list *fl, const t_str *str, char quote) {
@@ -75,7 +73,7 @@ t_str *shell_escape_str(free_list *fl, const t_str *str, char quote) {
         return NULL;
     }
 
-    if (!write_shell_escaped_to_str(new_str, str, quote, false)) {
+    if (!escape_str(new_str, str, quote, false)) {
         free_str(fl, new_str);
         return NULL;
     }
@@ -96,7 +94,7 @@ uint64_t shell_display_len(const t_str *str, char quote, bool pad_unquoted) {
     }
 
     ASSERT_EQ(quote, '\'');
-    return single_shell_escaped_len_(str);
+    return escaped_len_(str);
 }
 
 char shell_quote_style(const t_str *str) {
@@ -168,17 +166,18 @@ static uint64_t ansi_byte_len_(unsigned char byte) {
     }
 }
 
-static uint64_t ansi_c_segment_len_(const char *src, uint64_t len) {
+static uint64_t ansi_len_(const char *src, uint64_t len) {
     ASSERT_NOTNULL(src);
 
     uint64_t out = 3; /* $'  + closing ' */
     for (uint64_t i = 0; i < len; ++i) {
         out += ansi_byte_len_((unsigned char)src[i]);
     }
+
     return out;
 }
 
-static uint64_t single_shell_escaped_len_(const t_str *str) {
+static uint64_t escaped_len_(const t_str *str) {
     ASSERT_NOTNULL(str);
     ASSERT_NOTNULL(str->str);
 
@@ -220,7 +219,7 @@ static uint64_t single_shell_escaped_len_(const t_str *str) {
             ++index;
         }
 
-        out += ansi_c_segment_len_(str->str + start, index - start);
+        out += ansi_len_(str->str + start, index - start);
     }
 
     if (in_single) {
@@ -251,7 +250,7 @@ static bool append_ansi_byte_(t_str *dst, unsigned char byte) {
     return append_bytes_(dst, octal, 4);
 }
 
-static bool append_ansi_c_segment_(t_str *dst, const char *src, uint64_t len) {
+static bool append_ansi_segment_(t_str *dst, const char *src, uint64_t len) {
     ASSERT_NOTNULL(src);
 
     if (!append_bytes_(dst, "$'", 2)) {
@@ -267,7 +266,7 @@ static bool append_ansi_c_segment_(t_str *dst, const char *src, uint64_t len) {
     return append_bytes_(dst, "\'", 1);
 }
 
-static bool append_single_shell_escaped_(t_str *dst, const t_str *str) {
+static bool shell_escaped_(t_str *dst, const t_str *str) {
     ASSERT_NOTNULL(dst);
     ASSERT_NOTNULL(str);
     ASSERT_NOTNULL(str->str);
@@ -325,7 +324,7 @@ static bool append_single_shell_escaped_(t_str *dst, const t_str *str) {
             ++index;
         }
 
-        if (!append_ansi_c_segment_(dst, str->str + start, index - start)) {
+        if (!append_ansi_segment_(dst, str->str + start, index - start)) {
             return false;
         }
     }
@@ -364,8 +363,8 @@ static bool needs_raw_quote_(unsigned char c, uint64_t index,
         case '^': needs_quote = true; break;
         case '=': needs_quote = true; break;
         default:
-            needs_quote = !ft_isalpha(c) && !ft_isdigit(c) &&
-                          !is_raw_safe_punct_(c, index);
+            needs_quote =
+                !ft_isalpha(c) && !ft_isdigit(c) && !is_safe_punct_(c, index);
             break;
     }
 
@@ -384,7 +383,7 @@ static bool needs_raw_quote_(unsigned char c, uint64_t index,
     return needs_quote;
 }
 
-static bool is_raw_safe_punct_(unsigned char c, uint64_t index) {
+static bool is_safe_punct_(unsigned char c, uint64_t index) {
     switch (c) {
         case '_':
         case '-':

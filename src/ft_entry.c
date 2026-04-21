@@ -13,6 +13,7 @@
 #include "../include/ft_str.h"
 
 #include "../libft/include/libft.h"
+#include "ft_shell_escape.h"
 
 static t_str *get_perm_(free_list *fl, const t_entry *entry);
 static t_str *get_user_(free_list *fl, uid_t user_id);
@@ -20,6 +21,7 @@ static t_str *get_group_(free_list *fl, gid_t group_id);
 static t_str *get_dt_(free_list *fl, const struct timespec *ctim);
 static bool get_symlink_(free_list *fl, const t_entry *entry, t_str **out);
 static bool has_xattr_(const char *path, const char *name);
+static t_str *join_paths_(free_list *fl, const t_str *lhs, const t_str *rhs);
 
 typedef enum {
     P_LINK,
@@ -42,6 +44,35 @@ static uid_t cached_uid = (uid_t)-1;
 static gid_t cached_gid = (gid_t)-1;
 static char cached_user[LOGIN_NAME_MAX] = "";
 static char cached_group[LOGIN_NAME_MAX] = "";
+
+t_entry *new_entry(free_list *fl, t_entry *entry, const struct dirent *dp) {
+    ASSERT_NOTNULL(fl);
+    ASSERT_NOTNULL(entry);
+    ASSERT_NOTNULL(dp);
+
+    t_entry *ent = fl_alloc(fl, sizeof(*entry), 8);
+    if (!ent) {
+        goto failed;
+    }
+
+    ent->name = create_str(fl, dp->d_name);
+    if (!ent->name) {
+        goto failed;
+    }
+
+    ent->path = join_paths_(fl, entry->path, ent->name);
+    if (!ent->path) {
+        goto failed;
+    }
+
+    ent->quote = shell_quote_style(ent->name);
+    ent->is_escaped = false;
+    ent->is_operand = false;
+
+    return ent;
+failed:
+    return NULL;
+}
 
 bool get_file_info(free_list *fl, t_entry *entry) {
     ASSERT_NOTNULL(fl);
@@ -312,4 +343,26 @@ static bool has_xattr_(const char *path, const char *name) {
     }
 
     return true;
+}
+
+static t_str *join_paths_(free_list *fl, const t_str *lhs, const t_str *rhs) {
+    ASSERT_NOTNULL(fl);
+    ASSERT_NOTNULL(lhs);
+    ASSERT_NOTNULL(rhs);
+
+    const size_t new_len = lhs->len + 1 + rhs->len + 1;
+    t_str *fullname = init_str(fl, new_len);
+    if (!fullname) {
+        return NULL;
+    }
+
+    char slash_buffer[] = "/";
+    t_str slash = {.str = slash_buffer, .cap = 2, .len = 1, .pos = 0};
+    (void)cat_str(fullname, lhs);
+    if (fullname->str[fullname->len - 1] != '/') {
+        (void)cat_str(fullname, &slash);
+    }
+    (void)cat_str(fullname, rhs);
+
+    return fullname;
 }

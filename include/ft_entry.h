@@ -1,6 +1,7 @@
 #ifndef FT_ENTRY_H
 #define FT_ENTRY_H
 
+#include <dirent.h>
 #include <limits.h>
 #include <linux/limits.h>
 #include <stdbool.h>
@@ -51,6 +52,7 @@ typedef struct {
     bool is_escaped;
 } t_entry;
 
+t_entry *new_entry(free_list *fl, t_entry *entry, const struct dirent *dp);
 bool get_file_info(free_list *fl, t_entry *entry);
 
 #endif // !FT_ENTRY_H
