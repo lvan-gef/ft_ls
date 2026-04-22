@@ -31,6 +31,10 @@ bool put_mem(t_str *out, const char *src, uint64_t len) {
 bool flush_str(t_str *out) {
     ASSERT_NOTNULL(out);
 
+    if (out->len < 1) {
+        return true;
+    }
+
     if (write(STDOUT_FILENO, out->str, out->len) < 0) {
         return false;
     }

@@ -28,7 +28,6 @@ static uint64_t calc_width_(t_array *array, uint64_t num_cols,
 static bool create_row_(t_str *out, t_array *array, const t_map *map,
                         const uint64_t *col_widths, bool quoted);
 static bool check_quoted_(t_array *array);
-static uint64_t display_name_len_(const t_entry *entry, bool pad_unquoted);
 static bool indent_(t_str *out, uint64_t from, uint64_t to);
 
 void printer(const t_args *args, t_array *array, const t_entry *dir_entry,
@@ -83,6 +82,7 @@ static void init_print_row_(t_array *array, const t_entry *dir_entry,
         !flush_str(&out)) {
         err_msg = "Failed to write output";
     }
+
 done:
     if (col_widths) {
         free(col_widths);
@@ -108,7 +108,7 @@ static bool create_row_(t_str *out, t_array *array, const t_map *map,
 
         while (true) {
             const t_entry *entry = array->data[filesno];
-            const uint64_t name_length = display_name_len_(entry, quoted);
+            const uint64_t name_length = shell_display_len(entry->name, entry->quote, quoted);
             const uint64_t max_name_length = col_widths[col++];
 
             if (!escaped_out(out, entry->name, entry->quote, quoted)) {
@@ -182,7 +182,7 @@ static uint64_t calc_width_(t_array *array, uint64_t num_cols,
         ASSERT_NOTNULL(entry->name);
 
         const uint64_t idx = filesno / num_rows;
-        const uint64_t name_length = display_name_len_(entry, quoted);
+        const uint64_t name_length = shell_display_len(entry->name, entry->quote, quoted);
         const uint64_t real_length =
             name_length + (idx == num_cols - 1 ? 0 : SPACE_GAP);
 
@@ -209,13 +209,6 @@ static bool check_quoted_(t_array *array) {
     }
 
     return false;
-}
-
-static uint64_t display_name_len_(const t_entry *entry, bool pad_unquoted) {
-    ASSERT_NOTNULL(entry);
-    ASSERT_NOTNULL(entry->name);
-
-    return shell_display_len(entry->name, entry->quote, pad_unquoted);
 }
 
 static bool indent_(t_str *out, uint64_t from, uint64_t to) {

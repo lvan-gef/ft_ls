@@ -144,7 +144,7 @@ static bool run_(const t_args *args, t_params *params, t_array *array,
         }
 
         t_entry entry = {.name = dir_path->path};
-        entry.quote = shell_quote_style(entry.name);
+        entry.quote = shell_quote(entry.name);
         if (entry.quote == '\0' && ft_strchr(entry.name->str, ':')) {
             entry.quote = '\'';
         }
@@ -216,7 +216,7 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
             goto failed;
         }
 
-        entry->quote = shell_quote_style(str);
+        entry->quote = shell_quote(str);
         entry->name = str;
         entry->path = str;
         entry->st = st;
@@ -464,7 +464,7 @@ static bool has_quoted_operands_(const t_array *array) {
             continue;
         }
 
-        if (has_shell_quote_char(operand)) {
+        if (shell_quote(operand) != '\0') {
             return true;
         }
     }
@@ -490,7 +490,7 @@ static void clean_up_(t_params *params) {
 
 static void print_err_(free_list *fl, t_str *str, int e, const char *prefix) {
     const char *msg = strerror(e);
-    const char quote = shell_quote_style(str);
+    const char quote = shell_quote(str);
 
     if (quote != '\0') {
         t_str *new_str = shell_escape_str(fl, str, quote);

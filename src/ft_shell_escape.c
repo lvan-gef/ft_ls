@@ -8,6 +8,7 @@
 
 #include "../libft/include/libft.h"
 
+static bool escape_str_(t_str *dst, const t_str *str, char quote, bool pad_unquoted);
 static bool append_bytes_(t_str *dst, const char *src, uint64_t len);
 static uint64_t ansi_byte_len_(unsigned char byte);
 static uint64_t ansi_len_(const char *src, uint64_t len);
@@ -15,36 +16,10 @@ static uint64_t escaped_len_(const t_str *str);
 static bool append_ansi_byte_(t_str *dst, unsigned char byte);
 static bool append_ansi_segment_(t_str *dst, const char *src, uint64_t len);
 static bool shell_escaped_(t_str *dst, const t_str *str);
-static bool needs_raw_quote_(unsigned char c, uint64_t index,
-                             bool *assignment_candidate);
+static bool needs_raw_quote_(unsigned char c, uint64_t index, bool *candidate);
 static bool is_safe_punct_(unsigned char c, uint64_t index);
 static bool name_start_(unsigned char c);
 static bool name_continue_(unsigned char c);
-
-bool escape_str(t_str *dst, const t_str *str, char quote, bool pad_unquoted) {
-    ASSERT_NOTNULL(dst);
-    ASSERT_NOTNULL(dst->str);
-    ASSERT_NOTNULL(str);
-    ASSERT_NOTNULL(str->str);
-
-    if (quote == '\0') {
-        if (pad_unquoted && !append_bytes_(dst, " ", 1)) {
-            return false;
-        }
-        return append_bytes_(dst, str->str, str->len);
-    }
-
-    if (quote == '"') {
-        if (!append_bytes_(dst, "\"", 1) ||
-            !append_bytes_(dst, str->str, str->len)) {
-            return false;
-        }
-        return append_bytes_(dst, "\"", 1);
-    }
-
-    ASSERT_EQ(quote, '\'');
-    return shell_escaped_(dst, str);
-}
 
 bool escaped_out(t_str *dst, const t_str *str, char quote, bool pad_unquoted) {
     ASSERT_NOTNULL(dst);
@@ -59,7 +34,7 @@ bool escaped_out(t_str *dst, const t_str *str, char quote, bool pad_unquoted) {
         return false;
     }
 
-    return escape_str(dst, str, quote, pad_unquoted);
+    return escape_str_(dst, str, quote, pad_unquoted);
 }
 
 t_str *shell_escape_str(free_list *fl, const t_str *str, char quote) {
@@ -73,7 +48,7 @@ t_str *shell_escape_str(free_list *fl, const t_str *str, char quote) {
         return NULL;
     }
 
-    if (!escape_str(new_str, str, quote, false)) {
+    if (!escape_str_(new_str, str, quote, false)) {
         free_str(fl, new_str);
         return NULL;
     }
@@ -97,7 +72,7 @@ uint64_t shell_display_len(const t_str *str, char quote, bool pad_unquoted) {
     return escaped_len_(str);
 }
 
-char shell_quote_style(const t_str *str) {
+char shell_quote(const t_str *str) {
     ASSERT_NOTNULL(str);
     ASSERT_NOTNULL(str->str);
 
@@ -135,10 +110,29 @@ char shell_quote_style(const t_str *str) {
     return '\'';
 }
 
-bool has_shell_quote_char(const t_str *str) {
+static bool escape_str_(t_str *dst, const t_str *str, char quote, bool pad_unquoted) {
+    ASSERT_NOTNULL(dst);
+    ASSERT_NOTNULL(dst->str);
     ASSERT_NOTNULL(str);
+    ASSERT_NOTNULL(str->str);
 
-    return shell_quote_style(str) != '\0';
+    if (quote == '\0') {
+        if (pad_unquoted && !append_bytes_(dst, " ", 1)) {
+            return false;
+        }
+        return append_bytes_(dst, str->str, str->len);
+    }
+
+    if (quote == '"') {
+        if (!append_bytes_(dst, "\"", 1) ||
+            !append_bytes_(dst, str->str, str->len)) {
+            return false;
+        }
+        return append_bytes_(dst, "\"", 1);
+    }
+
+    ASSERT_EQ(quote, '\'');
+    return shell_escaped_(dst, str);
 }
 
 static bool append_bytes_(t_str *dst, const char *src, uint64_t len) {
@@ -230,8 +224,9 @@ static uint64_t escaped_len_(const t_str *str) {
 }
 
 static bool append_ansi_byte_(t_str *dst, unsigned char byte) {
-    char octal[4];
+    ASSERT_NOTNULL(dst);
 
+    char octal[4];
     switch (byte) {
         case '\a': return append_bytes_(dst, "\\a", 2);
         case '\b': return append_bytes_(dst, "\\b", 2);
@@ -251,6 +246,7 @@ static bool append_ansi_byte_(t_str *dst, unsigned char byte) {
 }
 
 static bool append_ansi_segment_(t_str *dst, const char *src, uint64_t len) {
+    ASSERT_NOTNULL(dst);
     ASSERT_NOTNULL(src);
 
     if (!append_bytes_(dst, "$'", 2)) {
@@ -336,9 +332,8 @@ static bool shell_escaped_(t_str *dst, const t_str *str) {
     return append_bytes_(dst, "\'", 1);
 }
 
-static bool needs_raw_quote_(unsigned char c, uint64_t index,
-                             bool *assignment_candidate) {
-    ASSERT_NOTNULL(assignment_candidate);
+static bool needs_raw_quote_(unsigned char c, uint64_t index, bool *candidate) {
+    ASSERT_NOTNULL(candidate);
     bool needs_quote = false;
 
     switch (c) {
@@ -368,16 +363,16 @@ static bool needs_raw_quote_(unsigned char c, uint64_t index,
             break;
     }
 
-    if (*assignment_candidate) {
+    if (*candidate) {
         if (index == 0) {
-            *assignment_candidate = name_start_(c);
+            *candidate = name_start_(c);
         } else {
-            *assignment_candidate = name_continue_(c);
+            *candidate = name_continue_(c);
         }
     }
 
     if (c == '/') {
-        *assignment_candidate = false;
+        *candidate = false;
     }
 
     return needs_quote;

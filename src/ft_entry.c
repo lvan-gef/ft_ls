@@ -10,18 +10,19 @@
 #include "../include/ft_assert.h"
 #include "../include/ft_entry.h"
 #include "../include/ft_free_list.h"
+#include "../include/ft_shell_escape.h"
 #include "../include/ft_str.h"
 
 #include "../libft/include/libft.h"
-#include "ft_shell_escape.h"
 
 static t_str *get_perm_(free_list *fl, const t_entry *entry);
 static t_str *get_user_(free_list *fl, uid_t user_id);
 static t_str *get_group_(free_list *fl, gid_t group_id);
 static t_str *get_dt_(free_list *fl, const struct timespec *ctim);
-static bool get_symlink_(free_list *fl, const t_entry *entry, t_str **out);
+static t_str *get_symlink_(free_list *fl, const t_entry *entry);
 static bool has_xattr_(const char *path, const char *name);
 static t_str *join_paths_(free_list *fl, const t_str *lhs, const t_str *rhs);
+static void free_info_(free_list *fl, t_file_info *info);
 
 typedef enum {
     P_LINK,
@@ -50,7 +51,7 @@ t_entry *new_entry(free_list *fl, t_entry *entry, const struct dirent *dp) {
     ASSERT_NOTNULL(entry);
     ASSERT_NOTNULL(dp);
 
-    t_entry *ent = fl_alloc(fl, sizeof(*entry), 8);
+    t_entry *ent = fl_alloc(fl, sizeof(*ent), 8);
     if (!ent) {
         goto failed;
     }
@@ -65,12 +66,17 @@ t_entry *new_entry(free_list *fl, t_entry *entry, const struct dirent *dp) {
         goto failed;
     }
 
-    ent->quote = shell_quote_style(ent->name);
+    ent->quote = shell_quote(ent->name);
     ent->is_escaped = false;
     ent->is_operand = false;
+    ent->info = NULL;
 
     return ent;
 failed:
+    if (ent) {
+        free_entry(fl, ent);
+    }
+
     return NULL;
 }
 
@@ -83,48 +89,74 @@ bool get_file_info(free_list *fl, t_entry *entry) {
 
     t_file_info *info = fl_alloc(fl, sizeof(*info), 8);
     if (!info) {
-        return false;
+        goto failed;
     }
 
     info->perm = get_perm_(fl, entry);
     if (!info->perm) {
-        return false;
+        goto failed;
     }
 
     info->links = uint_to_str(fl, entry->st.st_nlink);
     if (!info->links) {
-        return false;
+        goto failed;
     }
 
     info->username = get_user_(fl, entry->st.st_uid);
     if (!info->username) {
-        return false;
+        goto failed;
     }
 
     info->groupname = get_group_(fl, entry->st.st_gid);
     if (!info->groupname) {
-        return false;
+        goto failed;
     }
 
     info->size = uint_to_str(fl, (uint64_t)entry->st.st_size);
     if (!info->size) {
-        return false;
+        goto failed;
     }
 
     info->dt = get_dt_(fl, &entry->st.st_mtim);
     if (!info->dt) {
-        return false;
+        goto failed;
     }
 
-    info->symlink = info->perm;
-    if (!get_symlink_(fl, entry, &info->symlink)) {
-        return false;
+    info->symlink = get_symlink_(fl, entry);
+    if (!info->symlink) {
+        goto failed;
     }
 
     info->blocks = (uint64_t)entry->st.st_blocks;
 
     entry->info = info;
     return true;
+failed:
+    if (info) {
+        free_info_(fl, info);
+    }
+
+    entry->info = NULL;
+    return false;
+}
+
+void free_entry(free_list *fl, t_entry *entry) {
+    ASSERT_NOTNULL(fl);
+    ASSERT_NOTNULL(entry);
+
+    if (entry->name) {
+        fl_free(fl, entry->name);
+    }
+
+    if (entry->path) {
+        fl_free(fl, entry->path);
+    }
+
+    if (entry->info) {
+        free_info_(fl, entry->info);
+    }
+
+    fl_free(fl, entry);
 }
 
 static t_str *get_perm_(free_list *fl, const t_entry *entry) {
@@ -133,7 +165,7 @@ static t_str *get_perm_(free_list *fl, const t_entry *entry) {
 
     t_str *str = init_str(fl, PERMISSION_SIZE);
     if (!str) {
-        goto failed;
+        return NULL;
     }
 
     for (uint64_t index = 0; index < P_TOTAL; ++index) {
@@ -195,8 +227,6 @@ static t_str *get_perm_(free_list *fl, const t_entry *entry) {
             "unexpected permission length: %llu", (unsigned long long)str->len);
     ASSERT_EQ(str->pos, 0);
     return str;
-failed:
-    return NULL;
 }
 
 static t_str *get_user_(free_list *fl, uid_t user_id) {
@@ -290,15 +320,12 @@ static t_str *get_dt_(free_list *fl, const struct timespec *ctim) {
     return new_str;
 }
 
-static bool get_symlink_(free_list *fl, const t_entry *entry, t_str **out) {
+static t_str *get_symlink_(free_list *fl, const t_entry *entry) {
     ASSERT_NOTNULL(fl);
     ASSERT_NOTNULL(entry);
-    ASSERT_NOTNULL(out);
-    ASSERT_NOTNULL(*out);
 
-    *out = NULL;
     if (!S_ISLNK(entry->st.st_mode)) {
-        return true;
+        return init_str(fl, 1);
     }
 
     uint64_t cap = (entry->st.st_size > 0) ? (uint64_t)entry->st.st_size
@@ -317,8 +344,7 @@ static bool get_symlink_(free_list *fl, const t_entry *entry, t_str **out) {
         if ((uint64_t)len < cap) {
             new_str->len = (uint64_t)len;
             new_str->str[new_str->len] = '\0';
-            *out = new_str;
-            return true;
+            return new_str;
         }
 
         if (cap > UINT64_MAX / 2) {
@@ -328,7 +354,7 @@ static bool get_symlink_(free_list *fl, const t_entry *entry, t_str **out) {
         cap *= 2;
     }
 
-    return false;
+    return NULL;
 }
 
 static bool has_xattr_(const char *path, const char *name) {
@@ -365,4 +391,37 @@ static t_str *join_paths_(free_list *fl, const t_str *lhs, const t_str *rhs) {
     (void)cat_str(fullname, rhs);
 
     return fullname;
+}
+
+static void free_info_(free_list *fl, t_file_info *info) {
+    ASSERT_NOTNULL(fl);
+    ASSERT_NOTNULL(info);
+
+    if (info->perm) {
+        fl_free(fl, info->perm);
+    }
+
+    if (info->links) {
+        fl_free(fl, info->links);
+    }
+
+    if (info->username) {
+        fl_free(fl, info->username);
+    }
+
+    if (info->groupname) {
+        fl_free(fl, info->groupname);
+    }
+
+    if (info->size) {
+        fl_free(fl, info->size);
+    }
+
+    if (info->dt) {
+        fl_free(fl, info->dt);
+    }
+
+    if (info->symlink) {
+        fl_free(fl, info->symlink);
+    }
 }

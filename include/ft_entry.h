@@ -54,5 +54,6 @@ typedef struct {
 
 t_entry *new_entry(free_list *fl, t_entry *entry, const struct dirent *dp);
 bool get_file_info(free_list *fl, t_entry *entry);
+void free_entry(free_list *fl, t_entry *entry);
 
 #endif // !FT_ENTRY_H

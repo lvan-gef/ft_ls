@@ -56,6 +56,8 @@ void *pop_array(t_array *array) {
 
     --array->len;
     void *elem = array->data[array->len];
+    ASSERT_NOTNULL(elem);
+
     array->data[array->len] = NULL;
     return elem;
 }

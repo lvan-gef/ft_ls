@@ -9,7 +9,6 @@
 #include "../include/ft_shell_escape.h"
 #include "../include/ft_str.h"
 
-#include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
 
 typedef struct {
@@ -24,7 +23,6 @@ static void get_sizes_(t_array *array, t_sizes *sizes);
 static bool printer_(t_str *out, t_array *array, const t_sizes *sizes);
 static bool left_pad_(t_str *out, uint64_t src_len, uint64_t max_size);
 static bool have_quotes_(t_array *array);
-static bool put_fill_(t_str *out, char c, uint64_t count);
 static bool put_uint_(t_str *out, uint64_t value);
 
 void print_list(t_array *array, const t_entry *dir_entry, bool print_total,
@@ -38,13 +36,11 @@ void print_list(t_array *array, const t_entry *dir_entry, bool print_total,
     char buffer[OUTPUT_BUFFER_CAP];
     t_str out = {.str = buffer, .cap = sizeof(buffer), .len = 0, .pos = 0};
     out.str[0] = '\0';
-    const char *err_msg = NULL;
 
     get_sizes_(array, &sizes);
     if (dir_entry) {
         if (!escaped_out(&out, dir_entry->name, dir_entry->quote, false) ||
             !put_mem(&out, ":\n", 2)) {
-            err_msg = "Failed to write dir header";
             goto done;
         }
     }
@@ -53,19 +49,18 @@ void print_list(t_array *array, const t_entry *dir_entry, bool print_total,
         if (!put_mem(&out, "total ", 6) ||
             !put_uint_(&out, (sizes.total + 1) / 2) ||
             !put_mem(&out, "\n", 1)) {
-            err_msg = "Failed to write total";
             goto done;
         }
     }
 
-    if (!printer_(&out, array, &sizes) || !flush_str(&out)) {
-        err_msg = "Failed to write output";
+    if (!printer_(&out, array, &sizes)) {
+        goto done;
     }
 
+    (void)flush_str(&out);
+
 done:
-    if (err_msg) {
-        ft_fprintf(STDERR_FILENO, "%s\n", err_msg);
-    }
+    return;
 }
 
 static bool printer_(t_str *out, t_array *array, const t_sizes *sizes) {
@@ -97,7 +92,7 @@ static bool printer_(t_str *out, t_array *array, const t_sizes *sizes) {
             return false;
         }
 
-        if (entry->info->symlink) {
+        if (entry->info->symlink && entry->info->symlink->len > 0) {
             if (!put_mem(out, " -> ", 4) ||
                 !put_mem(out, entry->info->symlink->str,
                          entry->info->symlink->len)) {
@@ -140,7 +135,21 @@ static bool left_pad_(t_str *out, uint64_t src_len, uint64_t max_size) {
     ASSERT_NOTNULL(out);
     ASSERT_LE(src_len, max_size);
 
-    return put_fill_(out, ' ', max_size - src_len);
+    uint64_t count = max_size - src_len;
+    while (count) {
+        if (out->len == out->cap - 1 && !flush_str(out)) {
+            return false;
+        }
+
+        const uint64_t avail = (out->cap - 1) - out->len;
+        const uint64_t to_fill = count < avail ? count : avail;
+        ft_memset(out->str + out->len, ' ', (size_t)to_fill);
+        out->len += to_fill;
+        out->str[out->len] = '\0';
+        count -= to_fill;
+    }
+
+    return true;
 }
 
 static bool have_quotes_(t_array *array) {
@@ -154,25 +163,6 @@ static bool have_quotes_(t_array *array) {
     }
 
     return false;
-}
-
-static bool put_fill_(t_str *out, char c, uint64_t count) {
-    ASSERT_NOTNULL(out);
-
-    while (count) {
-        if (out->len == out->cap - 1 && !flush_str(out)) {
-            return false;
-        }
-
-        const uint64_t avail = (out->cap - 1) - out->len;
-        const uint64_t to_fill = count < avail ? count : avail;
-        ft_memset(out->str + out->len, c, (size_t)to_fill);
-        out->len += to_fill;
-        out->str[out->len] = '\0';
-        count -= to_fill;
-    }
-
-    return true;
 }
 
 static bool put_uint_(t_str *out, uint64_t value) {
