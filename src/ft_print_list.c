@@ -2,9 +2,8 @@
 #include <stdint.h>
 #include <unistd.h>
 
-#include "../include/ft_assert.h"
 #include "../include/ft_entry.h"
-#include "../include/ft_print_list.h"
+#include "../include/ft_printer.h"
 #include "../include/ft_printer_helper.h"
 #include "../include/ft_shell_escape.h"
 #include "../include/ft_str.h"
@@ -22,30 +21,26 @@ typedef struct {
 static void get_sizes_(t_array *array, t_sizes *sizes);
 static bool printer_(t_str *out, t_array *array, const t_sizes *sizes);
 static bool left_pad_(t_str *out, uint64_t src_len, uint64_t max_size);
-static bool have_quotes_(t_array *array);
 static bool put_uint_(t_str *out, uint64_t value);
 
-void print_list(t_array *array, const t_entry *dir_entry, bool print_total,
-                uint64_t min_len_links, uint64_t min_len_sizes,
-                bool force_quote_padding) {
-    ASSERT_NOTNULL(array);
-
-    t_sizes sizes = {.have_quote = force_quote_padding || have_quotes_(array),
-                     .max_len_links = min_len_links,
-                     .max_len_sizes = min_len_sizes};
+void print_list(t_ps *ps) {
+    t_sizes sizes = {.have_quote = ps->quote_padding || have_quotes(ps->array),
+                     .max_len_links = ps->min_len_links,
+                     .max_len_sizes = ps->min_len_sizes};
     char buffer[OUTPUT_BUFFER_CAP];
     t_str out = {.str = buffer, .cap = sizeof(buffer), .len = 0, .pos = 0};
     out.str[0] = '\0';
 
-    get_sizes_(array, &sizes);
-    if (dir_entry) {
-        if (!escaped_out(&out, dir_entry->name, dir_entry->quote, false) ||
+    get_sizes_(ps->array, &sizes);
+    if (ps->dir_entry) {
+        if (!escaped_out(&out, ps->dir_entry->name, ps->dir_entry->quote,
+                         false) ||
             !put_mem(&out, ":\n", 2)) {
             goto done;
         }
     }
 
-    if (print_total) {
+    if (ps->print_total) {
         if (!put_mem(&out, "total ", 6) ||
             !put_uint_(&out, (sizes.total + 1) / 2) ||
             !put_mem(&out, "\n", 1)) {
@@ -53,7 +48,7 @@ void print_list(t_array *array, const t_entry *dir_entry, bool print_total,
         }
     }
 
-    if (!printer_(&out, array, &sizes)) {
+    if (!printer_(&out, ps->array, &sizes)) {
         goto done;
     }
 
@@ -64,10 +59,6 @@ done:
 }
 
 static bool printer_(t_str *out, t_array *array, const t_sizes *sizes) {
-    ASSERT_NOTNULL(out);
-    ASSERT_NOTNULL(array);
-    ASSERT_NOTNULL(sizes);
-
     for (uint64_t index = 0; index < array->len; ++index) {
         const t_entry *entry = array->data[index];
 
@@ -109,9 +100,6 @@ static bool printer_(t_str *out, t_array *array, const t_sizes *sizes) {
 }
 
 static void get_sizes_(t_array *array, t_sizes *sizes) {
-    ASSERT_NOTNULL(array);
-    ASSERT_NOTNULL(sizes);
-
     for (uint64_t i = 0; i < array->len; ++i) {
         const t_entry *e = array->data[i];
 
@@ -132,9 +120,6 @@ static void get_sizes_(t_array *array, t_sizes *sizes) {
 }
 
 static bool left_pad_(t_str *out, uint64_t src_len, uint64_t max_size) {
-    ASSERT_NOTNULL(out);
-    ASSERT_LE(src_len, max_size);
-
     uint64_t count = max_size - src_len;
     while (count) {
         if (out->len == out->cap - 1 && !flush_str(out)) {
@@ -150,19 +135,6 @@ static bool left_pad_(t_str *out, uint64_t src_len, uint64_t max_size) {
     }
 
     return true;
-}
-
-static bool have_quotes_(t_array *array) {
-    ASSERT_NOTNULL(array);
-
-    for (uint64_t index = 0; index < array->len; ++index) {
-        const t_entry *entry = array->data[index];
-        if (entry->quote != '\0') {
-            return true;
-        }
-    }
-
-    return false;
 }
 
 static bool put_uint_(t_str *out, uint64_t value) {

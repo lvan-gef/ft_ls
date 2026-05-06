@@ -4,9 +4,7 @@
 #include <unistd.h>
 
 #include "../include/ft_array.h"
-#include "../include/ft_assert.h"
 #include "../include/ft_entry.h"
-#include "../include/ft_print_list.h"
 #include "../include/ft_printer.h"
 #include "../include/ft_printer_helper.h"
 #include "../include/ft_shell_escape.h"
@@ -20,65 +18,54 @@ typedef struct {
     uint64_t max;
 } t_map;
 
-static void init_print_row_(t_array *array, const t_entry *dir_entry,
-                            bool force_quote_padding);
+static void init_print_row_(t_ps *ps);
 static uint64_t *calc_cols_(t_array *array, t_map *map, bool quoted);
 static uint64_t calc_width_(t_array *array, uint64_t num_cols,
                             uint64_t *col_widths, bool quoted);
 static bool create_row_(t_str *out, t_array *array, const t_map *map,
                         const uint64_t *col_widths, bool quoted);
-static bool check_quoted_(t_array *array);
 static bool indent_(t_str *out, uint64_t from, uint64_t to);
 
-void printer(const t_args *args, t_array *array, const t_entry *dir_entry,
-             bool print_total, uint64_t min_len_links, uint64_t min_len_sizes,
-             bool force_quote_padding) {
-    ASSERT_NOTNULL(args);
-    ASSERT_NOTNULL(array);
-
-    if (array->len) {
-        sort(array, args->reverse, args->time);
+void printer(t_ps *ps) {
+    if (ps->array->len) {
+        sort(ps->array, ps->args->reverse, ps->args->time);
     }
 
-    if (args->list) {
-        print_list(array, dir_entry, print_total, min_len_links, min_len_sizes,
-                   force_quote_padding);
+    if (ps->args->list) {
+        print_list(ps);
     } else {
-        init_print_row_(array, dir_entry, force_quote_padding);
+        init_print_row_(ps);
     }
 }
 
-static void init_print_row_(t_array *array, const t_entry *dir_entry,
-                            bool force_quote_padding) {
-    ASSERT_NOTNULL(array);
-
+static void init_print_row_(t_ps *ps) {
     uint64_t max_cols = (TERM_SIZE + SPACE_GAP) / (1 + SPACE_GAP);
     t_map map = {.cols = 1,
-                 .rows = array->len,
-                 .max = array->len < max_cols ? array->len : max_cols};
+                 .rows = ps->array->len,
+                 .max = ps->array->len < max_cols ? ps->array->len : max_cols};
 
-    const bool quoted = force_quote_padding || check_quoted_(array);
+    const bool quoted = ps->quote_padding || have_quotes(ps->array);
     const char *err_msg = NULL;
-
     char buffer[OUTPUT_BUFFER_CAP];
-    uint64_t *col_widths = calc_cols_(array, &map, quoted);
     t_str out = {.str = buffer, .cap = sizeof(buffer), .len = 0, .pos = 0};
     out.str[0] = '\0';
 
+    uint64_t *col_widths = calc_cols_(ps->array, &map, quoted);
     if (!col_widths) {
         err_msg = "Failed to calc column leng";
         goto done;
     }
 
-    if (dir_entry) {
-        if (!escaped_out(&out, dir_entry->name, dir_entry->quote, false) ||
+    if (ps->dir_entry) {
+        if (!escaped_out(&out, ps->dir_entry->name, ps->dir_entry->quote,
+                         false) ||
             !put_mem(&out, ":\n", 2)) {
             err_msg = "Failed to write dir header";
             goto done;
         }
     }
 
-    if (!create_row_(&out, array, &map, col_widths, quoted) ||
+    if (!create_row_(&out, ps->array, &map, col_widths, quoted) ||
         !flush_str(&out)) {
         err_msg = "Failed to write output";
     }
@@ -95,11 +82,6 @@ done:
 
 static bool create_row_(t_str *out, t_array *array, const t_map *map,
                         const uint64_t *col_widths, bool quoted) {
-    ASSERT_NOTNULL(out);
-    ASSERT_NOTNULL(array);
-    ASSERT_NOTNULL(map);
-    ASSERT_NOTNULL(col_widths);
-
     const uint64_t files_len = array->len;
     for (uint64_t row = 0; row < map->rows; ++row) {
         uint64_t col = 0;
@@ -108,7 +90,8 @@ static bool create_row_(t_str *out, t_array *array, const t_map *map,
 
         while (true) {
             const t_entry *entry = array->data[filesno];
-            const uint64_t name_length = shell_display_len(entry->name, entry->quote, quoted);
+            const uint64_t name_length =
+                shell_display_len(entry->name, entry->quote, quoted);
             const uint64_t max_name_length = col_widths[col++];
 
             if (!escaped_out(out, entry->name, entry->quote, quoted)) {
@@ -118,11 +101,13 @@ static bool create_row_(t_str *out, t_array *array, const t_map *map,
             if (files_len - map->rows <= filesno) {
                 break;
             }
+
             filesno += map->rows;
 
             if (!indent_(out, pos + name_length, pos + max_name_length)) {
                 return false;
             }
+
             pos += max_name_length;
         }
 
@@ -135,9 +120,6 @@ static bool create_row_(t_str *out, t_array *array, const t_map *map,
 }
 
 static uint64_t *calc_cols_(t_array *array, t_map *map, bool quoted) {
-    ASSERT_NOTNULL(array);
-    ASSERT_NOTNULL(map);
-
     const uint64_t max_cols = TERM_SIZE / MIN_COLUMN_WIDTH;
     if (map->max > max_cols) {
         map->max = max_cols;
@@ -166,65 +148,53 @@ static uint64_t *calc_cols_(t_array *array, t_map *map, bool quoted) {
 
 static uint64_t calc_width_(t_array *array, uint64_t num_cols,
                             uint64_t *col_widths, bool quoted) {
-    ASSERT_NOTNULL(array);
-    ASSERT_NOTNULL(col_widths);
-    ASSERT_GT(num_cols, 0);
     const uint64_t num_rows = (array->len + num_cols - 1) / num_cols;
-    uint64_t line_len = num_cols * MIN_COLUMN_WIDTH;
+    uint64_t line_len = 0;
 
     for (uint64_t index = 0; index < num_cols; ++index) {
-        col_widths[index] = MIN_COLUMN_WIDTH;
+        col_widths[index] = 0;
     }
 
     for (uint64_t filesno = 0; filesno < array->len; ++filesno) {
         const t_entry *entry = array->data[filesno];
-        ASSERT_NOTNULL(entry);
-        ASSERT_NOTNULL(entry->name);
-
         const uint64_t idx = filesno / num_rows;
-        const uint64_t name_length = shell_display_len(entry->name, entry->quote, quoted);
-        const uint64_t real_length =
-            name_length + (idx == num_cols - 1 ? 0 : SPACE_GAP);
+        const uint64_t name_length =
+            shell_display_len(entry->name, entry->quote, quoted);
 
-        if (col_widths[idx] < real_length) {
-            line_len += real_length - col_widths[idx];
-            col_widths[idx] = real_length;
-            if (line_len >= TERM_SIZE) {
-                return line_len;
-            }
+        if (col_widths[idx] < name_length) {
+            col_widths[idx] = name_length;
         }
+    }
+
+    for (uint64_t index = 0; index < num_cols; ++index) {
+        uint64_t width = col_widths[index];
+
+        if (index != num_cols - 1) {
+            if (width < MIN_COLUMN_WIDTH)
+                width = MIN_COLUMN_WIDTH;
+            width += SPACE_GAP;
+        }
+
+        col_widths[index] = width;
+        line_len += width;
     }
 
     return line_len;
 }
 
-static bool check_quoted_(t_array *array) {
-    ASSERT_NOTNULL(array);
-
-    for (uint64_t index = 0; index < array->len; ++index) {
-        const t_entry *entry = array->data[index];
-        if (entry->quote != '\0') {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 static bool indent_(t_str *out, uint64_t from, uint64_t to) {
-    ASSERT_NOTNULL(out);
-    ASSERT_LE(from, to);
-
     while (from < to) {
         if (TABSIZE != 0 && to / TABSIZE > (from + 1) / TABSIZE) {
             if (!put_mem(out, "\t", 1)) {
                 return false;
             }
+
             from += TABSIZE - from % TABSIZE;
         } else {
             if (!put_mem(out, " ", 1)) {
                 return false;
             }
+
             ++from;
         }
     }

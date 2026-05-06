@@ -8,7 +8,6 @@
 
 #include "../include/ft_arena.h"
 #include "../include/ft_array.h"
-#include "../include/ft_assert.h"
 #include "../include/ft_entry.h"
 #include "../include/ft_free_list.h"
 #include "../include/ft_helper.h"
@@ -24,8 +23,8 @@
 typedef struct {
     t_args *args;
     free_list fl;
-    Arena *dirs_arena;
-    Arena *temp_arena;
+    arena *dirs_arena;
+    arena *temp_arena;
     t_array *dirs;
     t_array *files;
     t_array *entries;
@@ -33,7 +32,7 @@ typedef struct {
     uint64_t max_len_sizes;
 } t_params;
 
-static bool run_(const t_args *args, t_params *params, t_array *array,
+static bool run_(t_args *args, t_params *params, t_array *array,
                  int *exit_code);
 static bool read_dir_(t_params *params, t_entry *path, int *exit_code);
 static bool walk_recurssive_(t_params *params);
@@ -50,32 +49,26 @@ static void print_err_(free_list *fl, t_str *str, int e, const char *prefix);
 typedef enum { SINGLE_QUOTE = '\'', DOUBLE_QUOTE = '\"', SPACE = ' ' } t_quote;
 
 void process(t_args *args, t_array *array, int *exit_code) {
-    ASSERT_NOTNULL(args);
-    ASSERT_NOTNULL(array);
-    ASSERT_GE(array->cap, 1);
-    ASSERT_GE(array->len, 1);
-    ASSERT_NOTNULL(exit_code);
-
     const char *err_msg = NULL;
-    unsigned char buffer[1024];
+    unsigned char buffer[FL_DEFAULT_SIZE];
     t_params params = {0};
 
     params.args = args;
     fl_init(&params.fl, buffer, sizeof(buffer));
-    params.dirs_arena = ArenaAlloc(ARENA_SIZE);
+    params.dirs_arena = arena_alloc(ARENA_SIZE);
     if (!params.dirs_arena) {
         *exit_code = 2;
         goto cleanup;
     }
 
-    params.temp_arena = ArenaAlloc(ARENA_SIZE);
+    params.temp_arena = arena_alloc(ARENA_SIZE);
     if (!params.temp_arena) {
         *exit_code = 2;
         goto cleanup;
     }
 
-    ArenaSetAutoAlign(params.dirs_arena, 8);
-    ArenaSetAutoAlign(params.temp_arena, 8);
+    arena_auto_align(params.dirs_arena, 8);
+    arena_auto_align(params.temp_arena, 8);
 
     params.dirs = init_array(&params.fl, ARRAY_SIZE);
     params.files = init_array(&params.fl, ARRAY_SIZE);
@@ -97,14 +90,8 @@ cleanup:
     clean_up_(&params);
 }
 
-static bool run_(const t_args *args, t_params *params, t_array *array,
+static bool run_(t_args *args, t_params *params, t_array *array,
                  int *exit_code) {
-    ASSERT_NOTNULL(args);
-    ASSERT_NOTNULL(params);
-    ASSERT_NOTNULL(array);
-    ASSERT_NOTNULL(exit_code);
-    ASSERT_EQ(*exit_code, 0);
-
     const char *err_msg = NULL;
     if (!process_args_(params, array, exit_code)) {
         goto failed;
@@ -112,9 +99,15 @@ static bool run_(const t_args *args, t_params *params, t_array *array,
 
     const bool has_quoted_operands = has_quoted_operands_(array);
     bool printed_files = false;
+    t_ps ps = {.args = args,
+               .array = params->files,
+               .dir_entry = NULL,
+               .print_total = false,
+               .min_len_links = params->max_len_links,
+               .min_len_sizes = params->max_len_sizes,
+               .quote_padding = has_quoted_operands};
     if (params->files->len) {
-        printer(args, params->files, NULL, false, params->max_len_links,
-                params->max_len_sizes, has_quoted_operands);
+        printer(&ps);
         printed_files = true;
         reset_array(&params->fl, params->files);
     }
@@ -122,6 +115,10 @@ static bool run_(const t_args *args, t_params *params, t_array *array,
     bool printed_dir = false;
     bool inserted_files_dirs_gap = false;
     const bool print_dir_path = args->recursive || array->len > 1;
+    ps.print_total = true;
+    ps.min_len_links = 0;
+    ps.min_len_sizes = 0;
+    ps.quote_padding = false;
     while (params->dirs->len) {
         t_entry *dir_path = pop_array(params->dirs);
 
@@ -143,14 +140,16 @@ static bool run_(const t_args *args, t_params *params, t_array *array,
             }
         }
 
-        t_entry entry = {.name = dir_path->path};
-        entry.quote = shell_quote(entry.name);
+        t_entry entry = {.name = dir_path->path,
+                         .quote = shell_quote(entry.name)};
         if (entry.quote == '\0' && ft_strchr(entry.name->str, ':')) {
             entry.quote = '\'';
         }
 
-        const t_entry *ent = print_dir_path ? &entry : NULL;
-        printer(args, params->files, ent, true, 0, 0, false);
+        t_entry *ent = print_dir_path ? &entry : NULL;
+        ps.array = params->files;
+        ps.dir_entry = ent;
+        printer(&ps);
         printed_dir = true;
         clear_temp_dir_(params);
     }
@@ -165,14 +164,6 @@ failed:
 }
 
 static bool process_args_(t_params *params, t_array *array, int *exit_code) {
-    ASSERT_NOTNULL(params);
-    ASSERT_NOTNULL(params->args);
-    // ASSERT_NOTNULL(params->fl);
-    ASSERT_NOTNULL(params->dirs);
-    ASSERT_NOTNULL(params->files);
-    ASSERT_NOTNULL(array);
-    ASSERT_NOTNULL(exit_code);
-
     const char *err_msg = NULL;
     struct stat st;
     unsigned char buffer[FL_DEFAULT_SIZE];
@@ -311,15 +302,6 @@ failed:
 }
 
 static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
-    ASSERT_NOTNULL(params);
-    ASSERT_NOTNULL(params->args);
-    ASSERT_NOTNULL(params->dirs);
-    ASSERT_NOTNULL(params->files);
-    ASSERT_NOTNULL(path);
-    ASSERT_NOTNULL(path->path);
-    ASSERT_NOTNULL(path->path->str);
-    ASSERT_NOTNULL(exit_code);
-
     errno = 0;
     bool ok = false;
     DIR *d = opendir(path->path->str);
@@ -381,19 +363,12 @@ cleanup:
 }
 
 static void clear_temp_dir_(t_params *params) {
-    ASSERT_NOTNULL(params);
-    ASSERT_NOTNULL(params->files);
-    ASSERT_NOTNULL(params->entries);
-    ASSERT_NOTNULL(params->temp_arena);
-
     clear_array(params->files);
     clear_array(params->entries);
-    ArenaClear(params->temp_arena);
+    arena_clear(params->temp_arena);
 }
 
 static bool walk_recurssive_(t_params *params) {
-    ASSERT_NOTNULL(params);
-
     if (params->args->recursive && params->entries->len) {
         sort(params->entries, params->args->reverse, params->args->time);
         size_t index = params->entries->len;
@@ -427,12 +402,7 @@ static bool walk_recurssive_(t_params *params) {
 
 static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
                                  bool is_operand) {
-    ASSERT_NOTNULL(params);
-    ASSERT_NOTNULL(params->dirs_arena);
-    ASSERT_NOTNULL(src);
-    ASSERT_NOTNULL(src->path);
-
-    t_entry *entry = ArenaPush(params->dirs_arena, sizeof(*entry));
+    t_entry *entry = arena_push(params->dirs_arena, sizeof(*entry));
     if (!entry) {
         return NULL;
     }
@@ -456,8 +426,6 @@ static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
 }
 
 static bool has_quoted_operands_(const t_array *array) {
-    ASSERT_NOTNULL(array);
-
     for (uint64_t index = 0; index < array->len; ++index) {
         const t_str *operand = array->data[index];
         if (!operand) {
@@ -473,15 +441,13 @@ static bool has_quoted_operands_(const t_array *array) {
 }
 
 static void clean_up_(t_params *params) {
-    ASSERT_NOTNULL(params);
-
     if (params->dirs_arena) {
-        ArenaRelease(params->dirs_arena);
+        arena_release(params->dirs_arena);
         params->dirs_arena = NULL;
     }
 
     if (params->temp_arena) {
-        ArenaRelease(params->temp_arena);
+        arena_release(params->temp_arena);
         params->temp_arena = NULL;
     }
 

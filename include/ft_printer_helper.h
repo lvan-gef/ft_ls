@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "./ft_str.h"
+#include "./ft_array.h"
 
 #ifndef TABSIZE
 #define TABSIZE UINT64_C(8)
@@ -24,5 +25,6 @@
 
 bool put_mem(t_str *out, const char *src, uint64_t len);
 bool flush_str(t_str *out);
+bool have_quotes(t_array *array);
 
 #endif // !FT_PRINTER_HELPER_H

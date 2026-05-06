@@ -3,7 +3,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "../include/ft_assert.h"
 #include "../include/ft_free_list.h"
 
 static size_t calc_padding_(uintptr_t ptr, uintptr_t align, size_t header_size);
@@ -14,8 +13,6 @@ static void *alloc_extra_block_(free_list *fl, size_t size, size_t align);
 static void free_extra_block_(free_list *fl, free_list_header *header);
 
 void fl_free_all(free_list *fl) {
-    ASSERT_NOTNULL(fl);
-
     free_extra_allocs_(fl);
     fl->used = 0;
     free_list_node *first_node = (free_list_node *)fl->data;
@@ -25,10 +22,6 @@ void fl_free_all(free_list *fl) {
 }
 
 void fl_init(free_list *fl, void *data, size_t size) {
-    ASSERT_NOTNULL(fl);
-    ASSERT_NOTNULL(data);
-    ASSERT_GT(size, 0);
-
     fl->data = data;
     fl->size = size;
     fl->extra_allocs = NULL;
@@ -37,12 +30,6 @@ void fl_init(free_list *fl, void *data, size_t size) {
 
 free_list_node *fl_find_best(free_list *fl, size_t size, size_t align,
                              size_t *padding_, free_list_node **prev_node_) {
-    ASSERT_NOTNULL(fl);
-    ASSERT_NOTNULL(padding_);
-    ASSERT_NOTNULL(prev_node_);
-    ASSERT_GT(size, 0);
-    ASSERT_GT(align, 0);
-
     size_t smallest_diff = ~(size_t)0;
     free_list_node *node = fl->head;
     free_list_node *prev_node = NULL;
@@ -78,10 +65,6 @@ free_list_node *fl_find_best(free_list *fl, size_t size, size_t align,
 }
 
 void *fl_alloc(free_list *fl, size_t size, size_t align) {
-    ASSERT_NOTNULL(fl);
-    ASSERT_GT(size, 0);
-    ASSERT_GT(align, 0);
-
     size_t padding = 0;
     free_list_node *prev_node = NULL;
     free_list_node *node = NULL;
@@ -96,7 +79,6 @@ void *fl_alloc(free_list *fl, size_t size, size_t align) {
         align = 8;
     }
 
-    ASSERT_TRUE(is_power_of_two_(align));
     if (!is_power_of_two_(align)) {
         return NULL;
     }
@@ -107,7 +89,6 @@ void *fl_alloc(free_list *fl, size_t size, size_t align) {
         if (extra != NULL) {
             return extra;
         }
-        ASSERT_TRUE(0);
         return NULL;
     }
 
@@ -117,7 +98,6 @@ void *fl_alloc(free_list *fl, size_t size, size_t align) {
     remaining = node->block_size - required_space;
     if (remaining >= sizeof(free_list_node)) {
         uintptr_t new_addr = (uintptr_t)node + required_space;
-        ASSERT_EQ((new_addr & (FREE_LIST_NODE_ALIGN - 1)), 0);
         free_list_node *new_node = (free_list_node *)new_addr;
         new_node->block_size = remaining;
         fl_node_insert(&fl->head, node, new_node);
@@ -135,9 +115,6 @@ void *fl_alloc(free_list *fl, size_t size, size_t align) {
 }
 
 void fl_free(free_list *fl, void *ptr) {
-    ASSERT_NOTNULL(fl);
-    ASSERT_NOTNULL(ptr);
-
     free_list_header *header;
     free_list_node *free_node;
     free_list_node *node;
@@ -175,10 +152,6 @@ void fl_free(free_list *fl, void *ptr) {
 
 void fl_coalescence(free_list *fl, free_list_node *prev_node,
                     free_list_node *free_node) {
-    ASSERT_NOTNULL(fl);
-    // ASSERT_NOTNULL(prev_node);
-    ASSERT_NOTNULL(free_node);
-
     if (!prev_node) {
         return;
     }
@@ -198,8 +171,6 @@ void fl_coalescence(free_list *fl, free_list_node *prev_node,
 
 void fl_node_insert(free_list_node **phead, free_list_node *prev_node,
                     free_list_node *new_node) {
-    ASSERT_NOTNULL(phead);
-
     if (prev_node == NULL) {
         new_node->next = *phead;
         *phead = new_node;
@@ -211,9 +182,6 @@ void fl_node_insert(free_list_node **phead, free_list_node *prev_node,
 
 void fl_node_remove(free_list_node **phead, free_list_node *prev_node,
                     free_list_node *del_node) {
-    ASSERT_NOTNULL(phead);
-    ASSERT_NOTNULL(del_node);
-
     if (prev_node == NULL) {
         *phead = del_node->next;
     } else {
@@ -223,7 +191,6 @@ void fl_node_remove(free_list_node **phead, free_list_node *prev_node,
 
 static size_t calc_padding_(uintptr_t ptr, uintptr_t align,
                             size_t header_size) {
-    ASSERT_TRUE(is_power_of_two_(align));
     if (!is_power_of_two_(align)) {
         return 0;
     }
@@ -257,8 +224,6 @@ static size_t align_up_(size_t x, size_t a) {
 }
 
 static void free_extra_allocs_(free_list *fl) {
-    ASSERT_NOTNULL(fl);
-
     free_list_header *header = fl->extra_allocs;
     while (header != NULL) {
         free_list_header *next = header->next_extra;
@@ -270,9 +235,6 @@ static void free_extra_allocs_(free_list *fl) {
 }
 
 static void *alloc_extra_block_(free_list *fl, size_t size, size_t align) {
-    ASSERT_NOTNULL(fl);
-    ASSERT_GT(align, 0);
-
     if (size > SIZE_MAX - sizeof(free_list_header) - (align - 1)) {
         return NULL;
     }
@@ -297,8 +259,6 @@ static void *alloc_extra_block_(free_list *fl, size_t size, size_t align) {
 }
 
 static void free_extra_block_(free_list *fl, free_list_header *header) {
-    ASSERT_NOTNULL(fl);
-
     free_list_header **slot = &fl->extra_allocs;
     while (*slot && *slot != header) {
         slot = &(*slot)->next_extra;
@@ -308,7 +268,6 @@ static void free_extra_block_(free_list *fl, free_list_header *header) {
         return;
     }
 
-    ASSERT_EQ(*slot, header);
     *slot = header->next_extra;
     fl->used -= header->block_size;
     free(header->allocation_base);

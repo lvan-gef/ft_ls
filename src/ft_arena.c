@@ -2,21 +2,18 @@
 #include <unistd.h>
 
 #include "../include/ft_arena.h"
-#include "../include/ft_assert.h"
 
 #include "../libft/include/libft.h"
 
-static ArenaBlock *new_block_(uint64_t cap);
+static arena_block *new_block_(uint64_t cap);
 
-Arena *ArenaAlloc(uint64_t cap) {
-    ASSERT_GT(cap, 0);
-
-    ArenaBlock *block = new_block_(cap);
+arena *arena_alloc(uint64_t cap) {
+    arena_block *block = new_block_(cap);
     if (!block) {
         return NULL;
     }
 
-    Arena *arena = malloc(sizeof(*arena));
+    arena *arena = malloc(sizeof(*arena));
     if (!arena) {
         free(block);
         return NULL;
@@ -27,21 +24,14 @@ Arena *ArenaAlloc(uint64_t cap) {
     arena->align = 0;
     arena->block_size = cap;
 
-    ASSERT_NOTNULL(arena);
-    ASSERT_NOTNULL(arena->first);
-    ASSERT_NOTNULL(arena->current);
-    ASSERT_EQ(arena->align, 0);
-    ASSERT_EQ(arena->block_size, cap);
     return arena;
 }
 
-void ArenaRelease(Arena *arena) {
-    ASSERT_NOTNULL(arena);
-
-    ArenaBlock *block = arena->first;
+void arena_release(arena *arena) {
+    arena_block *block = arena->first;
 
     while (block) {
-        ArenaBlock *next = block->next;
+        arena_block *next = block->next;
         free(block);
         block = next;
     }
@@ -49,29 +39,19 @@ void ArenaRelease(Arena *arena) {
     free(arena);
 }
 
-void ArenaSetAutoAlign(Arena *arena, uint64_t align) {
-    ASSERT_NOTNULL(arena);
-    ASSERT_GT(align, 0);
-
+void arena_auto_align(arena *arena, uint64_t align) {
     arena->align = align;
     if (align > arena->block_size) {
         arena->block_size = align;
     }
 }
 
-ArenaMark ArenaGetMark(const Arena *arena) {
-    ASSERT_NOTNULL(arena);
-
-    ArenaMark mark = {.block = arena->current, .pos = arena->current->pos};
-    ASSERT_NOTNULL(mark.block);
-    ASSERT_LE(mark.pos, mark.block->cap);
+arena_mark arena_get_mark(const arena *arena) {
+    arena_mark mark = {.block = arena->current, .pos = arena->current->pos};
     return mark;
 }
 
-void *ArenaPushNoZero(Arena *arena, uint64_t size) {
-    ASSERT_NOTNULL(arena);
-    ASSERT_GT(size, 0);
-
+void *arena_push_no_zero(arena *arena, uint64_t size) {
     uint64_t align_pos = arena->current->pos;
 
     if (arena->align) {
@@ -87,7 +67,7 @@ void *ArenaPushNoZero(Arena *arena, uint64_t size) {
             cap = size;
         }
 
-        ArenaBlock *block = new_block_(cap);
+        arena_block *block = new_block_(cap);
         if (!block) {
             return NULL;
         }
@@ -102,43 +82,33 @@ void *ArenaPushNoZero(Arena *arena, uint64_t size) {
     void *ptr = base + align_pos;
     arena->current->pos = align_pos + size;
 
-    ASSERT_NOTNULL(ptr);
     return ptr;
 }
 
-void *ArenaPush(Arena *arena, uint64_t size) {
-    ASSERT_NOTNULL(arena);
-    ASSERT_GT(size, 0);
-
-    void *ptr = ArenaPushNoZero(arena, size);
+void *arena_push(arena *arena, uint64_t size) {
+    void *ptr = arena_push_no_zero(arena, size);
     if (!ptr) {
         return NULL;
     }
 
     ft_memset(ptr, 0, size);
 
-    ASSERT_NOTNULL(ptr);
     return ptr;
 }
 
-void ArenaPopToMark(Arena *arena, ArenaMark mark) {
-    ASSERT_NOTNULL(arena);
-    ASSERT_NOTNULL(mark.block);
-    ASSERT_LE(mark.pos, mark.block->cap);
-
-    const ArenaBlock *cursor = arena->current;
+void arena_pop_to_mark(arena *arena, arena_mark mark) {
+    const arena_block *cursor = arena->current;
     while (cursor && cursor != mark.block) {
         cursor = cursor->prev;
     }
 
-    ASSERT_NOTNULL(cursor);
     if (!cursor) {
         return;
     }
 
-    ArenaBlock *block = arena->current;
+    arena_block *block = arena->current;
     while (block != mark.block) {
-        ArenaBlock *prev = block->prev;
+        arena_block *prev = block->prev;
         if (prev) {
             prev->next = NULL;
         }
@@ -148,18 +118,13 @@ void ArenaPopToMark(Arena *arena, ArenaMark mark) {
 
     block->pos = mark.pos;
     arena->current = block;
-
-    ASSERT_NOTNULL(arena->current);
-    ASSERT_NULL(arena->current->next);
 }
 
-void ArenaClear(Arena *arena) {
-    ASSERT_NOTNULL(arena);
-
-    ArenaBlock *block = arena->first->next;
+void arena_clear(arena *arena) {
+    arena_block *block = arena->first->next;
 
     while (block) {
-        ArenaBlock *next = block->next;
+        arena_block *next = block->next;
         free(block);
         block = next;
     }
@@ -170,10 +135,8 @@ void ArenaClear(Arena *arena) {
     arena->current = arena->first;
 }
 
-static ArenaBlock *new_block_(uint64_t cap) {
-    ASSERT_GT(cap, 0);
-
-    ArenaBlock *block = malloc(sizeof(*block) + cap);
+static arena_block *new_block_(uint64_t cap) {
+    arena_block *block = malloc(sizeof(*block) + cap);
     if (!block) {
         return NULL;
     }
@@ -183,6 +146,5 @@ static ArenaBlock *new_block_(uint64_t cap) {
     block->pos = 0;
     block->cap = cap;
 
-    ASSERT_NOTNULL(block);
     return block;
 }

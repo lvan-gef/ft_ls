@@ -1,14 +1,18 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "../include/ft_assert.h"
 #include "../include/ft_printer_helper.h"
 #include "../include/ft_shell_escape.h"
 #include "../include/ft_str.h"
 
 #include "../libft/include/libft.h"
 
-static bool escape_str_(t_str *dst, const t_str *str, char quote, bool pad_unquoted);
+#define OCTAL_DIGIT_MASK 0x7
+#define BYTE_OCTAL_HIGH_SHIFT 6
+#define BYTE_OCTAL_MID_SHIFT 3
+
+static bool escape_str_(t_str *dst, const t_str *str, char quote,
+                        bool pad_unquoted);
 static bool append_bytes_(t_str *dst, const char *src, uint64_t len);
 static uint64_t ansi_byte_len_(unsigned char byte);
 static uint64_t ansi_len_(const char *src, uint64_t len);
@@ -22,9 +26,6 @@ static bool name_start_(unsigned char c);
 static bool name_continue_(unsigned char c);
 
 bool escaped_out(t_str *dst, const t_str *str, char quote, bool pad_unquoted) {
-    ASSERT_NOTNULL(dst);
-    ASSERT_NOTNULL(str);
-
     const uint64_t need = shell_display_len(str, quote, pad_unquoted);
     if (need > dst->cap - 1) {
         return false;
@@ -38,10 +39,6 @@ bool escaped_out(t_str *dst, const t_str *str, char quote, bool pad_unquoted) {
 }
 
 t_str *shell_escape_str(free_list *fl, const t_str *str, char quote) {
-    ASSERT_NOTNULL(fl);
-    ASSERT_NOTNULL(str);
-    ASSERT_NOTNULL(str->str);
-
     const uint64_t escaped_len = shell_display_len(str, quote, false);
     t_str *new_str = init_str(fl, escaped_len);
     if (!new_str) {
@@ -57,9 +54,6 @@ t_str *shell_escape_str(free_list *fl, const t_str *str, char quote) {
 }
 
 uint64_t shell_display_len(const t_str *str, char quote, bool pad_unquoted) {
-    ASSERT_NOTNULL(str);
-    ASSERT_NOTNULL(str->str);
-
     if (quote == '\0') {
         return str->len + (pad_unquoted ? 1 : 0);
     }
@@ -68,14 +62,10 @@ uint64_t shell_display_len(const t_str *str, char quote, bool pad_unquoted) {
         return str->len + 2;
     }
 
-    ASSERT_EQ(quote, '\'');
     return escaped_len_(str);
 }
 
 char shell_quote(const t_str *str) {
-    ASSERT_NOTNULL(str);
-    ASSERT_NOTNULL(str->str);
-
     bool needs_quote = false;
     bool has_single = false;
     bool can_use_double = true;
@@ -110,12 +100,8 @@ char shell_quote(const t_str *str) {
     return '\'';
 }
 
-static bool escape_str_(t_str *dst, const t_str *str, char quote, bool pad_unquoted) {
-    ASSERT_NOTNULL(dst);
-    ASSERT_NOTNULL(dst->str);
-    ASSERT_NOTNULL(str);
-    ASSERT_NOTNULL(str->str);
-
+static bool escape_str_(t_str *dst, const t_str *str, char quote,
+                        bool pad_unquoted) {
     if (quote == '\0') {
         if (pad_unquoted && !append_bytes_(dst, " ", 1)) {
             return false;
@@ -131,16 +117,10 @@ static bool escape_str_(t_str *dst, const t_str *str, char quote, bool pad_unquo
         return append_bytes_(dst, "\"", 1);
     }
 
-    ASSERT_EQ(quote, '\'');
     return shell_escaped_(dst, str);
 }
 
 static bool append_bytes_(t_str *dst, const char *src, uint64_t len) {
-    ASSERT_NOTNULL(dst);
-    ASSERT_NOTNULL(dst->str);
-    ASSERT_NOTNULL(src);
-    ASSERT_LE(dst->len + len, dst->cap - 1);
-
     ft_memcpy(dst->str + dst->len, src, (size_t)len);
     dst->len += len;
     dst->str[dst->len] = '\0';
@@ -161,8 +141,6 @@ static uint64_t ansi_byte_len_(unsigned char byte) {
 }
 
 static uint64_t ansi_len_(const char *src, uint64_t len) {
-    ASSERT_NOTNULL(src);
-
     uint64_t out = 3; /* $'  + closing ' */
     for (uint64_t i = 0; i < len; ++i) {
         out += ansi_byte_len_((unsigned char)src[i]);
@@ -172,9 +150,6 @@ static uint64_t ansi_len_(const char *src, uint64_t len) {
 }
 
 static uint64_t escaped_len_(const t_str *str) {
-    ASSERT_NOTNULL(str);
-    ASSERT_NOTNULL(str->str);
-
     uint64_t out = 1; /* opening ' */
     bool in_single = true;
 
@@ -224,8 +199,6 @@ static uint64_t escaped_len_(const t_str *str) {
 }
 
 static bool append_ansi_byte_(t_str *dst, unsigned char byte) {
-    ASSERT_NOTNULL(dst);
-
     char octal[4];
     switch (byte) {
         case '\a': return append_bytes_(dst, "\\a", 2);
@@ -239,16 +212,16 @@ static bool append_ansi_byte_(t_str *dst, unsigned char byte) {
     }
 
     octal[0] = '\\';
-    octal[1] = (char)('0' + ((byte >> 6) & 0x7));
-    octal[2] = (char)('0' + ((byte >> 3) & 0x7));
-    octal[3] = (char)('0' + (byte & 0x7));
+    octal[1] =
+        (char)('0' + ((byte >> BYTE_OCTAL_HIGH_SHIFT) & OCTAL_DIGIT_MASK));
+    octal[2] =
+        (char)('0' + ((byte >> BYTE_OCTAL_MID_SHIFT) & OCTAL_DIGIT_MASK));
+    octal[3] = (char)('0' + (byte & OCTAL_DIGIT_MASK));
+
     return append_bytes_(dst, octal, 4);
 }
 
 static bool append_ansi_segment_(t_str *dst, const char *src, uint64_t len) {
-    ASSERT_NOTNULL(dst);
-    ASSERT_NOTNULL(src);
-
     if (!append_bytes_(dst, "$'", 2)) {
         return false;
     }
@@ -263,10 +236,6 @@ static bool append_ansi_segment_(t_str *dst, const char *src, uint64_t len) {
 }
 
 static bool shell_escaped_(t_str *dst, const t_str *str) {
-    ASSERT_NOTNULL(dst);
-    ASSERT_NOTNULL(str);
-    ASSERT_NOTNULL(str->str);
-
     bool in_single = true;
 
     if (!append_bytes_(dst, "\'", 1)) {
@@ -333,7 +302,6 @@ static bool shell_escaped_(t_str *dst, const t_str *str) {
 }
 
 static bool needs_raw_quote_(unsigned char c, uint64_t index, bool *candidate) {
-    ASSERT_NOTNULL(candidate);
     bool needs_quote = false;
 
     switch (c) {

@@ -2,7 +2,6 @@
 #include <stdint.h>
 
 #include "../include/ft_array.h"
-#include "../include/ft_assert.h"
 #include "../include/ft_free_list.h"
 #include "../include/ft_parse.h"
 #include "../include/ft_str.h"
@@ -13,11 +12,6 @@
 static void print_error_(const char *flag);
 
 t_array *parse_args(free_list *fl, uint64_t argc, char **argv, t_args *args) {
-    ASSERT_GE(argc, 1);
-    ASSERT_NOTNULL(argv);
-    ASSERT_NOTNULL(*argv);
-    ASSERT_NOTNULL(args);
-
     t_array *inputs = init_array(fl, ARRAY_SIZE);
     if (!inputs) {
         return NULL;
@@ -66,14 +60,10 @@ t_array *parse_args(free_list *fl, uint64_t argc, char **argv, t_args *args) {
         }
     }
 
-    ASSERT_GE(inputs->len, 1);
     return inputs;
 }
 
 static void print_error_(const char *flag) {
-    ASSERT_NOTNULL(flag);
-    ASSERT_(*flag, "*flag can not be '\\0'");
-
     ft_fprintf(STDERR_FILENO,
                "ft_ls: invalid option -- %s\nusage: ft_ls "
                "[-Ralrt] [file ...]\n",

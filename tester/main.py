@@ -43,7 +43,7 @@ class TestFailure(NamedTuple):
 
 
 DEBUG = True
-TERMINAL_MIN = 40   # include
+TERMINAL_MIN = 1   # include
 TERMINAL_MAX = 120  # exclude
 BATCH_SIZE = 32
 

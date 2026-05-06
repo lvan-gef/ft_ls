@@ -7,7 +7,6 @@
 #include <sys/xattr.h>
 #include <time.h>
 
-#include "../include/ft_assert.h"
 #include "../include/ft_entry.h"
 #include "../include/ft_free_list.h"
 #include "../include/ft_shell_escape.h"
@@ -47,10 +46,6 @@ static char cached_user[LOGIN_NAME_MAX] = "";
 static char cached_group[LOGIN_NAME_MAX] = "";
 
 t_entry *new_entry(free_list *fl, t_entry *entry, const struct dirent *dp) {
-    ASSERT_NOTNULL(fl);
-    ASSERT_NOTNULL(entry);
-    ASSERT_NOTNULL(dp);
-
     t_entry *ent = fl_alloc(fl, sizeof(*ent), 8);
     if (!ent) {
         goto failed;
@@ -81,12 +76,6 @@ failed:
 }
 
 bool get_file_info(free_list *fl, t_entry *entry) {
-    ASSERT_NOTNULL(fl);
-    ASSERT_NOTNULL(entry);
-    ASSERT_NOTNULL(entry->path);
-    ASSERT_GT(entry->path->cap, 0);
-    ASSERT_LT(entry->path->len, entry->path->cap);
-
     t_file_info *info = fl_alloc(fl, sizeof(*info), 8);
     if (!info) {
         goto failed;
@@ -141,9 +130,6 @@ failed:
 }
 
 void free_entry(free_list *fl, t_entry *entry) {
-    ASSERT_NOTNULL(fl);
-    ASSERT_NOTNULL(entry);
-
     if (entry->name) {
         fl_free(fl, entry->name);
     }
@@ -160,9 +146,6 @@ void free_entry(free_list *fl, t_entry *entry) {
 }
 
 static t_str *get_perm_(free_list *fl, const t_entry *entry) {
-    ASSERT_NOTNULL(fl);
-    ASSERT_NOTNULL(entry);
-
     t_str *str = init_str(fl, PERMISSION_SIZE);
     if (!str) {
         return NULL;
@@ -219,19 +202,14 @@ static t_str *get_perm_(free_list *fl, const t_entry *entry) {
                     append_chars_str(str, ".");
                 }
                 break;
-            default: ASSERT_FALSE(true);
+            default: free_str(fl, str); return NULL;
         }
     }
 
-    ASSERT_(str->len == UINT64_C(10) || str->len == UINT64_C(11),
-            "unexpected permission length: %llu", (unsigned long long)str->len);
-    ASSERT_EQ(str->pos, 0);
     return str;
 }
 
 static t_str *get_user_(free_list *fl, uid_t user_id) {
-    ASSERT_NOTNULL(fl);
-
     if (user_id == cached_uid) {
         return create_str(fl, cached_user);
     }
@@ -255,14 +233,10 @@ static t_str *get_user_(free_list *fl, uid_t user_id) {
     }
 
     cached_uid = user_id;
-    ASSERT_LE(new_str->len, LOGIN_NAME_MAX - 1);
-    ASSERT_EQ(new_str->pos, 0);
     return new_str;
 }
 
 static t_str *get_group_(free_list *fl, gid_t group_id) {
-    ASSERT_NOTNULL(fl);
-
     if (group_id == cached_gid) {
         return create_str(fl, cached_group);
     }
@@ -286,15 +260,10 @@ static t_str *get_group_(free_list *fl, gid_t group_id) {
     }
 
     cached_gid = group_id;
-    ASSERT_LE(new_str->len, LOGIN_NAME_MAX - 1);
-    ASSERT_EQ(new_str->pos, 0);
     return new_str;
 }
 
 static t_str *get_dt_(free_list *fl, const struct timespec *ctim) {
-    ASSERT_NOTNULL(fl);
-    ASSERT_NOTNULL(ctim);
-
     const char *dt = ctime(&ctim->tv_sec);
     if (!dt) {
         return NULL;
@@ -315,15 +284,10 @@ static t_str *get_dt_(free_list *fl, const struct timespec *ctim) {
     new_str->len = 12;
     new_str->str[new_str->len] = '\0';
 
-    ASSERT_EQ(new_str->len, DT_LEN - 1);
-    ASSERT_EQ(new_str->pos, 0);
     return new_str;
 }
 
 static t_str *get_symlink_(free_list *fl, const t_entry *entry) {
-    ASSERT_NOTNULL(fl);
-    ASSERT_NOTNULL(entry);
-
     if (!S_ISLNK(entry->st.st_mode)) {
         return init_str(fl, 1);
     }
@@ -358,11 +322,6 @@ static t_str *get_symlink_(free_list *fl, const t_entry *entry) {
 }
 
 static bool has_xattr_(const char *path, const char *name) {
-    ASSERT_NOTNULL(path);
-    ASSERT_NOTNULL(name);
-    ASSERT_(*path, "%c can not be '\\0'", *path);
-    ASSERT_(*name, "%c can not be '\\0'", *name);
-
     ssize_t n = getxattr(path, name, NULL, 0);
     if (n < 0) {
         return false;
@@ -372,10 +331,6 @@ static bool has_xattr_(const char *path, const char *name) {
 }
 
 static t_str *join_paths_(free_list *fl, const t_str *lhs, const t_str *rhs) {
-    ASSERT_NOTNULL(fl);
-    ASSERT_NOTNULL(lhs);
-    ASSERT_NOTNULL(rhs);
-
     const size_t new_len = lhs->len + 1 + rhs->len + 1;
     t_str *fullname = init_str(fl, new_len);
     if (!fullname) {
@@ -394,9 +349,6 @@ static t_str *join_paths_(free_list *fl, const t_str *lhs, const t_str *rhs) {
 }
 
 static void free_info_(free_list *fl, t_file_info *info) {
-    ASSERT_NOTNULL(fl);
-    ASSERT_NOTNULL(info);
-
     if (info->perm) {
         fl_free(fl, info->perm);
     }

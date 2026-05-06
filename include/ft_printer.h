@@ -10,8 +10,21 @@
 #define TERM_SIZE 80
 #endif // !TERM_SIZE
 
-void printer(const t_args *args, t_array *array, const t_entry *dir_entry,
-             bool print_total, uint64_t min_len_links, uint64_t min_len_sizes,
-             bool force_quote_padding);
+#if TERM_SIZE < 1
+#error "TERM_SIZE must be at least 1"
+#endif
+
+typedef struct {
+    t_args *args;
+    t_array *array;
+    t_entry *dir_entry;
+    bool print_total;
+    uint64_t min_len_links;
+    uint64_t min_len_sizes;
+    bool quote_padding;
+} t_ps;
+
+void printer(t_ps *ps);
+void print_list(t_ps *ps);
 
 #endif // !FT_PRINTER_H

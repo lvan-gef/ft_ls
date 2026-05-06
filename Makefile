@@ -4,7 +4,21 @@ MAKEFLAGS += -j
 
 TERM_SIZE ?= 80
 
+.PHONY: check-term-size
+check-term-size:
+	@case "$(TERM_SIZE)" in \
+		''|*[!0-9]*|0) \
+			echo "error: TERM_SIZE must be a positive integer, got '$(TERM_SIZE)'"; \
+			exit 1; \
+			;; \
+	esac
+
+LIBFT_DIR := libft
+LIBFT     := $(LIBFT_DIR)/libft.a
+LIBFT_D   := $(LIBFT_DIR)/libft_d.a
+
 CC        := cc
+CPPFLAGS  := -DTERM_SIZE=$(TERM_SIZE) -I include -I $(LIBFT_DIR)/include
 CFLAGS    := -std=c11 -D_DEFAULT_SOURCE                                        \
 			 -Wall -Wextra -Werror -Wshadow -Wpedantic                         \
 			 -Wconversion -Wsign-conversion -Wdouble-promotion                 \
@@ -14,8 +28,7 @@ CFLAGS    := -std=c11 -D_DEFAULT_SOURCE                                        \
 			 -Wredundant-decls -Wwrite-strings                                 \
 			 -Wimplicit-fallthrough                                            \
 			 -Wcast-qual                                                       \
-			 -Wvla -Walloca -Wold-style-definition                             \
-			 -DTERM_SIZE=$(TERM_SIZE)
+			 -Wvla -Walloca -Wold-style-definition
 
 DEPSFLAGS := -MMD -MP
 
@@ -51,18 +64,13 @@ BLUE := \033[36m
 MARGENTA := \033[35m
 NC := \033[0m
 
-LIBFT_DIR := libft
-LIBFT     := $(LIBFT_DIR)/libft.a
-LIBFT_D   := $(LIBFT_DIR)/libft_d.a
-
-HEADERS := -I include -I $(LIBFT_DIR)/include
 
 # Build rules
 .PHONY: all
-all: $(NAME)  ## Build release version (default)
+all: check-term-size $(NAME)  ## Build release version (default)
 
 .PHONY: debug
-debug: $(NAME_D)  ## Build debug version with ASAN
+debug: check-term-size $(NAME_D)  ## Build debug version with ASAN
 
 .PHONY: tester
 tester:  ## run the tester
@@ -112,12 +120,12 @@ $(NAME_D): $(LIBFT_D) $(D_OBJECTS)
 	@echo "Build complete: $(NAME_D) (debug)"
 
 # Release pattern rule
-$(R_OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(R_OBJ_DIR)
-	$(CC) $(CFLAGS) $(R_CFLAGS) $(DEPSFLAGS) $(HEADERS) -c $< -o $@
+$(R_OBJ_DIR)/%.o: $(SRC_DIR)/%.c | check-term-size $(R_OBJ_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(R_CFLAGS) $(DEPSFLAGS) -c $< -o $@
 
 # Debug pattern rule
-$(D_OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(D_OBJ_DIR)
-	$(CC) $(CFLAGS) $(D_CFLAGS) $(DEPSFLAGS) $(HEADERS) -c $< -o $@
+$(D_OBJ_DIR)/%.o: $(SRC_DIR)/%.c | check-term-size $(D_OBJ_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(D_CFLAGS) $(DEPSFLAGS) -c $< -o $@
 
 $(LIBFT):
 	@$(MAKE) -C $(LIBFT_DIR)
@@ -132,5 +140,3 @@ $(D_OBJ_DIR):
 	@mkdir -p $@
 
 -include $(R_DEPS) $(D_DEPS)
-
-# cppcheck --check-level=exhaustive --enable=all --inconclusive --force --project=/home/lvan-gef/advance/ft_ls/compile_commands.json --std=c11 --suppress=missingIncludeSystem
