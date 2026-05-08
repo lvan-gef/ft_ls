@@ -50,10 +50,15 @@ typedef struct {
     t_file_info *info;
     struct stat st;
     bool is_escaped;
+    uint64_t display_len;
+    uint64_t padded_display_len;
 } t_entry;
 
 t_entry *new_entry(free_list *fl, t_entry *entry, const struct dirent *dp);
+t_entry *new_entry_arena(Arena *arena, t_entry *entry, const struct dirent *dp);
 bool get_file_info(free_list *fl, t_entry *entry);
+bool get_file_info_arena(Arena *arena, t_entry *entry);
+void init_entry_display(t_entry *entry);
 void free_entry(free_list *fl, t_entry *entry);
 
 #endif // !FT_ENTRY_H

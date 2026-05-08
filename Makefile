@@ -4,15 +4,6 @@ MAKEFLAGS += -j
 
 TERM_SIZE ?= 80
 
-.PHONY: check-term-size
-check-term-size:
-	@case "$(TERM_SIZE)" in \
-		''|*[!0-9]*|0) \
-			echo "error: TERM_SIZE must be a positive integer, got '$(TERM_SIZE)'"; \
-			exit 1; \
-			;; \
-	esac
-
 LIBFT_DIR := libft
 LIBFT     := $(LIBFT_DIR)/libft.a
 LIBFT_D   := $(LIBFT_DIR)/libft_d.a
@@ -102,6 +93,15 @@ fmt:  ## Format code via clang-format
 	@echo "Format code"
 	@find . -type f -name "*.c" -print0 | xargs -0 clang-format -i
 	@find . -type f -name "*.h" -print0 | xargs -0 clang-format -i
+
+.PHONY: check-term-size
+check-term-size:
+	@case "$(TERM_SIZE)" in \
+		''|*[!0-9]*|0) \
+			echo "error: TERM_SIZE must be a positive integer, got '$(TERM_SIZE)'"; \
+			exit 1; \
+			;; \
+	esac
 
 .PHONY: help
 help:  ## Get help

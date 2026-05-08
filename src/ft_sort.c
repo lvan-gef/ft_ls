@@ -119,17 +119,19 @@ static int cmp_time_entry_(const t_entry *a, const t_entry *b) {
 static int compare_(const t_str *lhs, const t_str *rhs) {
     const unsigned char *a = (const unsigned char *)lhs->str;
     const unsigned char *b = (const unsigned char *)rhs->str;
+    const uint64_t limit = lhs->len < rhs->len ? lhs->len : rhs->len;
 
-    while (*a && *b) {
-        if (*a != *b) {
-            return (int)*a - (int)*b;
+    for (uint64_t index = 0; index < limit; ++index) {
+        if (a[index] != b[index]) {
+            return (int)a[index] - (int)b[index];
         }
-
-        ++a;
-        ++b;
     }
 
-    return (int)*a - (int)*b;
+    if (lhs->len == rhs->len) {
+        return 0;
+    }
+
+    return lhs->len < rhs->len ? -1 : 1;
 }
 
 static int compare_time_(const struct timespec *a, const struct timespec *b) {

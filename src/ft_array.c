@@ -77,6 +77,7 @@ static bool realloc_arr_(t_array *array) {
 
     ft_memcpy((void *)new_data, (void *)old_data,
               array->len * sizeof(*array->data));
+    fl_free(array->fl, old_data);
     array->data = new_data;
     array->cap = new_cap;
 

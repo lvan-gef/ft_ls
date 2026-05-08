@@ -23,8 +23,8 @@
 typedef struct {
     t_args *args;
     free_list fl;
-    arena *dirs_arena;
-    arena *temp_arena;
+    Arena *dirs_arena;
+    Arena *temp_arena;
     t_array *dirs;
     t_array *files;
     t_array *entries;
@@ -38,6 +38,7 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code);
 static bool walk_recurssive_(t_params *params);
 static bool process_args_(t_params *params, t_array *array, int *exit_code);
 static void clear_temp_dir_(t_params *params);
+static void free_entry_array_(t_params *params, t_array *array);
 static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
                                  bool is_operand);
 static int check_links_(t_params *params, t_str *str, t_array *dir_entries,
@@ -109,7 +110,7 @@ static bool run_(t_args *args, t_params *params, t_array *array,
     if (params->files->len) {
         printer(&ps);
         printed_files = true;
-        reset_array(&params->fl, params->files);
+        free_entry_array_(params, params->files);
     }
 
     bool printed_dir = false;
@@ -124,6 +125,7 @@ static bool run_(t_args *args, t_params *params, t_array *array,
 
         if (!inserted_files_dirs_gap && printed_files && dir_path->is_operand) {
             if (write(STDOUT_FILENO, "\n", 1) < 0) {
+                free_entry(&params->fl, dir_path);
                 goto failed;
             }
             inserted_files_dirs_gap = true;
@@ -131,20 +133,18 @@ static bool run_(t_args *args, t_params *params, t_array *array,
 
         if (!read_dir_(params, dir_path, exit_code)) {
             clear_temp_dir_(params);
+            free_entry(&params->fl, dir_path);
             continue;
         }
 
         if (printed_dir) {
             if (write(STDOUT_FILENO, "\n", 1) < 0) {
+                free_entry(&params->fl, dir_path);
                 goto failed;
             }
         }
 
-        t_entry entry = {.name = dir_path->path,
-                         .quote = shell_quote(entry.name)};
-        if (entry.quote == '\0' && ft_strchr(entry.name->str, ':')) {
-            entry.quote = '\'';
-        }
+        t_entry entry = {.name = dir_path->path, .quote = dir_path->quote};
 
         t_entry *ent = print_dir_path ? &entry : NULL;
         ps.array = params->files;
@@ -152,6 +152,7 @@ static bool run_(t_args *args, t_params *params, t_array *array,
         printer(&ps);
         printed_dir = true;
         clear_temp_dir_(params);
+        free_entry(&params->fl, dir_path);
     }
 
     return true;
@@ -196,6 +197,7 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
 
             if (!append_array(dir_entries, dir_entry)) {
                 err_msg = "Failed to append dir entry";
+                free_entry(&params->fl, dir_entry);
                 goto failed;
             }
             continue;
@@ -207,20 +209,32 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
             goto failed;
         }
 
-        entry->quote = shell_quote(str);
-        entry->name = str;
-        entry->path = str;
+        *entry = (t_entry){0};
+
+        entry->name = dup_str(&params->fl, str);
+        if (!entry->name) {
+            err_msg = "Failed to duplicate entry name";
+            free_entry(&params->fl, entry);
+            goto failed;
+        }
+
+        entry->quote = shell_quote(entry->name);
+        entry->path = entry->name;
         entry->st = st;
         entry->is_escaped = false;
         entry->is_operand = false;
+        init_entry_display(entry);
         if (params->args->list) {
             if (!get_file_info(&params->fl, entry)) {
+                err_msg = "Failed to get file info";
+                free_entry(&params->fl, entry);
                 goto failed;
             }
         }
 
         if (!append_array(params->files, entry)) {
             err_msg = "Failed to append file entry";
+            free_entry(&params->fl, entry);
             goto failed;
         }
     }
@@ -232,6 +246,7 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
             entry->is_operand = true;
             if (!append_array(params->dirs, entry)) {
                 err_msg = "Failed to append dir";
+                free_entry(&params->fl, entry);
                 goto failed;
             }
         }
@@ -287,6 +302,7 @@ static int check_links_(t_params *params, t_str *str, t_array *dir_entries,
 
         if (!append_array(dir_entries, dir_entry)) {
             err_msg = "Failed to append dir entry";
+            free_entry(&params->fl, dir_entry);
             goto failed;
         }
         return 0;
@@ -322,7 +338,7 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
             continue;
         }
 
-        t_entry *entry = new_entry(&params->fl, path, dp);
+        t_entry *entry = new_entry_arena(params->temp_arena, path, dp);
         if (!entry) {
             goto cleanup;
         }
@@ -332,20 +348,21 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
             continue;
         }
 
-        if (S_ISDIR(entry->st.st_mode) && params->args->recursive) {
-            if (!append_array(params->entries, entry)) {
-                goto cleanup;
-            }
-        }
-
         if (params->args->list) {
-            if (!get_file_info(&params->fl, entry)) {
+            if (!get_file_info_arena(params->temp_arena, entry)) {
                 goto cleanup;
             }
         }
 
         if (!append_array(params->files, entry)) {
             goto cleanup;
+        }
+
+        if (S_ISDIR(entry->st.st_mode) && params->args->recursive) {
+            if (!append_array(params->entries, entry)) {
+                (void)pop_array(params->files);
+                goto cleanup;
+            }
         }
     }
 
@@ -363,9 +380,16 @@ cleanup:
 }
 
 static void clear_temp_dir_(t_params *params) {
-    clear_array(params->files);
     clear_array(params->entries);
+    clear_array(params->files);
     arena_clear(params->temp_arena);
+}
+
+static void free_entry_array_(t_params *params, t_array *array) {
+    while (array->len) {
+        t_entry *entry = pop_array(array);
+        free_entry(&params->fl, entry);
+    }
 }
 
 static bool walk_recurssive_(t_params *params) {
@@ -392,6 +416,7 @@ static bool walk_recurssive_(t_params *params) {
             }
 
             if (!append_array(params->dirs, dir_entry)) {
+                free_entry(&params->fl, dir_entry);
                 return false;
             }
         }
@@ -402,26 +427,39 @@ static bool walk_recurssive_(t_params *params) {
 
 static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
                                  bool is_operand) {
-    t_entry *entry = arena_push(params->dirs_arena, sizeof(*entry));
+    t_entry *entry = fl_alloc(&params->fl, sizeof(*entry), 8);
     if (!entry) {
         return NULL;
     }
 
-    *entry = *src;
-    entry->name =
-        src->name ? dup_str_arena(params->dirs_arena, src->name) : NULL;
+    *entry = (t_entry){0};
+    entry->name = src->name ? dup_str(&params->fl, src->name) : NULL;
     if (src->name && !entry->name) {
+        free_entry(&params->fl, entry);
         return NULL;
     }
 
-    entry->path = dup_str_arena(params->dirs_arena, src->path);
+    if (src->path == src->name) {
+        entry->path = entry->name;
+    } else {
+        entry->path = dup_str(&params->fl, src->path);
+    }
+
     if (!entry->path) {
+        free_entry(&params->fl, entry);
         return NULL;
     }
 
-    entry->quote = '\0';
+    entry->st = src->st;
+    entry->quote = shell_quote(entry->path);
+    if (entry->quote == '\0' && ft_strchr(entry->path->str, ':')) {
+        entry->quote = '\'';
+    }
+    entry->is_escaped = false;
     entry->info = NULL;
     entry->is_operand = is_operand;
+    entry->display_len = 0;
+    entry->padded_display_len = 0;
     return entry;
 }
 
@@ -463,6 +501,7 @@ static void print_err_(free_list *fl, t_str *str, int e, const char *prefix) {
         if (new_str) {
             ft_fprintf(STDERR_FILENO, "ft_ls: %s %s: %s\n", prefix,
                        new_str->str, msg);
+            free_str(fl, new_str);
             return;
         }
     }

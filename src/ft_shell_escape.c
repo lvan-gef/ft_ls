@@ -327,7 +327,8 @@ static bool needs_raw_quote_(unsigned char c, uint64_t index, bool *candidate) {
         case '=': needs_quote = true; break;
         default:
             needs_quote =
-                !ft_isalpha(c) && !ft_isdigit(c) && !is_safe_punct_(c, index);
+                !ft_isalpha(c) && !ft_isdigit(c) &&
+                !is_safe_punct_(c, index);
             break;
     }
 

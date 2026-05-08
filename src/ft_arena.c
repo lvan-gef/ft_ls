@@ -7,13 +7,13 @@
 
 static arena_block *new_block_(uint64_t cap);
 
-arena *arena_alloc(uint64_t cap) {
+Arena *arena_alloc(uint64_t cap) {
     arena_block *block = new_block_(cap);
     if (!block) {
         return NULL;
     }
 
-    arena *arena = malloc(sizeof(*arena));
+    Arena *arena = malloc(sizeof(*arena));
     if (!arena) {
         free(block);
         return NULL;
@@ -27,7 +27,7 @@ arena *arena_alloc(uint64_t cap) {
     return arena;
 }
 
-void arena_release(arena *arena) {
+void arena_release(Arena *arena) {
     arena_block *block = arena->first;
 
     while (block) {
@@ -39,19 +39,19 @@ void arena_release(arena *arena) {
     free(arena);
 }
 
-void arena_auto_align(arena *arena, uint64_t align) {
+void arena_auto_align(Arena *arena, uint64_t align) {
     arena->align = align;
     if (align > arena->block_size) {
         arena->block_size = align;
     }
 }
 
-arena_mark arena_get_mark(const arena *arena) {
-    arena_mark mark = {.block = arena->current, .pos = arena->current->pos};
+Arena_mark arena_get_mark(const Arena *arena) {
+    Arena_mark mark = {.block = arena->current, .pos = arena->current->pos};
     return mark;
 }
 
-void *arena_push_no_zero(arena *arena, uint64_t size) {
+void *arena_push_no_zero(Arena *arena, uint64_t size) {
     uint64_t align_pos = arena->current->pos;
 
     if (arena->align) {
@@ -85,7 +85,7 @@ void *arena_push_no_zero(arena *arena, uint64_t size) {
     return ptr;
 }
 
-void *arena_push(arena *arena, uint64_t size) {
+void *arena_push(Arena *arena, uint64_t size) {
     void *ptr = arena_push_no_zero(arena, size);
     if (!ptr) {
         return NULL;
@@ -96,7 +96,7 @@ void *arena_push(arena *arena, uint64_t size) {
     return ptr;
 }
 
-void arena_pop_to_mark(arena *arena, arena_mark mark) {
+void arena_pop_to_mark(Arena *arena, Arena_mark mark) {
     const arena_block *cursor = arena->current;
     while (cursor && cursor != mark.block) {
         cursor = cursor->prev;
@@ -120,7 +120,7 @@ void arena_pop_to_mark(arena *arena, arena_mark mark) {
     arena->current = block;
 }
 
-void arena_clear(arena *arena) {
+void arena_clear(Arena *arena) {
     arena_block *block = arena->first->next;
 
     while (block) {

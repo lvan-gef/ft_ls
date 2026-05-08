@@ -18,6 +18,8 @@ t_str *init_str(free_list *fl, uint64_t cap) {
         goto failed;
     }
 
+    *str = (t_str){0};
+
     if (cap + 1 < cap) {
         goto failed;
     }
@@ -41,6 +43,24 @@ failed:
     return NULL;
 }
 
+t_str *init_str_arena(Arena *arena, uint64_t cap) {
+    if (cap + 1 < cap || cap > UINT64_MAX - sizeof(t_str) - 1) {
+        return NULL;
+    }
+
+    t_str *str = arena_push_no_zero(arena, sizeof(t_str) + cap + 1);
+    if (!str) {
+        return NULL;
+    }
+
+    str->str = (char *)(str + 1);
+    str->cap = cap + 1;
+    str->len = 0;
+    str->pos = 0;
+    str->str[0] = '\0';
+    return str;
+}
+
 t_str *create_str(free_list *fl, const char *str) {
     const size_t len = ft_strlen(str);
     if (len + 1 < len) {
@@ -59,6 +79,23 @@ t_str *create_str(free_list *fl, const char *str) {
     return new_str;
 }
 
+t_str *create_str_arena(Arena *arena, const char *str) {
+    const size_t len = ft_strlen(str);
+    if (len + 1 < len) {
+        return NULL;
+    }
+
+    t_str *new_str = init_str_arena(arena, len);
+    if (!new_str) {
+        return NULL;
+    }
+
+    ft_memcpy(new_str->str, str, len);
+    new_str->len = len;
+    new_str->str[new_str->len] = '\0';
+    return new_str;
+}
+
 t_str *dup_str(free_list *fl, const t_str *str) {
     t_str *new_str = init_str(fl, str->cap - 1);
     if (!new_str) {
@@ -71,22 +108,14 @@ t_str *dup_str(free_list *fl, const t_str *str) {
     return new_str;
 }
 
-t_str *dup_str_arena(arena *arena, const t_str *src) {
-    t_str *dst = arena_push(arena, sizeof(*dst));
-    char *buf;
+t_str *dup_str_arena(Arena *arena, const t_str *src) {
+    t_str *dst = init_str_arena(arena, src->cap - 1);
     if (!dst) {
         return NULL;
     }
 
-    buf = arena_push_no_zero(arena, src->cap);
-    if (!buf) {
-        return NULL;
-    }
-
-    *dst = *src;
-    dst->str = buf;
-    dst->pos = 0;
-    ft_memcpy(dst->str, src->str, src->len + 1);
+    uint64_t len = strlcpy_(dst, src, src->len + 1);
+    dst->len = len;
     return dst;
 }
 
@@ -114,6 +143,25 @@ t_str *uint_to_str(free_list *fl, uint64_t nbr) {
     str->str[str->cap - 1] = '\0';
     str->pos = str->cap - 1;
 
+    while (str->pos) {
+        --str->pos;
+        str->str[str->pos] = (char)((nbr % 10) + '0');
+        nbr /= 10;
+        ++str->len;
+    }
+
+    return str;
+}
+
+t_str *uint_to_str_arena(Arena *arena, uint64_t nbr) {
+    uint64_t len = len_of_nbr(nbr);
+    t_str *str = init_str_arena(arena, len);
+    if (!str) {
+        return NULL;
+    }
+
+    str->str[str->cap - 1] = '\0';
+    str->pos = str->cap - 1;
     while (str->pos) {
         --str->pos;
         str->str[str->pos] = (char)((nbr % 10) + '0');

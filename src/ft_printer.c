@@ -18,6 +18,7 @@ typedef struct {
     uint64_t max;
 } t_map;
 
+static uint64_t display_len_(const t_entry *entry, bool quoted);
 static void init_print_row_(t_ps *ps);
 static uint64_t *calc_cols_(t_array *array, t_map *map, bool quoted);
 static uint64_t calc_width_(t_array *array, uint64_t num_cols,
@@ -90,8 +91,7 @@ static bool create_row_(t_str *out, t_array *array, const t_map *map,
 
         while (true) {
             const t_entry *entry = array->data[filesno];
-            const uint64_t name_length =
-                shell_display_len(entry->name, entry->quote, quoted);
+            const uint64_t name_length = display_len_(entry, quoted);
             const uint64_t max_name_length = col_widths[col++];
 
             if (!escaped_out(out, entry->name, entry->quote, quoted)) {
@@ -150,20 +150,24 @@ static uint64_t calc_width_(t_array *array, uint64_t num_cols,
                             uint64_t *col_widths, bool quoted) {
     const uint64_t num_rows = (array->len + num_cols - 1) / num_cols;
     uint64_t line_len = 0;
-
+    uint64_t start = 0;
     for (uint64_t index = 0; index < num_cols; ++index) {
-        col_widths[index] = 0;
-    }
-
-    for (uint64_t filesno = 0; filesno < array->len; ++filesno) {
-        const t_entry *entry = array->data[filesno];
-        const uint64_t idx = filesno / num_rows;
-        const uint64_t name_length =
-            shell_display_len(entry->name, entry->quote, quoted);
-
-        if (col_widths[idx] < name_length) {
-            col_widths[idx] = name_length;
+        uint64_t width = 0;
+        uint64_t end = start + num_rows;
+        if (end > array->len) {
+            end = array->len;
         }
+
+        for (uint64_t filesno = start; filesno < end; ++filesno) {
+            const t_entry *entry = array->data[filesno];
+            const uint64_t name_length = display_len_(entry, quoted);
+            if (width < name_length) {
+                width = name_length;
+            }
+        }
+
+        col_widths[index] = width;
+        start = end;
     }
 
     for (uint64_t index = 0; index < num_cols; ++index) {
@@ -180,6 +184,14 @@ static uint64_t calc_width_(t_array *array, uint64_t num_cols,
     }
 
     return line_len;
+}
+
+static uint64_t display_len_(const t_entry *entry, bool quoted) {
+    if (quoted) {
+        return entry->padded_display_len;
+    }
+
+    return entry->display_len;
 }
 
 static bool indent_(t_str *out, uint64_t from, uint64_t to) {
