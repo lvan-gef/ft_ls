@@ -44,7 +44,7 @@ class TestFailure(NamedTuple):
 
 DEBUG = True
 TERMINAL_MIN = 1   # include
-TERMINAL_MAX = 120  # exclude
+TERMINAL_MAX = 250  # exclude
 BATCH_SIZE = 32
 
 def main() -> None:
@@ -63,7 +63,7 @@ def main() -> None:
     try:
         data = create_test_folders(path=test_path)
         cases = list(gen_data(paths=data))
-        for term_size in range(TERMINAL_MIN, TERMINAL_MAX, 5):
+        for term_size in range(TERMINAL_MIN, TERMINAL_MAX, 1):
             subprocess.run('make fclean', shell=True, capture_output=True)
             print('=' * 60)
             compile_ls(term_size=term_size, debug=args.debug)

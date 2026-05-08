@@ -21,8 +21,8 @@ typedef struct {
 static uint64_t display_len_(const t_entry *entry, bool quoted);
 static void init_print_row_(t_ps *ps);
 static uint64_t *calc_cols_(t_array *array, t_map *map, bool quoted);
-static uint64_t calc_width_(t_array *array, uint64_t num_cols,
-                            uint64_t *col_widths, bool quoted);
+static bool calc_width_(t_array *array, uint64_t num_cols,
+                        uint64_t *col_widths, bool quoted);
 static bool create_row_(t_str *out, t_array *array, const t_map *map,
                         const uint64_t *col_widths, bool quoted);
 static bool indent_(t_str *out, uint64_t from, uint64_t to);
@@ -120,11 +120,6 @@ static bool create_row_(t_str *out, t_array *array, const t_map *map,
 }
 
 static uint64_t *calc_cols_(t_array *array, t_map *map, bool quoted) {
-    const uint64_t max_cols = TERM_SIZE / MIN_COLUMN_WIDTH;
-    if (map->max > max_cols) {
-        map->max = max_cols;
-    }
-
     const uint64_t width_count = map->max ? map->max : 1;
     uint64_t *col_widths = malloc((size_t)width_count * sizeof(*col_widths));
     if (!col_widths) {
@@ -133,8 +128,7 @@ static uint64_t *calc_cols_(t_array *array, t_map *map, bool quoted) {
 
     uint64_t try_cols = map->max;
     while (try_cols > 1) {
-        const uint64_t width = calc_width_(array, try_cols, col_widths, quoted);
-        if (width < TERM_SIZE) {
+        if (calc_width_(array, try_cols, col_widths, quoted)) {
             map->cols = try_cols;
             map->rows = (array->len + map->cols - 1) / map->cols;
             return col_widths;
@@ -146,44 +140,35 @@ static uint64_t *calc_cols_(t_array *array, t_map *map, bool quoted) {
     return col_widths;
 }
 
-static uint64_t calc_width_(t_array *array, uint64_t num_cols,
-                            uint64_t *col_widths, bool quoted) {
+static bool calc_width_(t_array *array, uint64_t num_cols,
+                        uint64_t *col_widths, bool quoted) {
     const uint64_t num_rows = (array->len + num_cols - 1) / num_cols;
-    uint64_t line_len = 0;
-    uint64_t start = 0;
+    uint64_t line_len = num_cols * MIN_COLUMN_WIDTH;
+
+    // Seed each column with the same minimum width GNU ls uses.
     for (uint64_t index = 0; index < num_cols; ++index) {
-        uint64_t width = 0;
-        uint64_t end = start + num_rows;
-        if (end > array->len) {
-            end = array->len;
-        }
-
-        for (uint64_t filesno = start; filesno < end; ++filesno) {
-            const t_entry *entry = array->data[filesno];
-            const uint64_t name_length = display_len_(entry, quoted);
-            if (width < name_length) {
-                width = name_length;
-            }
-        }
-
-        col_widths[index] = width;
-        start = end;
+        col_widths[index] = MIN_COLUMN_WIDTH;
     }
 
-    for (uint64_t index = 0; index < num_cols; ++index) {
-        uint64_t width = col_widths[index];
+    for (uint64_t filesno = 0; filesno < array->len; ++filesno) {
+        const t_entry *entry = array->data[filesno];
+        const uint64_t index = filesno / num_rows;
+        uint64_t real_length = display_len_(entry, quoted);
 
         if (index != num_cols - 1) {
-            if (width < MIN_COLUMN_WIDTH)
-                width = MIN_COLUMN_WIDTH;
-            width += SPACE_GAP;
+            real_length += SPACE_GAP;
         }
 
-        col_widths[index] = width;
-        line_len += width;
+        if (col_widths[index] < real_length) {
+            line_len += real_length - col_widths[index];
+            col_widths[index] = real_length;
+            if (line_len >= TERM_SIZE) {
+                return false;
+            }
+        }
     }
 
-    return line_len;
+    return true;
 }
 
 static uint64_t display_len_(const t_entry *entry, bool quoted) {
