@@ -12,21 +12,21 @@
 
 #include "../../include/ft_fprintf.h"
 
-static ssize_t check_it(va_list args, char c, int fd) {
+static ssize_t check_it(va_list *args, char c, int fd) {
     if (c == 'c')
-        return (f_write_ascii(va_arg(args, int), fd));
+        return (f_write_ascii(va_arg(*args, int), fd));
     else if (c == 's')
-        return (f_write_str(va_arg(args, char *), fd));
+        return (f_write_str(va_arg(*args, char *), fd));
     else if (c == 'd' || c == 'i')
-        return (f_format_int(va_arg(args, int), 0, 10, fd));
+        return (f_format_int(va_arg(*args, int), 0, 10, fd));
     else if (c == 'u')
-        return (f_to_hex(va_arg(args, unsigned int), 0, 10, fd));
+        return (f_to_hex(va_arg(*args, unsigned int), 0, 10, fd));
     else if (c == 'p')
-        return (f_format_ptr(va_arg(args, void *), 0, 16, fd));
+        return (f_format_ptr(va_arg(*args, void *), 0, 16, fd));
     else if (c == 'x')
-        return (f_to_hex(va_arg(args, unsigned int), 0, 16, fd));
+        return (f_to_hex(va_arg(*args, unsigned int), 0, 16, fd));
     else if (c == 'X')
-        return (f_to_hex(va_arg(args, unsigned int), 1, 16, fd));
+        return (f_to_hex(va_arg(*args, unsigned int), 1, 16, fd));
     else if (c == '%')
         return (f_write_ascii('%', fd));
     else
@@ -46,7 +46,7 @@ int ft_fprintf(int fd, const char *s, ...) {
             s++;
             if (!*s)
                 break;
-            counter = check_it(args, *s, fd);
+            counter = check_it(&args, *s, fd);
         } else
             counter = f_write_ascii(*s, fd);
         if (counter < 0)

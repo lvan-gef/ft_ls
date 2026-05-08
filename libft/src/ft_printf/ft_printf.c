@@ -12,21 +12,21 @@
 
 #include "../../include/ft_printf.h"
 
-static ssize_t check_it(va_list args, char c) {
+static ssize_t check_it(va_list *args, char c) {
     if (c == 'c')
-        return (write_ascii(va_arg(args, int)));
+        return (write_ascii(va_arg(*args, int)));
     else if (c == 's')
-        return (write_str(va_arg(args, char *)));
+        return (write_str(va_arg(*args, char *)));
     else if (c == 'd' || c == 'i')
-        return (format_int(va_arg(args, int), 0, 10));
+        return (format_int(va_arg(*args, int), 0, 10));
     else if (c == 'u')
-        return (to_hex(va_arg(args, unsigned int), 0, 10));
+        return (to_hex(va_arg(*args, unsigned int), 0, 10));
     else if (c == 'p')
-        return (format_ptr(va_arg(args, void *), 0, 16));
+        return (format_ptr(va_arg(*args, void *), 0, 16));
     else if (c == 'x')
-        return (to_hex(va_arg(args, unsigned int), 0, 16));
+        return (to_hex(va_arg(*args, unsigned int), 0, 16));
     else if (c == 'X')
-        return (to_hex(va_arg(args, unsigned int), 1, 16));
+        return (to_hex(va_arg(*args, unsigned int), 1, 16));
     else if (c == '%')
         return (write_ascii('%'));
     else
@@ -46,7 +46,7 @@ int ft_printf(const char *s, ...) {
             s++;
             if (!*s)
                 break;
-            counter = check_it(args, *s);
+            counter = check_it(&args, *s);
         } else
             counter = write_ascii(*s);
         if (counter < 0)
