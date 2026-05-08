@@ -100,7 +100,8 @@ failed:
     return NULL;
 }
 
-t_entry *new_entry_arena(Arena *arena, t_entry *entry, const struct dirent *dp) {
+t_entry *new_entry_arena(Arena *arena, t_entry *entry,
+                         const struct dirent *dp) {
     t_name_scan scan;
     t_entry *ent = arena_push(arena, sizeof(*ent));
     if (!ent) {
