@@ -129,8 +129,8 @@ ssize_t append_chars_str(t_str *dst, const char *src) {
 }
 
 void free_str(free_list *fl, t_str *str) {
-    if (str->str) {
-        fl_free(fl, str->str);
+    if (!str) {
+        return;
     }
 
     fl_free(fl, str);
