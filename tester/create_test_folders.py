@@ -95,7 +95,7 @@ def create_test_folders(path: Path) -> Paths:
 
 
 def create_curated_cases(path: Path) -> list[list[Path]]:
-    return [
+    cases = [
         [path.joinpath('missing space')],
         [
             path.joinpath('quote_paths', 'plain'),
@@ -109,7 +109,25 @@ def create_curated_cases(path: Path) -> list[list[Path]]:
             path.joinpath('quote_paths', 'plain'),
             path.joinpath('recursive', 'colon:dir'),
         ],
+        [path.joinpath('symlinks', 'broken_link')],
     ]
+
+    unreadable_proc_link = get_unreadable_proc_symlink_case()
+    if unreadable_proc_link is not None:
+        cases.append([unreadable_proc_link])
+
+    return cases
+
+
+def get_unreadable_proc_symlink_case() -> Path | None:
+    if os.geteuid() == 0:
+        return None
+
+    for proc_link in (Path('/proc/1'), Path('/proc/1/cwd'), Path('/proc/1/root'), Path('/proc/1/exe')):
+        if proc_link.is_symlink():
+            return proc_link
+
+    return None
 
 
 def create_simple(path: Path) -> tuple[Path, list[Path]]:
