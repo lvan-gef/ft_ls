@@ -3,9 +3,11 @@
 #include <pwd.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/xattr.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "../include/ft_entry.h"
 #include "../include/ft_free_list.h"
@@ -25,25 +27,8 @@ static t_str *get_dt_arena_(Arena *arena, const struct timespec *ctim);
 static t_str *get_symlink_(free_list *fl, const t_entry *entry);
 static t_str *get_symlink_arena_(Arena *arena, const t_entry *entry);
 static bool has_xattr_(const char *path, const char *name);
-static t_str *join_paths_(free_list *fl, const t_str *lhs, const t_str *rhs);
-static t_str *join_paths_arena_(Arena *arena, const t_str *lhs,
-                                const t_str *rhs);
+static t_str *join_paths_(Arena *arena, const t_str *lhs, const t_str *rhs);
 static void free_info_(free_list *fl, t_file_info *info);
-static bool is_alpha_ascii_(unsigned char c);
-static bool is_digit_ascii_(unsigned char c);
-static bool is_print_ascii_(unsigned char c);
-static bool is_safe_punct_(unsigned char c, uint64_t index);
-static bool needs_raw_quote_char_(unsigned char c, uint64_t index);
-static uint64_t ansi_byte_len_(unsigned char byte);
-
-typedef struct {
-    uint64_t len;
-    uint64_t display_len;
-    uint64_t padded_display_len;
-    char quote;
-} t_name_scan;
-
-static void scan_name_(const char *src, t_name_scan *scan);
 
 typedef enum {
     P_LINK,
@@ -67,48 +52,14 @@ static gid_t cached_gid = (gid_t)-1;
 static char cached_user[LOGIN_NAME_MAX] = "";
 static char cached_group[LOGIN_NAME_MAX] = "";
 
-t_entry *new_entry(free_list *fl, t_entry *entry, const struct dirent *dp) {
-    t_entry *ent = fl_alloc(fl, sizeof(*ent), 8);
-    if (!ent) {
-        goto failed;
-    }
-
-    *ent = (t_entry){0};
-
-    ent->name = create_str(fl, dp->d_name);
-    if (!ent->name) {
-        goto failed;
-    }
-
-    ent->path = join_paths_(fl, entry->path, ent->name);
-    if (!ent->path) {
-        goto failed;
-    }
-
-    ent->quote = shell_quote(ent->name);
-    ent->is_escaped = false;
-    ent->is_operand = false;
-    ent->info = NULL;
-    init_entry_display(ent);
-
-    return ent;
-failed:
-    if (ent) {
-        free_entry(fl, ent);
-    }
-
-    return NULL;
-}
-
-t_entry *new_entry_arena(Arena *arena, t_entry *entry,
-                         const struct dirent *dp) {
-    t_name_scan scan;
+t_entry *new_entry(Arena *arena, t_entry *entry, const struct dirent *dp) {
+    t_shell_scan scan;
     t_entry *ent = arena_push(arena, sizeof(*ent));
     if (!ent) {
         return NULL;
     }
 
-    scan_name_(dp->d_name, &scan);
+    shell_scan_cstr(dp->d_name, &scan);
     ent->name = init_str_arena(arena, scan.len);
     if (!ent->name) {
         return NULL;
@@ -118,7 +69,7 @@ t_entry *new_entry_arena(Arena *arena, t_entry *entry,
     ent->name->len = scan.len;
     ent->name->str[ent->name->len] = '\0';
 
-    ent->path = join_paths_arena_(arena, entry->path, ent->name);
+    ent->path = join_paths_(arena, entry->path, ent->name);
     if (!ent->path) {
         return NULL;
     }
@@ -561,8 +512,7 @@ static t_str *get_symlink_(free_list *fl, const t_entry *entry) {
 
         ssize_t len = readlink(entry->path->str, new_str->str, (size_t)cap);
         if (len < 0) {
-            free_str(fl, new_str);
-            break;
+            return init_str(fl, 1);
         }
 
         if ((uint64_t)len < cap) {
@@ -626,28 +576,7 @@ static bool has_xattr_(const char *path, const char *name) {
     return true;
 }
 
-static t_str *join_paths_(free_list *fl, const t_str *lhs, const t_str *rhs) {
-    const bool need_slash = lhs->len == 0 || lhs->str[lhs->len - 1] != '/';
-    const size_t new_len = lhs->len + rhs->len + (need_slash ? 1U : 0U) + 1U;
-    t_str *fullname = init_str(fl, new_len);
-    if (!fullname) {
-        return NULL;
-    }
-
-    ft_memcpy(fullname->str, lhs->str, lhs->len);
-    fullname->len = lhs->len;
-    if (need_slash) {
-        fullname->str[fullname->len++] = '/';
-    }
-    ft_memcpy(fullname->str + fullname->len, rhs->str, rhs->len);
-    fullname->len += rhs->len;
-    fullname->str[fullname->len] = '\0';
-
-    return fullname;
-}
-
-static t_str *join_paths_arena_(Arena *arena, const t_str *lhs,
-                                const t_str *rhs) {
+static t_str *join_paths_(Arena *arena, const t_str *lhs, const t_str *rhs) {
     const bool need_slash = lhs->len == 0 || lhs->str[lhs->len - 1] != '/';
     const size_t new_len = lhs->len + rhs->len + (need_slash ? 1U : 0U) + 1U;
     t_str *fullname = init_str_arena(arena, new_len);
@@ -660,6 +589,7 @@ static t_str *join_paths_arena_(Arena *arena, const t_str *lhs,
     if (need_slash) {
         fullname->str[fullname->len++] = '/';
     }
+
     ft_memcpy(fullname->str + fullname->len, rhs->str, rhs->len);
     fullname->len += rhs->len;
     fullname->str[fullname->len] = '\0';
@@ -696,161 +626,4 @@ static void free_info_(free_list *fl, t_file_info *info) {
     }
 
     fl_free(fl, info);
-}
-
-static bool is_alpha_ascii_(unsigned char c) {
-    return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
-}
-
-static bool is_digit_ascii_(unsigned char c) {
-    return c >= '0' && c <= '9';
-}
-
-static bool is_print_ascii_(unsigned char c) {
-    return c >= ' ' && c <= '~';
-}
-
-static bool is_safe_punct_(unsigned char c, uint64_t index) {
-    switch (c) {
-        case '_':
-        case '-':
-        case '.':
-        case '/':
-        case '+':
-        case ':':
-        case ',':
-        case '@':
-        case '%':
-        case '{':
-        case '}': return true;
-        case '#':
-        case '~': return index != 0;
-        default: return false;
-    }
-}
-
-static bool needs_raw_quote_char_(unsigned char c, uint64_t index) {
-    switch (c) {
-        case ' ':
-        case '\'':
-        case '"':
-        case '!':
-        case '&':
-        case '(':
-        case ')':
-        case '[':
-        case ']':
-        case '*':
-        case '?':
-        case '<':
-        case '>':
-        case '|':
-        case ';':
-        case '$':
-        case '`':
-        case '\\':
-        case '^':
-        case '=': return true;
-        default:
-            return !is_alpha_ascii_(c) && !is_digit_ascii_(c) &&
-                   !is_safe_punct_(c, index);
-    }
-}
-
-static uint64_t ansi_byte_len_(unsigned char byte) {
-    switch (byte) {
-        case '\a':
-        case '\b':
-        case '\t':
-        case '\n':
-        case '\v':
-        case '\f':
-        case '\r': return 2;
-        default: return 4;
-    }
-}
-
-static void scan_name_(const char *src, t_name_scan *scan) {
-    bool needs_quote = false;
-    bool has_single = false;
-    bool can_use_double = true;
-    bool in_single = true;
-    bool in_ansi = false;
-    bool has_non_print = false;
-    uint64_t escaped_len = 1;
-
-    scan->len = 0;
-    while (src[scan->len] != '\0') {
-        const unsigned char c = (unsigned char)src[scan->len];
-        if (!is_print_ascii_(c)) {
-            has_non_print = true;
-        }
-
-        if (needs_raw_quote_char_(c, scan->len)) {
-            needs_quote = true;
-            if (c != ' ' && c != '\'') {
-                can_use_double = false;
-            }
-        }
-
-        if (c == '\'') {
-            has_single = true;
-        }
-
-        if (is_print_ascii_(c) && c != '\'') {
-            if (in_ansi) {
-                ++escaped_len;
-                in_ansi = false;
-            }
-            if (!in_single) {
-                ++escaped_len;
-                in_single = true;
-            }
-            ++escaped_len;
-        } else if (c == '\'') {
-            if (in_ansi) {
-                ++escaped_len;
-                in_ansi = false;
-            }
-            escaped_len += 4;
-            in_single = true;
-        } else {
-            if (in_single) {
-                ++escaped_len;
-                in_single = false;
-            }
-            if (!in_ansi) {
-                escaped_len += 2;
-                in_ansi = true;
-            }
-            escaped_len += ansi_byte_len_(c);
-        }
-
-        ++scan->len;
-    }
-
-    if (in_ansi || in_single) {
-        ++escaped_len;
-    }
-
-    if (has_non_print) {
-        scan->quote = '\'';
-    } else if (!needs_quote) {
-        scan->quote = '\0';
-    } else if (has_single && can_use_double) {
-        scan->quote = '"';
-    } else {
-        scan->quote = '\'';
-    }
-
-    if (scan->quote == '\0') {
-        scan->display_len = scan->len;
-        scan->padded_display_len = scan->len + 1;
-    } else if (scan->quote == '"') {
-        scan->display_len = scan->len + 2;
-        scan->padded_display_len = scan->display_len;
-    } else {
-        scan->display_len = escaped_len;
-        scan->padded_display_len = escaped_len;
-    }
 }

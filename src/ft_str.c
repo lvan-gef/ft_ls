@@ -2,52 +2,40 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "../include/ft_arena.h"
+#include "../include/ft_free_list.h"
 #include "../include/ft_helper.h"
 #include "../include/ft_str.h"
 
-#include "../include/ft_free_list.h"
 #include "../libft/include/libft.h"
-#include "ft_arena.h"
 
 static uint64_t strlcpy_(t_str *dst, const t_str *src, uint64_t dstsize);
+static void to_uint_(t_str *str, uint64_t nbr);
 
 t_str *init_str(free_list *fl, uint64_t cap) {
-    t_str *str = fl_alloc(fl, sizeof(*str), 8);
-    if (!str) {
-        goto failed;
-    }
-
-    *str = (t_str){0};
-
-    if (cap + 1 < cap) {
-        goto failed;
-    }
-
-    str->str = fl_alloc(fl, cap + 1, 8);
-    if (!str->str) {
-        goto failed;
-    }
-
-    str->cap = cap + 1;
-    str->len = 0;
-    str->pos = 0;
-
-    return str;
-
-failed:
-    if (str) {
-        free_str(fl, str);
-    }
-
-    return NULL;
-}
-
-t_str *init_str_arena(Arena *arena, uint64_t cap) {
-    if (cap + 1 < cap || cap > UINT64_MAX - sizeof(t_str) - 1) {
+    if (cap > UINT64_MAX - 1 - sizeof(t_str)) {
         return NULL;
     }
 
-    t_str *str = arena_push_no_zero(arena, sizeof(t_str) + cap + 1);
+    t_str *str = fl_alloc(fl, sizeof(*str) + cap + 1, 8);
+    if (!str) {
+        return NULL;
+    }
+
+    str->str = (char *)(str + 1);
+    str->cap = cap + 1;
+    str->len = 0;
+    str->pos = 0;
+    str->str[0] = '\0';
+    return str;
+}
+
+t_str *init_str_arena(Arena *arena, uint64_t cap) {
+    if (cap > UINT64_MAX - 1 - sizeof(t_str)) {
+        return NULL;
+    }
+
+    t_str *str = arena_push_no_zero(arena, sizeof(*str) + cap + 1);
     if (!str) {
         return NULL;
     }
@@ -107,31 +95,6 @@ t_str *dup_str(free_list *fl, const t_str *str) {
     return new_str;
 }
 
-t_str *dup_str_arena(Arena *arena, const t_str *src) {
-    t_str *dst = init_str_arena(arena, src->cap - 1);
-    if (!dst) {
-        return NULL;
-    }
-
-    uint64_t len = strlcpy_(dst, src, src->len + 1);
-    dst->len = len;
-    return dst;
-}
-
-uint64_t cat_str(t_str *dst, const t_str *src) {
-    if (dst->cap - dst->len == 0) {
-        return 0;
-    }
-
-    uint64_t cur_pos = dst->pos;
-    dst->pos = dst->len;
-    uint64_t len = strlcpy_(dst, src, dst->cap - dst->len + 1);
-    dst->len += len;
-    dst->pos = cur_pos;
-
-    return len;
-}
-
 t_str *uint_to_str(free_list *fl, uint64_t nbr) {
     uint64_t len = len_of_nbr(nbr);
     t_str *str = init_str(fl, len);
@@ -139,16 +102,7 @@ t_str *uint_to_str(free_list *fl, uint64_t nbr) {
         return NULL;
     }
 
-    str->str[str->cap - 1] = '\0';
-    str->pos = str->cap - 1;
-
-    while (str->pos) {
-        --str->pos;
-        str->str[str->pos] = (char)((nbr % 10) + '0');
-        nbr /= 10;
-        ++str->len;
-    }
-
+    to_uint_(str, nbr);
     return str;
 }
 
@@ -159,15 +113,7 @@ t_str *uint_to_str_arena(Arena *arena, uint64_t nbr) {
         return NULL;
     }
 
-    str->str[str->cap - 1] = '\0';
-    str->pos = str->cap - 1;
-    while (str->pos) {
-        --str->pos;
-        str->str[str->pos] = (char)((nbr % 10) + '0');
-        nbr /= 10;
-        ++str->len;
-    }
-
+    to_uint_(str, nbr);
     return str;
 }
 
@@ -180,18 +126,6 @@ ssize_t append_chars_str(t_str *dst, const char *src) {
     ft_memcpy(dst->str + dst->len, src, src_len + 1);
     dst->len += (uint64_t)src_len;
     return (ssize_t)src_len;
-}
-
-bool has_next_str(const t_str *s) {
-    return s->pos < s->len;
-}
-
-char peek_str(t_str *s) {
-    return s->str[s->pos];
-}
-
-char next_str(t_str *s) {
-    return s->str[s->pos++];
 }
 
 void free_str(free_list *fl, t_str *str) {
@@ -219,4 +153,15 @@ static uint64_t strlcpy_(t_str *dst, const t_str *src, uint64_t dstsize) {
 
     dst->str[dst->pos + copied] = '\0';
     return copied;
+}
+
+static void to_uint_(t_str *str, uint64_t nbr) {
+    str->str[str->cap - 1] = '\0';
+    str->pos = str->cap - 1;
+    while (str->pos) {
+        --str->pos;
+        str->str[str->pos] = (char)((nbr % 10) + '0');
+        nbr /= 10;
+        ++str->len;
+    }
 }

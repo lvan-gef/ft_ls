@@ -549,8 +549,5 @@ def quote_case_names() -> Generator[str, None, None]:
 
 def control_char_case_names() -> Generator[str, None, None]:
     """Return cases with control characters that should be shell-escaped."""
-    for elem in (
-        'Icon\r',
-        'carriage\rreturn',
-    ):
+    for elem in ('Icon\r', 'carriage\rreturn', "file.name\n'.ext", "a'\nfile.ext"):
         yield elem

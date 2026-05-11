@@ -261,9 +261,10 @@ failed:
 
 static int check_links_(t_params *params, t_str *str, t_array *dir_entries,
                         struct stat *st, int *exit_code) {
+    int e = 0;
     const char *err_msg = NULL;
     if (lstat(str->str, st) == -1) {
-        int e = errno;
+        e = errno;
         const char *prefix = "cannot access";
         print_err_(&params->fl, str, e, prefix);
         *exit_code = 2;
@@ -290,6 +291,21 @@ static int check_links_(t_params *params, t_str *str, t_array *dir_entries,
             is_dir_operand = true;
             st_dir = &st_target;
         }
+
+        Arena_Mark arena_mark = arena_get_mark(params->temp_arena);
+        char *buf = arena_push(params->temp_arena, str->len + 1);
+        if (readlink(str->str, buf, str->len) < 0) {
+            e = errno;
+            *exit_code = 2;
+            if (params->args->list) {
+                print_err_(&params->fl, str, e, "cannot read symbolic link");
+            } else {
+                print_err_(&params->fl, str, e, "cannot access");
+                arena_pop_to_mark(params->temp_arena, arena_mark);
+                return 0;
+            }
+        }
+        arena_pop_to_mark(params->temp_arena, arena_mark);
     }
 
     if (is_dir_operand && !params->args->list) {
@@ -338,7 +354,7 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
             continue;
         }
 
-        t_entry *entry = new_entry_arena(params->temp_arena, path, dp);
+        t_entry *entry = new_entry(params->temp_arena, path, dp);
         if (!entry) {
             goto cleanup;
         }

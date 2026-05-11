@@ -48,13 +48,6 @@ void *pop_array(t_array *array) {
     return elem;
 }
 
-void reset_array(free_list *fl, t_array *array) {
-    while (array->len) {
-        void *elem = pop_array(array);
-        fl_free(fl, elem);
-    }
-}
-
 void clear_array(t_array *array) {
     while (array->len) {
         (void)pop_array(array);
@@ -77,7 +70,7 @@ static bool realloc_arr_(t_array *array) {
 
     ft_memcpy((void *)new_data, (void *)old_data,
               array->len * sizeof(*array->data));
-    fl_free(array->fl, old_data);
+    fl_free(array->fl, (void *)old_data);
     array->data = new_data;
     array->cap = new_cap;
 

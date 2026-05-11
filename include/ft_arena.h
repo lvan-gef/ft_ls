@@ -3,25 +3,25 @@
 
 #include <stdint.h>
 
-typedef struct Arena_block arena_block;
+typedef struct Arena_block Arena_Block;
 struct Arena_block {
     uint64_t pos;
     uint64_t cap;
-    arena_block *next;
-    arena_block *prev;
+    Arena_Block *next;
+    Arena_Block *prev;
 };
 
 typedef struct {
     uint64_t align;
     uint64_t block_size;
-    arena_block *first;
-    arena_block *current;
+    Arena_Block *first;
+    Arena_Block *current;
 } Arena;
 
 typedef struct {
-    arena_block *block;
+    Arena_Block *block;
     uint64_t pos;
-} Arena_mark;
+} Arena_Mark;
 
 #ifndef ARENA_SIZE
 #define ARENA_SIZE UINT64_C(4096)
@@ -30,10 +30,10 @@ typedef struct {
 Arena *arena_alloc(uint64_t cap);
 void arena_release(Arena *arena);
 void arena_auto_align(Arena *arena, uint64_t align);
-Arena_mark arena_get_mark(const Arena *arena);
+Arena_Mark arena_get_mark(const Arena *arena);
 void *arena_push_no_zero(Arena *arena, uint64_t size);
 void *arena_push(Arena *arena, uint64_t size);
-void arena_pop_to_mark(Arena *arena, Arena_mark mark);
+void arena_pop_to_mark(Arena *arena, Arena_Mark mark);
 void arena_clear(Arena *arena);
 
 #endif // !ARENA_H
