@@ -82,6 +82,8 @@ void *fl_alloc(free_list *fl, size_t size, size_t align) {
     header_ptr = (free_list_header *)((uintptr_t)node + align_padding);
     header_ptr->block_size = required_space;
     header_ptr->padding = align_padding;
+    header_ptr->allocation_base = NULL;
+    header_ptr->next_extra = NULL;
     fl->used += required_space;
 
     return (void *)((char *)header_ptr + sizeof(free_list_header));
