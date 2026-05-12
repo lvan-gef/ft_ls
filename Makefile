@@ -28,8 +28,8 @@ R_CFLAGS  := -DNDEBUG -O3 -march=native -fomit-frame-pointer -fPIE -fstack-clash
 R_LDFLAGS := -pie -Wl,-z,relro,-z,now
 
 # Debug flags
-SANITIZERS := -fsanitize=address,undefined,null,leak,integer-divide-by-zero,signed-integer-overflow
-# SANITIZERS :=
+# SANITIZERS := -fsanitize=address,undefined,null,leak,integer-divide-by-zero,signed-integer-overflow
+SANITIZERS :=
 D_CFLAGS   := -g3 -fno-omit-frame-pointer -fstack-protector-strong $(SANITIZERS)
 D_LDFLAGS  := $(SANITIZERS) -rdynamic
 
@@ -121,7 +121,7 @@ $(NAME_D): $(LIBFT_D) $(D_OBJECTS)
 
 # Release pattern rule
 $(R_OBJ_DIR)/%.o: $(SRC_DIR)/%.c | check-term-size $(R_OBJ_DIR)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(R_CFLAGS) $(DEPSFLAGS) -c $< -o $@
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(R_CFLAGS) -g3 $(DEPSFLAGS) -c $< -o $@
 
 # Debug pattern rule
 $(D_OBJ_DIR)/%.o: $(SRC_DIR)/%.c | check-term-size $(D_OBJ_DIR)

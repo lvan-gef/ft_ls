@@ -15,6 +15,7 @@
 #include "../include/ft_str.h"
 
 #include "../libft/include/libft.h"
+#include "ft_arena.h"
 
 static t_str *get_perm_(free_list *fl, const t_entry *entry);
 static t_str *get_perm_arena_(Arena *arena, const t_entry *entry);
@@ -54,7 +55,7 @@ static char cached_group[LOGIN_NAME_MAX] = "";
 
 t_entry *new_entry(Arena *arena, t_entry *entry, const struct dirent *dp) {
     t_shell_scan scan;
-    t_entry *ent = arena_push(arena, sizeof(*ent));
+    t_entry *ent = arena_push_no_zero(arena, sizeof(*ent));
     if (!ent) {
         return NULL;
     }
@@ -140,7 +141,7 @@ failed:
 }
 
 bool get_file_info_arena(Arena *arena, t_entry *entry) {
-    t_file_info *info = arena_push(arena, sizeof(*info));
+    t_file_info *info = arena_push_no_zero(arena, sizeof(*info));
     if (!info) {
         return false;
     }

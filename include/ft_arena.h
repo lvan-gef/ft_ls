@@ -32,7 +32,6 @@ void arena_release(Arena *arena);
 void arena_auto_align(Arena *arena, uint64_t align);
 Arena_Mark arena_get_mark(const Arena *arena);
 void *arena_push_no_zero(Arena *arena, uint64_t size);
-void *arena_push(Arena *arena, uint64_t size);
 void arena_pop_to_mark(Arena *arena, Arena_Mark mark);
 void arena_clear(Arena *arena);
 

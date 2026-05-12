@@ -3,8 +3,6 @@
 
 #include "../include/ft_arena.h"
 
-#include "../libft/include/libft.h"
-
 static Arena_Block *new_block_(uint64_t cap);
 
 Arena *arena_alloc(uint64_t cap) {
@@ -81,17 +79,6 @@ void *arena_push_no_zero(Arena *arena, uint64_t size) {
     unsigned char *base = (unsigned char *)(arena->current + 1);
     void *ptr = base + align_pos;
     arena->current->pos = align_pos + size;
-
-    return ptr;
-}
-
-void *arena_push(Arena *arena, uint64_t size) {
-    void *ptr = arena_push_no_zero(arena, size);
-    if (!ptr) {
-        return NULL;
-    }
-
-    ft_memset(ptr, 0, size);
 
     return ptr;
 }

@@ -29,7 +29,7 @@ static bool indent_(t_str *out, uint64_t from, uint64_t to);
 
 void printer(t_ps *ps) {
     if (ps->array->len) {
-        sort(ps->array, ps->args->reverse, ps->args->time);
+        sort(ps->sort_arena, ps->array, ps->args->reverse, ps->args->time);
     }
 
     if (ps->args->list) {

@@ -4,11 +4,12 @@
 
 #include "../include/ft_array.h"
 #include "../include/ft_entry.h"
+#include "ft_arena.h"
 #include "../include/ft_sort.h"
 
 typedef int (*t_cmp_entry)(const t_entry *a, const t_entry *b);
 
-static void merge_sort_(t_array *array, t_cmp_entry cmp);
+static void merge_sort_(Arena *sort_arena, t_array *array, t_cmp_entry cmp);
 static uint64_t add_capped_(uint64_t lhs, uint64_t rhs, uint64_t cap);
 static void merge_(void **data, void **tmp, uint64_t left, uint64_t mid,
                    uint64_t right, t_cmp_entry cmp);
@@ -18,26 +19,26 @@ static int compare_(const t_str *lhs, const t_str *rhs);
 static int compare_time_(const struct timespec *a, const struct timespec *b);
 static void reverse_(t_array *array);
 
-void sort(t_array *array, bool reverse, bool sort_time) {
+void sort(Arena *sort_arena, t_array *array, bool reverse, bool sort_time) {
     if (array->len <= 1) {
         return;
     }
 
     const t_cmp_entry cmp = sort_time ? cmp_time_entry_ : cmp_name_entry_;
-    merge_sort_(array, cmp);
+    merge_sort_(sort_arena, array, cmp);
 
     if (reverse) {
         reverse_(array);
     }
 }
 
-static void merge_sort_(t_array *array, t_cmp_entry cmp) {
+static void merge_sort_(Arena *sort_arena, t_array *array, t_cmp_entry cmp) {
     const uint64_t max_len = (uint64_t)(SIZE_MAX / sizeof(void *));
     if (array->len > max_len) {
         return;
     }
 
-    void **tmp = (void **)malloc((size_t)array->len * sizeof(*tmp));
+    void **tmp = (void **)arena_push_no_zero(sort_arena, array->len * sizeof(*tmp));
     if (!tmp) {
         return;
     }
@@ -62,7 +63,7 @@ static void merge_sort_(t_array *array, t_cmp_entry cmp) {
         width += width;
     }
 
-    free((void *)tmp);
+    arena_clear(sort_arena);
 }
 
 static uint64_t add_capped_(uint64_t lhs, uint64_t rhs, uint64_t cap) {

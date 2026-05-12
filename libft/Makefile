@@ -19,9 +19,9 @@ R_CFLAGS  := -DNDEBUG -D_FORTIFY_SOURCE=2 -O3                                  \
 			 -march=native -fomit-frame-pointer -fPIE
 
 # Debug flags
-D_CFLAGS  := -g3 -fno-omit-frame-pointer -fstack-protector-strong              \
-			 -fsanitize=address,undefined,null,integer-divide-by-zero,signed-integer-overflow
-# D_CFLAGS  := -g3 -fno-omit-frame-pointer
+# D_CFLAGS  := -g3 -fno-omit-frame-pointer -fstack-protector-strong              \
+# 			 -fsanitize=address,undefined,null,integer-divide-by-zero,signed-integer-overflow
+D_CFLAGS  := -g3 -fno-omit-frame-pointer
 
 SRC_DIR   := src
 INC_DIR   := include
@@ -125,7 +125,7 @@ $(NAME_D): $(D_OBJECTS)
 
 # Release pattern rule
 $(R_OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(R_OBJ_DIRS)
-	$(CC) $(CFLAGS) $(R_CFLAGS) $(DEPSFLAGS) $(HEADERS) -c $< -o $@
+	$(CC) $(CFLAGS) $(R_CFLAGS) -g3 $(DEPSFLAGS) $(HEADERS) -c $< -o $@
 
 # Debug pattern rule
 $(D_OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(D_OBJ_DIRS)

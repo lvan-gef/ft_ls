@@ -25,6 +25,7 @@ typedef struct {
     free_list fl;
     Arena *dirs_arena;
     Arena *temp_arena;
+    Arena *sort_arena;
     t_array *dirs;
     t_array *files;
     t_array *entries;
@@ -57,19 +58,16 @@ void process(t_args *args, t_array *array, int *exit_code) {
     params.args = args;
     fl_init(&params.fl, buffer, sizeof(buffer));
     params.dirs_arena = arena_alloc(ARENA_SIZE);
-    if (!params.dirs_arena) {
-        *exit_code = 2;
-        goto cleanup;
-    }
-
     params.temp_arena = arena_alloc(ARENA_SIZE);
-    if (!params.temp_arena) {
+    params.sort_arena = arena_alloc(ARENA_SIZE);
+    if (!params.temp_arena || !params.dirs_arena || !params.sort_arena) {
         *exit_code = 2;
         goto cleanup;
     }
 
     arena_auto_align(params.dirs_arena, 8);
     arena_auto_align(params.temp_arena, 8);
+    arena_auto_align(params.sort_arena, 8);
 
     params.dirs = init_array(&params.fl, ARRAY_SIZE);
     params.files = init_array(&params.fl, ARRAY_SIZE);
@@ -102,6 +100,7 @@ static bool run_(t_args *args, t_params *params, t_array *array,
     bool printed_files = false;
     t_ps ps = {.args = args,
                .array = params->files,
+               .sort_arena = params->sort_arena,
                .dir_entry = NULL,
                .print_total = false,
                .min_len_links = params->max_len_links,
@@ -240,7 +239,7 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
     }
 
     if (dir_entries->len) {
-        sort(dir_entries, params->args->reverse, params->args->time);
+        sort(params->sort_arena, dir_entries, params->args->reverse, params->args->time);
         while (dir_entries->len) {
             t_entry *entry = pop_array(dir_entries);
             entry->is_operand = true;
@@ -293,7 +292,7 @@ static int check_links_(t_params *params, t_str *str, t_array *dir_entries,
         }
 
         Arena_Mark arena_mark = arena_get_mark(params->temp_arena);
-        char *buf = arena_push(params->temp_arena, str->len + 1);
+        char *buf = arena_push_no_zero(params->temp_arena, str->len + 1);
         if (readlink(str->str, buf, str->len) < 0) {
             e = errno;
             *exit_code = 2;
@@ -410,7 +409,7 @@ static void free_entry_array_(t_params *params, t_array *array) {
 
 static bool walk_recurssive_(t_params *params) {
     if (params->args->recursive && params->entries->len) {
-        sort(params->entries, params->args->reverse, params->args->time);
+        sort(params->sort_arena, params->entries, params->args->reverse, params->args->time);
         size_t index = params->entries->len;
         while (index > 0) {
             --index;
@@ -497,12 +496,14 @@ static bool has_quoted_operands_(const t_array *array) {
 static void clean_up_(t_params *params) {
     if (params->dirs_arena) {
         arena_release(params->dirs_arena);
-        params->dirs_arena = NULL;
     }
 
     if (params->temp_arena) {
         arena_release(params->temp_arena);
-        params->temp_arena = NULL;
+    }
+
+    if (params->sort_arena) {
+        arena_release(params->sort_arena);
     }
 
     fl_free_all(&params->fl);

@@ -4,7 +4,8 @@
 #include <stdbool.h>
 
 #include "./ft_array.h"
+#include "./ft_arena.h"
 
-void sort(t_array *array, bool reverse, bool sort_time);
+void sort(Arena *sort_arena, t_array *array, bool reverse, bool sort_time);
 
 #endif // !FT_SORT_H
