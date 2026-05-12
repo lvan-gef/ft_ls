@@ -11,6 +11,9 @@
 #define BYTE_OCTAL_HIGH_SHIFT 6
 #define BYTE_OCTAL_MID_SHIFT 3
 
+#define SHELL_CLASS_SAFE 0x1u
+#define SHELL_CLASS_ALNUM 0x2u
+
 typedef struct s_shell_out {
     t_str *dst;
     uint64_t len;
@@ -23,8 +26,11 @@ typedef struct s_escape_state {
 
 typedef struct s_shell_analysis {
     uint64_t len;
-    uint64_t escaped_len;
     char quote;
+    bool needs_quote;
+    bool has_single;
+    bool can_use_double;
+    bool has_non_print;
 } t_shell_analysis;
 
 static bool escape_str_(t_str *dst, const t_str *str, char quote,
@@ -39,14 +45,99 @@ static bool shell_escape_bytes_(t_shell_out *out, const char *src,
 static bool escape_byte_(t_shell_out *out, t_escape_state *state,
                          unsigned char c);
 static bool shell_escaped_(t_str *dst, const t_str *str);
-static void analyze_shell_bytes_(const char *src, uint64_t len,
-                                 t_shell_analysis *analysis);
-static void fill_scan_(t_shell_scan *scan, const t_shell_analysis *analysis);
+static void analyze_shell_cstr_(const char *src, t_shell_analysis *analysis);
+static void analyze_shell_span_(const char *src, uint64_t len,
+                                t_shell_analysis *analysis);
+static char quote_from_analysis_(const t_shell_analysis *analysis);
+static void fill_scan_(t_shell_scan *scan, const char *src,
+                       const t_shell_analysis *analysis);
 static bool needs_raw_quote_(unsigned char c, uint64_t index);
-static bool is_safe_punct_(unsigned char c, uint64_t index);
+
+static const unsigned char g_shell_class_table_[256] = {
+    ['0'] = SHELL_CLASS_ALNUM,
+    ['1'] = SHELL_CLASS_ALNUM,
+    ['2'] = SHELL_CLASS_ALNUM,
+    ['3'] = SHELL_CLASS_ALNUM,
+    ['4'] = SHELL_CLASS_ALNUM,
+    ['5'] = SHELL_CLASS_ALNUM,
+    ['6'] = SHELL_CLASS_ALNUM,
+    ['7'] = SHELL_CLASS_ALNUM,
+    ['8'] = SHELL_CLASS_ALNUM,
+    ['9'] = SHELL_CLASS_ALNUM,
+    ['A'] = SHELL_CLASS_ALNUM,
+    ['B'] = SHELL_CLASS_ALNUM,
+    ['C'] = SHELL_CLASS_ALNUM,
+    ['D'] = SHELL_CLASS_ALNUM,
+    ['E'] = SHELL_CLASS_ALNUM,
+    ['F'] = SHELL_CLASS_ALNUM,
+    ['G'] = SHELL_CLASS_ALNUM,
+    ['H'] = SHELL_CLASS_ALNUM,
+    ['I'] = SHELL_CLASS_ALNUM,
+    ['J'] = SHELL_CLASS_ALNUM,
+    ['K'] = SHELL_CLASS_ALNUM,
+    ['L'] = SHELL_CLASS_ALNUM,
+    ['M'] = SHELL_CLASS_ALNUM,
+    ['N'] = SHELL_CLASS_ALNUM,
+    ['O'] = SHELL_CLASS_ALNUM,
+    ['P'] = SHELL_CLASS_ALNUM,
+    ['Q'] = SHELL_CLASS_ALNUM,
+    ['R'] = SHELL_CLASS_ALNUM,
+    ['S'] = SHELL_CLASS_ALNUM,
+    ['T'] = SHELL_CLASS_ALNUM,
+    ['U'] = SHELL_CLASS_ALNUM,
+    ['V'] = SHELL_CLASS_ALNUM,
+    ['W'] = SHELL_CLASS_ALNUM,
+    ['X'] = SHELL_CLASS_ALNUM,
+    ['Y'] = SHELL_CLASS_ALNUM,
+    ['Z'] = SHELL_CLASS_ALNUM,
+    ['_'] = SHELL_CLASS_SAFE,
+    ['a'] = SHELL_CLASS_ALNUM,
+    ['b'] = SHELL_CLASS_ALNUM,
+    ['c'] = SHELL_CLASS_ALNUM,
+    ['d'] = SHELL_CLASS_ALNUM,
+    ['e'] = SHELL_CLASS_ALNUM,
+    ['f'] = SHELL_CLASS_ALNUM,
+    ['g'] = SHELL_CLASS_ALNUM,
+    ['h'] = SHELL_CLASS_ALNUM,
+    ['i'] = SHELL_CLASS_ALNUM,
+    ['j'] = SHELL_CLASS_ALNUM,
+    ['k'] = SHELL_CLASS_ALNUM,
+    ['l'] = SHELL_CLASS_ALNUM,
+    ['m'] = SHELL_CLASS_ALNUM,
+    ['n'] = SHELL_CLASS_ALNUM,
+    ['o'] = SHELL_CLASS_ALNUM,
+    ['p'] = SHELL_CLASS_ALNUM,
+    ['q'] = SHELL_CLASS_ALNUM,
+    ['r'] = SHELL_CLASS_ALNUM,
+    ['s'] = SHELL_CLASS_ALNUM,
+    ['t'] = SHELL_CLASS_ALNUM,
+    ['u'] = SHELL_CLASS_ALNUM,
+    ['v'] = SHELL_CLASS_ALNUM,
+    ['w'] = SHELL_CLASS_ALNUM,
+    ['x'] = SHELL_CLASS_ALNUM,
+    ['y'] = SHELL_CLASS_ALNUM,
+    ['z'] = SHELL_CLASS_ALNUM,
+    ['#'] = SHELL_CLASS_SAFE,
+    ['%'] = SHELL_CLASS_SAFE,
+    ['+'] = SHELL_CLASS_SAFE,
+    [','] = SHELL_CLASS_SAFE,
+    ['-'] = SHELL_CLASS_SAFE,
+    ['.'] = SHELL_CLASS_SAFE,
+    ['/'] = SHELL_CLASS_SAFE,
+    [':'] = SHELL_CLASS_SAFE,
+    ['@'] = SHELL_CLASS_SAFE,
+    ['{'] = SHELL_CLASS_SAFE,
+    ['}'] = SHELL_CLASS_SAFE,
+    ['~'] = SHELL_CLASS_SAFE,
+};
 
 bool escaped_out(t_str *dst, const t_str *str, char quote, bool pad_unquoted) {
     const uint64_t need = shell_display_len(str, quote, pad_unquoted);
+    return escaped_out_len(dst, str, quote, need, pad_unquoted);
+}
+
+bool escaped_out_len(t_str *dst, const t_str *str, char quote, uint64_t need,
+                     bool pad_unquoted) {
     if (need > dst->cap - 1) {
         return false;
     }
@@ -90,20 +181,22 @@ uint64_t shell_display_len(const t_str *str, char quote, bool pad_unquoted) {
 char shell_quote(const t_str *str) {
     t_shell_analysis analysis;
 
-    analyze_shell_bytes_(str->str, str->len, &analysis);
-    return analysis.quote;
+    analyze_shell_span_(str->str, str->len, &analysis);
+    return quote_from_analysis_(&analysis);
+}
+
+void shell_scan_str(const t_str *str, t_shell_scan *scan) {
+    t_shell_analysis analysis;
+
+    analyze_shell_span_(str->str, str->len, &analysis);
+    fill_scan_(scan, str->str, &analysis);
 }
 
 void shell_scan_cstr(const char *src, t_shell_scan *scan) {
     t_shell_analysis analysis;
-    uint64_t len = 0;
 
-    while (src[len]) {
-        ++len;
-    }
-
-    analyze_shell_bytes_(src, len, &analysis);
-    fill_scan_(scan, &analysis);
+    analyze_shell_cstr_(src, &analysis);
+    fill_scan_(scan, src, &analysis);
 }
 
 static bool escape_str_(t_str *dst, const t_str *str, char quote,
@@ -285,52 +378,75 @@ static bool shell_escaped_(t_str *dst, const t_str *str) {
     return shell_escape_bytes_(&out, str->str, str->len);
 }
 
-static void analyze_shell_bytes_(const char *src, uint64_t len,
-                                 t_shell_analysis *analysis) {
-    bool needs_quote = false;
-    bool has_single = false;
-    bool can_use_double = true;
-    bool has_non_print = false;
-    t_shell_out escaped;
+static void analyze_shell_cstr_(const char *src, t_shell_analysis *analysis) {
+    uint64_t len;
 
-    escaped.dst = NULL;
-    escaped.len = 0;
-    shell_escape_bytes_(&escaped, src, len);
+    analysis->len = 0;
+    analysis->needs_quote = false;
+    analysis->has_single = false;
+    analysis->can_use_double = true;
+    analysis->has_non_print = false;
+    for (len = 0; src[len]; ++len) {
+        const unsigned char c = (unsigned char)src[len];
 
+        if (!ft_isprint(c)) {
+            analysis->has_non_print = true;
+        }
+        if (needs_raw_quote_(c, len)) {
+            analysis->needs_quote = true;
+            if (c != ' ' && c != '\'') {
+                analysis->can_use_double = false;
+            }
+        }
+        if (c == '\'') {
+            analysis->has_single = true;
+        }
+    }
+    analysis->len = len;
+    analysis->quote = quote_from_analysis_(analysis);
+}
+
+static void analyze_shell_span_(const char *src, uint64_t len,
+                                t_shell_analysis *analysis) {
+    analysis->len = len;
+    analysis->needs_quote = false;
+    analysis->has_single = false;
+    analysis->can_use_double = true;
+    analysis->has_non_print = false;
     for (uint64_t i = 0; i < len; ++i) {
         const unsigned char c = (unsigned char)src[i];
 
         if (!ft_isprint(c)) {
-            has_non_print = true;
+            analysis->has_non_print = true;
         }
-
         if (needs_raw_quote_(c, i)) {
-            needs_quote = true;
+            analysis->needs_quote = true;
             if (c != ' ' && c != '\'') {
-                can_use_double = false;
+                analysis->can_use_double = false;
             }
         }
-
         if (c == '\'') {
-            has_single = true;
+            analysis->has_single = true;
         }
     }
-
-    analysis->len = len;
-    analysis->escaped_len = escaped.len;
-
-    if (has_non_print) {
-        analysis->quote = '\'';
-    } else if (!needs_quote) {
-        analysis->quote = '\0';
-    } else if (has_single && can_use_double) {
-        analysis->quote = '"';
-    } else {
-        analysis->quote = '\'';
-    }
+    analysis->quote = quote_from_analysis_(analysis);
 }
 
-static void fill_scan_(t_shell_scan *scan, const t_shell_analysis *analysis) {
+static char quote_from_analysis_(const t_shell_analysis *analysis) {
+    if (analysis->has_non_print) {
+        return '\'';
+    }
+    if (!analysis->needs_quote) {
+        return '\0';
+    }
+    if (analysis->has_single && analysis->can_use_double) {
+        return '"';
+    }
+    return '\'';
+}
+
+static void fill_scan_(t_shell_scan *scan, const char *src,
+                       const t_shell_analysis *analysis) {
     scan->len = analysis->len;
     scan->quote = analysis->quote;
 
@@ -341,13 +457,23 @@ static void fill_scan_(t_shell_scan *scan, const t_shell_analysis *analysis) {
         scan->display_len = analysis->len + 2;
         scan->padded_display_len = scan->display_len;
     } else {
-        scan->display_len = analysis->escaped_len;
-        scan->padded_display_len = analysis->escaped_len;
+        t_shell_out escaped = {.dst = NULL, .len = 0};
+
+        shell_escape_bytes_(&escaped, src, analysis->len);
+        scan->display_len = escaped.len;
+        scan->padded_display_len = escaped.len;
     }
 }
 
 static bool needs_raw_quote_(unsigned char c, uint64_t index) {
-    bool needs_quote = false;
+    const unsigned char cls = g_shell_class_table_[c];
+
+    if (cls & SHELL_CLASS_ALNUM) {
+        return false;
+    }
+    if (cls & SHELL_CLASS_SAFE) {
+        return index == 0 && (c == '#' || c == '~');
+    }
 
     switch (c) {
         case ' ':
@@ -368,32 +494,8 @@ static bool needs_raw_quote_(unsigned char c, uint64_t index) {
         case '$':
         case '`':
         case '\\':
-        case '^': needs_quote = true; break;
-        case '=': needs_quote = true; break;
-        default:
-            needs_quote =
-                !ft_isalpha(c) && !ft_isdigit(c) && !is_safe_punct_(c, index);
-            break;
-    }
-
-    return needs_quote;
-}
-
-static bool is_safe_punct_(unsigned char c, uint64_t index) {
-    switch (c) {
-        case '_':
-        case '-':
-        case '.':
-        case '/':
-        case '+':
-        case ':':
-        case ',':
-        case '@':
-        case '%':
-        case '{':
-        case '}': return true;
-        case '#':
-        case '~': return index != 0;
-        default: return false;
+        case '^':
+        case '=': return true;
+        default: return true;
     }
 }

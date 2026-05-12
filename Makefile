@@ -111,7 +111,8 @@ help:  ## Get help
 
 # Release build
 $(NAME): $(LIBFT) $(R_OBJECTS)
-	$(CC) $(R_OBJECTS) $(R_LDFLAGS) -s $(LIBFT) -o $@
+	$(CC) $(R_OBJECTS) $(R_LDFLAGS) -g3 $(LIBFT) -o $@
+	# $(CC) $(R_OBJECTS) $(R_LDFLAGS) -s $(LIBFT) -o $@
 	@echo "Build complete: $(NAME) (release)"
 
 # Debug build

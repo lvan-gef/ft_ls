@@ -13,12 +13,6 @@
 #include "../../include/libft.h"
 
 void *ft_memcpy(void *dst, const void *src, size_t len) {
-    char *dst_;
-    const char *src_;
-
-    dst_ = dst;
-    src_ = src;
-    while (len--)
-        *dst_++ = *src_++;
-    return (dst);
+    __builtin_memcpy(dst, src, len);
+    return dst;
 }

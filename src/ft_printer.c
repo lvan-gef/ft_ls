@@ -29,7 +29,7 @@ static bool indent_(t_str *out, uint64_t from, uint64_t to);
 
 void printer(t_ps *ps) {
     if (ps->array->len) {
-        sort(ps->sort_arena, ps->array, ps->args->reverse, ps->args->time);
+        sort(ps->array, ps->args->reverse, ps->args->time);
     }
 
     if (ps->args->list) {
@@ -58,8 +58,8 @@ static void init_print_row_(t_ps *ps) {
     }
 
     if (ps->dir_entry) {
-        if (!escaped_out(&out, ps->dir_entry->name, ps->dir_entry->quote,
-                         false) ||
+        if (!escaped_out_len(&out, ps->dir_entry->name, ps->dir_entry->quote,
+                             ps->dir_entry->display_len, false) ||
             !put_mem(&out, ":\n", 2)) {
             err_msg = "Failed to write dir header";
             goto done;
@@ -94,7 +94,8 @@ static bool create_row_(t_str *out, t_array *array, const t_map *map,
             const uint64_t name_length = display_len_(entry, quoted);
             const uint64_t max_name_length = col_widths[col++];
 
-            if (!escaped_out(out, entry->name, entry->quote, quoted)) {
+            if (!escaped_out_len(out, entry->name, entry->quote, name_length,
+                                 quoted)) {
                 return false;
             }
 

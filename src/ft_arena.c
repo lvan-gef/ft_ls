@@ -2,6 +2,7 @@
 #include <unistd.h>
 
 #include "../include/ft_arena.h"
+#include "ft_fprintf.h"
 
 static Arena_Block *new_block_(uint64_t cap);
 

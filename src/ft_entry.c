@@ -187,12 +187,12 @@ bool get_file_info_arena(Arena *arena, t_entry *entry) {
 }
 
 void init_entry_display(t_entry *entry) {
-    entry->display_len = shell_display_len(entry->name, entry->quote, false);
-    if (entry->quote == '\0') {
-        entry->padded_display_len = entry->display_len + 1;
-    } else {
-        entry->padded_display_len = entry->display_len;
-    }
+    t_shell_scan scan;
+
+    shell_scan_str(entry->name, &scan);
+    entry->quote = scan.quote;
+    entry->display_len = scan.display_len;
+    entry->padded_display_len = scan.padded_display_len;
 }
 
 void free_entry(free_list *fl, t_entry *entry) {

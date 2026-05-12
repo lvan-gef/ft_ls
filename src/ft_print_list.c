@@ -33,8 +33,8 @@ void print_list(t_ps *ps) {
 
     get_sizes_(ps->array, &sizes);
     if (ps->dir_entry) {
-        if (!escaped_out(&out, ps->dir_entry->name, ps->dir_entry->quote,
-                         false) ||
+        if (!escaped_out_len(&out, ps->dir_entry->name, ps->dir_entry->quote,
+                             ps->dir_entry->display_len, false) ||
             !put_mem(&out, ":\n", 2)) {
             goto done;
         }
@@ -61,6 +61,8 @@ done:
 static bool printer_(t_str *out, t_array *array, const t_sizes *sizes) {
     for (uint64_t index = 0; index < array->len; ++index) {
         const t_entry *entry = array->data[index];
+        const uint64_t name_len = sizes->have_quote ? entry->padded_display_len
+                                                    : entry->display_len;
 
         if (!put_mem(out, entry->info->perm->str, entry->info->perm->len) ||
             !left_pad_(out, entry->info->perm->len, sizes->max_len_perm) ||
@@ -76,10 +78,11 @@ static bool printer_(t_str *out, t_array *array, const t_sizes *sizes) {
             !put_mem(out, " ", 1) ||
             !left_pad_(out, entry->info->size->len, sizes->max_len_sizes) ||
             !put_mem(out, entry->info->size->str, entry->info->size->len) ||
-            !put_mem(out, " ", 1) ||
-            !put_mem(out, entry->info->dt->str, entry->info->dt->len) ||
-            !put_mem(out, " ", 1) ||
-            !escaped_out(out, entry->name, entry->quote, sizes->have_quote)) {
+             !put_mem(out, " ", 1) ||
+             !put_mem(out, entry->info->dt->str, entry->info->dt->len) ||
+             !put_mem(out, " ", 1) ||
+             !escaped_out_len(out, entry->name, entry->quote, name_len,
+                              sizes->have_quote)) {
             return false;
         }
 

@@ -25,7 +25,6 @@ typedef struct {
     free_list fl;
     Arena *dirs_arena;
     Arena *temp_arena;
-    Arena *sort_arena;
     t_array *dirs;
     t_array *files;
     t_array *entries;
@@ -59,15 +58,13 @@ void process(t_args *args, t_array *array, int *exit_code) {
     fl_init(&params.fl, buffer, sizeof(buffer));
     params.dirs_arena = arena_alloc(ARENA_SIZE);
     params.temp_arena = arena_alloc(ARENA_SIZE);
-    params.sort_arena = arena_alloc(ARENA_SIZE);
-    if (!params.temp_arena || !params.dirs_arena || !params.sort_arena) {
+    if (!params.temp_arena || !params.dirs_arena) {
         *exit_code = 2;
         goto cleanup;
     }
 
     arena_auto_align(params.dirs_arena, 8);
     arena_auto_align(params.temp_arena, 8);
-    arena_auto_align(params.sort_arena, 8);
 
     params.dirs = init_array(&params.fl, ARRAY_SIZE);
     params.files = init_array(&params.fl, ARRAY_SIZE);
@@ -100,7 +97,6 @@ static bool run_(t_args *args, t_params *params, t_array *array,
     bool printed_files = false;
     t_ps ps = {.args = args,
                .array = params->files,
-               .sort_arena = params->sort_arena,
                .dir_entry = NULL,
                .print_total = false,
                .min_len_links = params->max_len_links,
@@ -143,7 +139,10 @@ static bool run_(t_args *args, t_params *params, t_array *array,
             }
         }
 
-        t_entry entry = {.name = dir_path->path, .quote = dir_path->quote};
+        t_entry entry = {.name = dir_path->path,
+                         .quote = dir_path->quote,
+                         .display_len = dir_path->display_len,
+                         .padded_display_len = dir_path->padded_display_len};
 
         t_entry *ent = print_dir_path ? &entry : NULL;
         ps.array = params->files;
@@ -217,7 +216,6 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
             goto failed;
         }
 
-        entry->quote = shell_quote(entry->name);
         entry->path = entry->name;
         entry->st = st;
         entry->is_escaped = false;
@@ -239,7 +237,7 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
     }
 
     if (dir_entries->len) {
-        sort(params->sort_arena, dir_entries, params->args->reverse, params->args->time);
+        sort(dir_entries, params->args->reverse, params->args->time);
         while (dir_entries->len) {
             t_entry *entry = pop_array(dir_entries);
             entry->is_operand = true;
@@ -409,7 +407,7 @@ static void free_entry_array_(t_params *params, t_array *array) {
 
 static bool walk_recurssive_(t_params *params) {
     if (params->args->recursive && params->entries->len) {
-        sort(params->sort_arena, params->entries, params->args->reverse, params->args->time);
+        sort(params->entries, params->args->reverse, params->args->time);
         size_t index = params->entries->len;
         while (index > 0) {
             --index;
@@ -442,6 +440,7 @@ static bool walk_recurssive_(t_params *params) {
 
 static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
                                  bool is_operand) {
+    t_shell_scan scan;
     t_entry *entry = fl_alloc(&params->fl, sizeof(*entry), 8);
     if (!entry) {
         return NULL;
@@ -466,26 +465,32 @@ static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
     }
 
     entry->st = src->st;
-    entry->quote = shell_quote(entry->path);
+    shell_scan_str(entry->path, &scan);
+    entry->quote = scan.quote;
+    entry->display_len = scan.display_len;
+    entry->padded_display_len = scan.padded_display_len;
     if (entry->quote == '\0' && ft_strchr(entry->path->str, ':')) {
         entry->quote = '\'';
+        entry->display_len = shell_display_len(entry->path, entry->quote, false);
+        entry->padded_display_len = entry->display_len;
     }
     entry->is_escaped = false;
     entry->info = NULL;
     entry->is_operand = is_operand;
-    entry->display_len = 0;
-    entry->padded_display_len = 0;
     return entry;
 }
 
 static bool has_quoted_operands_(const t_array *array) {
     for (uint64_t index = 0; index < array->len; ++index) {
         const t_str *operand = array->data[index];
+        t_shell_scan scan;
+
         if (!operand) {
             continue;
         }
 
-        if (shell_quote(operand) != '\0') {
+        shell_scan_str(operand, &scan);
+        if (scan.quote != '\0') {
             return true;
         }
     }
@@ -502,19 +507,17 @@ static void clean_up_(t_params *params) {
         arena_release(params->temp_arena);
     }
 
-    if (params->sort_arena) {
-        arena_release(params->sort_arena);
-    }
-
     fl_free_all(&params->fl);
 }
 
 static void print_err_(free_list *fl, t_str *str, int e, const char *prefix) {
     const char *msg = strerror(e);
-    const char quote = shell_quote(str);
+    t_shell_scan scan;
 
-    if (quote != '\0') {
-        t_str *new_str = shell_escape_str(fl, str, quote);
+    shell_scan_str(str, &scan);
+
+    if (scan.quote != '\0') {
+        t_str *new_str = shell_escape_str(fl, str, scan.quote);
         if (new_str) {
             ft_fprintf(STDERR_FILENO, "ft_ls: %s %s: %s\n", prefix,
                        new_str->str, msg);
