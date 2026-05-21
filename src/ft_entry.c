@@ -30,7 +30,8 @@ static t_str *get_symlink_arena_(Arena *arena, const t_entry *entry);
 static void free_info_(free_list *fl, t_file_info *info);
 static char get_attr_marker_(const char *path);
 static bool fill_perm_(const t_entry *entry, t_str *str);
-static void fill_dt_(t_str *new_str, const char *dt);
+static bool fill_dt_(t_str *new_str, const struct timespec *ctim);
+static bool read_symlink_(const t_entry *entry, t_str *new_str, uint64_t cap);
 
 typedef enum {
     P_LINK,
@@ -363,42 +364,30 @@ static t_str *get_group_arena_(Arena *arena, gid_t group_id) {
 }
 
 static t_str *get_dt_(free_list *fl, const struct timespec *ctim) {
-    const char *dt = ctime(&ctim->tv_sec);
-    if (!dt) {
-        return NULL;
-    }
-
-    const size_t len = ft_strlen(dt);
-    if (len < 16) {
-        return NULL;
-    }
-
     t_str *new_str = init_str(fl, DT_LEN);
     if (!new_str) {
         return NULL;
     }
 
-    fill_dt_(new_str, dt);
+    if (!fill_dt_(new_str, ctim)) {
+        fl_free(fl, new_str);
+        return NULL;
+    }
+
     return new_str;
 }
 
 static t_str *get_dt_arena_(Arena *arena, const struct timespec *ctim) {
-    const char *dt = ctime(&ctim->tv_sec);
-    if (!dt) {
-        return NULL;
-    }
-
-    const size_t len = ft_strlen(dt);
-    if (len < 16) {
-        return NULL;
-    }
-
+    Arena_Mark mark = arena_get_mark(arena);
     t_str *new_str = init_str_arena(arena, DT_LEN);
     if (!new_str) {
         return NULL;
     }
 
-    fill_dt_(new_str, dt);
+    if (!fill_dt_(new_str, ctim)) {
+        arena_pop_to_mark(arena, mark);
+        return NULL;
+    }
     return new_str;
 }
 
@@ -415,16 +404,7 @@ static t_str *get_symlink_(free_list *fl, const t_entry *entry) {
             break;
         }
 
-        ssize_t len = readlink(entry->path->str, new_str->str, (size_t)cap);
-        if (len < 0) {
-            new_str->len = 0;
-            new_str->str[0] = '\0';
-            return new_str;
-        }
-
-        if ((uint64_t)len < cap) {
-            new_str->len = (uint64_t)len;
-            new_str->str[new_str->len] = '\0';
+        if (!read_symlink_(entry, new_str, cap)) {
             return new_str;
         }
 
@@ -453,16 +433,7 @@ static t_str *get_symlink_arena_(Arena *arena, const t_entry *entry) {
             return NULL;
         }
 
-        ssize_t len = readlink(entry->path->str, new_str->str, (size_t)cap);
-        if (len < 0) {
-            new_str->len = 0;
-            new_str->str[0] = '\0';
-            return new_str;
-        }
-
-        if ((uint64_t)len < cap) {
-            new_str->len = (uint64_t)len;
-            new_str->str[new_str->len] = '\0';
+        if (!read_symlink_(entry, new_str, cap)) {
             return new_str;
         }
 
@@ -601,9 +572,37 @@ static bool fill_perm_(const t_entry *entry, t_str *str) {
     return true;
 }
 
-static void fill_dt_(t_str *new_str, const char *dt) {
+static bool fill_dt_(t_str *new_str, const struct timespec *ctim) {
+    const char *dt = ctime(&ctim->tv_sec);
+    if (!dt) {
+        return false;
+    }
+
+    const size_t len = ft_strlen(dt);
+    if (len < 16) {
+        return false;
+    }
+
     ft_memcpy(new_str->str, dt + 4, 7);
     ft_memcpy(new_str->str + 7, dt + 11, 5);
     new_str->len = 12;
     new_str->str[new_str->len] = '\0';
+    return true;
+}
+
+static bool read_symlink_(const t_entry *entry, t_str *new_str, uint64_t cap) {
+    ssize_t len = readlink(entry->path->str, new_str->str, (size_t)cap);
+    if (len < 0) {
+        new_str->len = 0;
+        new_str->str[0] = '\0';
+        return false;
+    }
+
+    if ((uint64_t)len < cap) {
+        new_str->len = (uint64_t)len;
+        new_str->str[new_str->len] = '\0';
+        return false;
+    }
+
+    return true;
 }
