@@ -486,26 +486,29 @@ static char get_attr_marker_(const char *path) {
 }
 
 static void fill_perm_(const t_entry *entry, t_str *str) {
-    const bool is_link = (entry->st.st_mode & S_IFMT) == S_IFLNK;
-    const bool is_reg = (entry->st.st_mode & S_IFMT) == S_IFREG;
-    const bool is_dir = (entry->st.st_mode & S_IFMT) == S_IFDIR;
+    uint64_t index = 0;
+    if ((entry->st.st_mode & S_IFMT) == S_IFLNK) {
+        str->str[index++] = 'l';
 
-    append_chars_str(str, is_link ? "l" : is_reg ? "-" : is_dir ? "d" : "");
-    append_chars_str(str, entry->st.st_mode & S_IRUSR ? "r" : "-");
-    append_chars_str(str, entry->st.st_mode & S_IWUSR ? "w" : "-");
-    append_chars_str(str, entry->st.st_mode & S_IXUSR ? "x" : "-");
-    append_chars_str(str, entry->st.st_mode & S_IRGRP ? "r" : "-");
-    append_chars_str(str, entry->st.st_mode & S_IWGRP ? "w" : "-");
-    append_chars_str(str, entry->st.st_mode & S_IXGRP ? "x" : "-");
-    append_chars_str(str, entry->st.st_mode & S_IROTH ? "r" : "-");
-    append_chars_str(str, entry->st.st_mode & S_IWOTH ? "w" : "-");
-    append_chars_str(str, entry->st.st_mode & S_IXOTH ? "x" : "-");
+    } else if ((entry->st.st_mode & S_IFMT) == S_IFREG) {
+        str->str[index++] = '-';
+    } else if ((entry->st.st_mode & S_IFMT) == S_IFDIR) {
+        str->str[index++] = 'd';
+    }
+
+    str->str[index++] = entry->st.st_mode & S_IRUSR ? 'r' : '-';
+    str->str[index++] = entry->st.st_mode & S_IWUSR ? 'w' : '-';
+    str->str[index++] = entry->st.st_mode & S_IXUSR ? 'x' : '-';
+    str->str[index++] = entry->st.st_mode & S_IRGRP ? 'r' : '-';
+    str->str[index++] = entry->st.st_mode & S_IWGRP ? 'w' : '-';
+    str->str[index++] = entry->st.st_mode & S_IXGRP ? 'x' : '-';
+    str->str[index++] = entry->st.st_mode & S_IROTH ? 'r' : '-';
+    str->str[index++] = entry->st.st_mode & S_IWOTH ? 'w' : '-';
+    str->str[index++] = entry->st.st_mode & S_IXOTH ? 'x' : '-';
 
     char marker = get_attr_marker_(entry->path->str);
-    if (marker == '+') {
-        append_chars_str(str, "+");
-    } else if (marker == '.') {
-        append_chars_str(str, ".");
+    if (marker == '+' || marker == '.') {
+        str->str[index++] = marker;
     }
 }
 

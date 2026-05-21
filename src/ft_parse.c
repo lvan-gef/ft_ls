@@ -9,6 +9,8 @@
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
 
+static t_str *create_and_append_(free_list *fl, const char *arg,
+                                 t_array *inputs);
 static void print_error_(const char *flag);
 
 t_array *parse_args(free_list *fl, uint64_t argc, char **argv, t_args *args) {
@@ -39,28 +41,33 @@ t_array *parse_args(free_list *fl, uint64_t argc, char **argv, t_args *args) {
             continue;
         }
 
-        t_str *str = create_str(fl, argv[index]);
-        if (!str) {
-            return NULL;
-        }
-
-        if (!append_array(inputs, (void *)str)) {
+        if (!create_and_append_(fl, argv[index], inputs)) {
             return NULL;
         }
     }
 
     if (!inputs->len) {
-        t_str *str = create_str(fl, ".");
-        if (!str) {
-            return NULL;
-        }
-
-        if (!append_array(inputs, (void *)str)) {
+        if (!create_and_append_(fl, ".", inputs)) {
             return NULL;
         }
     }
 
     return inputs;
+}
+
+static t_str *create_and_append_(free_list *fl, const char *arg,
+                                 t_array *inputs) {
+    t_str *str = create_str(fl, arg);
+    if (!str) {
+        return NULL;
+    }
+
+    if (!append_array(inputs, (void *)str)) {
+        fl_free(fl, str);
+        return NULL;
+    }
+
+    return str;
 }
 
 static void print_error_(const char *flag) {

@@ -50,11 +50,11 @@ static int check_links_(t_params *params, t_str *str, t_array *dir_entries,
 static bool has_quoted_operands_(const t_array *array);
 static void clean_up_(t_params *params);
 static void print_err_(free_list *fl, t_str *str, int e, const char *prefix);
+static void set_entry_(t_entry *entry, t_str *str, struct stat *st);
 
 typedef enum { SINGLE_QUOTE = '\'', DOUBLE_QUOTE = '\"', SPACE = ' ' } t_quote;
 
 void process(t_args *args, t_array *array, int *exit_code) {
-    const char *err_msg = NULL;
     unsigned char buffer[FL_DEFAULT_SIZE];
     t_params params = {0};
 
@@ -88,16 +88,11 @@ void process(t_args *args, t_array *array, int *exit_code) {
         goto cleanup;
     }
 cleanup:
-    if (err_msg) {
-        ft_fprintf(STDERR_FILENO, "Error: %s\n", err_msg);
-    }
-
     clean_up_(&params);
 }
 
 static bool run_(t_args *args, t_params *params, t_array *array,
                  int *exit_code) {
-    const char *err_msg = NULL;
     if (!process_args_(params, array, exit_code)) {
         goto failed;
     }
@@ -160,10 +155,6 @@ static bool run_(t_args *args, t_params *params, t_array *array,
 
     return true;
 failed:
-    if (err_msg) {
-        ft_fprintf(STDERR_FILENO, "Error: %s\n", err_msg);
-    }
-
     return false;
 }
 
@@ -192,13 +183,8 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
         }
 
         if (S_ISDIR(st.st_mode)) {
-            t_entry src = {
-                .name = str,
-                .path = str,
-                .path_has_colon = ft_memchr(str->str + str->pos, ':',
-                                            (size_t)str->len) != NULL,
-                .st = st,
-            };
+            t_entry src = {0};
+            set_entry_(&src, str, &st);
             t_entry *dir_entry = queue_dir_entry_(params, &src, true);
             if (!dir_entry) {
                 err_msg = "Failed to alloc dir entry";
@@ -320,13 +306,8 @@ static int check_links_(t_params *params, t_str *str, t_array *dir_entries,
     }
 
     if (is_dir_operand && !params->args->list) {
-        t_entry src = {
-            .name = str,
-            .path = str,
-            .path_has_colon =
-                ft_memchr(str->str + str->pos, ':', (size_t)str->len) != NULL,
-            .st = *st_dir,
-        };
+        t_entry src = {0};
+        set_entry_(&src, str, st_dir);
         t_entry *dir_entry = queue_dir_entry_(params, &src, true);
         if (!dir_entry) {
             err_msg = "Failed to alloc dir entry";
@@ -618,4 +599,11 @@ static void print_err_(free_list *fl, t_str *str, int e, const char *prefix) {
     }
 
     ft_fprintf(STDERR_FILENO, "ft_ls: %s '%s': %s\n", prefix, str->str, msg);
+}
+
+static void set_entry_(t_entry *entry, t_str *str, struct stat *st) {
+    entry->name = str;
+    entry->path = str;
+    entry->path_has_colon = ft_memchr(str->str + str->pos, ':', (size_t)str->len) != NULL,
+    entry->st = *st;
 }
