@@ -39,7 +39,6 @@ static bool walk_recurssive_(t_params *params);
 static bool process_args_(t_params *params, t_array *array, int *exit_code);
 static void clear_temp_dir_(t_params *params);
 static void free_entry_array_(t_params *params, t_array *array);
-static t_str *dup_dir_str_(Arena *arena, const t_str *src);
 static t_str *join_dir_path_(Arena *arena, const t_str *lhs, const t_str *rhs);
 static bool ensure_entry_path_(Arena *arena, t_entry *entry);
 static mode_t mode_from_dtype_(unsigned char dtype);
@@ -356,8 +355,7 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
     DIR *d = opendir(path->path->str);
     if (!d) {
         int e = errno;
-        const char *prefix = "cannot open directory";
-        print_err_(&params->fl, path->path, e, prefix);
+        print_err_(&params->fl, path->path, e, "cannot open directory");
         *exit_code = (path->is_operand ? 2 : 1);
         return false;
     }
@@ -522,23 +520,9 @@ static bool walk_recurssive_(t_params *params) {
     return true;
 }
 
-static t_str *dup_dir_str_(Arena *arena, const t_str *src) {
-    t_str *dst = init_str_arena(arena, src->len);
-    if (!dst) {
-        return NULL;
-    }
-
-    const char *src_bytes = src->str + src->pos;
-    ft_memcpy(dst->str, src_bytes, (size_t)src->len);
-    dst->len = src->len;
-    dst->str[dst->len] = '\0';
-    return dst;
-}
-
 static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
                                  bool is_operand) {
     Arena_Mark mark = arena_get_mark(params->dirs_arena);
-    t_shell_scan scan;
     t_entry *entry = arena_push(params->dirs_arena, sizeof(*entry));
     if (!entry) {
         return NULL;
@@ -546,7 +530,7 @@ static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
 
     *entry = (t_entry){0};
     entry->name =
-        src->name ? dup_dir_str_(params->dirs_arena, src->name) : NULL;
+        src->name ? create_str_arena(params->dirs_arena, src->name->str) : NULL;
     if (src->name && !entry->name) {
         goto failed;
     }
@@ -560,13 +544,14 @@ static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
     } else if (src->path == src->name) {
         entry->path = entry->name;
     } else {
-        entry->path = dup_dir_str_(params->dirs_arena, src->path);
+        entry->path = create_str_arena(params->dirs_arena, src->path->str);
     }
 
     if (!entry->path) {
         goto failed;
     }
 
+    t_shell_scan scan;
     shell_scan_str(entry->path, &scan);
     entry->st = src->st;
     entry->quote = scan.quote;
@@ -622,7 +607,6 @@ static void print_err_(free_list *fl, t_str *str, int e, const char *prefix) {
     t_shell_scan scan;
 
     shell_scan_str(str, &scan);
-
     if (scan.quote != '\0') {
         t_str *new_str = shell_escape_str(fl, str, scan.quote);
         if (new_str) {
