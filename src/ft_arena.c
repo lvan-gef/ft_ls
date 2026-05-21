@@ -2,7 +2,6 @@
 #include <unistd.h>
 
 #include "../include/ft_arena.h"
-#include "ft_fprintf.h"
 
 static Arena_Block *new_block_(uint64_t cap);
 
@@ -50,7 +49,7 @@ Arena_Mark arena_get_mark(const Arena *arena) {
     return mark;
 }
 
-void *arena_push_no_zero(Arena *arena, uint64_t size) {
+void *arena_push(Arena *arena, uint64_t size) {
     uint64_t align_pos = arena->current->pos;
 
     if (arena->align) {

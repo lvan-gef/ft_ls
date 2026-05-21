@@ -4,7 +4,7 @@
 #include <stddef.h>
 
 #ifndef FL_DEFAULT_SIZE
-#define FL_DEFAULT_SIZE UINT64_C(1024)
+#define FL_DEFAULT_SIZE UINT64_C(4096)
 #endif // !FL_DEFAULT_SIZE
 
 typedef struct free_list_header free_list_header;

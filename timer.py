@@ -22,8 +22,8 @@ def print_stats(name: str, durations: list[float]):
 
 
 def run():
-    cmd_own = ['./ft_ls', '-R', '/']
-    cmd_ls = ['ls', '-R', '/']
+    cmd_own = ['./ft_ls', '-R', '/home/luuk']
+    cmd_ls = ['ls', '-R', '/home/luuk']
     runs = 20
 
 
@@ -41,6 +41,27 @@ def run():
     # - below 1.000x means ft_ls is faster
     ls_avg = print_stats('ls   ', ls_results)
     own_avg = print_stats('ft_ls', own_results)
-    print(f'ratio: ft_ls / ls = {own_avg / ls_avg:.3f}x')
+    print(f'ratio: ft_ls / ls  -R = {own_avg / ls_avg:.3f}x')
+
+    cmd_own = ['./ft_ls', '-Rl', '/home/luuk']
+    cmd_ls = ['ls', '-Rl', '/home/luuk']
+    runs = 20
+
+
+    print('cache warmup for ls')
+    subprocess.run(cmd_ls, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+    print(f'benchmarking {runs} runs for ls')
+    ls_results = bench(cmd_ls, runs=runs)
+
+    print('cache warmup for ft_ls')
+    subprocess.run(cmd_own, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+    print(f'benchmarking {runs} runs for ft_ls')
+    own_results = bench(cmd_own, runs=runs)
+
+    # - above 1.000x means ft_ls is slower
+    # - below 1.000x means ft_ls is faster
+    ls_avg = print_stats('ls   ', ls_results)
+    own_avg = print_stats('ft_ls', own_results)
+    print(f'ratio: ft_ls / ls Rl= {own_avg / ls_avg:.3f}x')
 
 run()

@@ -9,13 +9,13 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "../include/ft_arena.h"
 #include "../include/ft_entry.h"
 #include "../include/ft_free_list.h"
 #include "../include/ft_shell_escape.h"
 #include "../include/ft_str.h"
 
 #include "../libft/include/libft.h"
-#include "ft_arena.h"
 
 static t_str *get_perm_(free_list *fl, const t_entry *entry);
 static t_str *get_perm_arena_(Arena *arena, const t_entry *entry);
@@ -27,9 +27,10 @@ static t_str *get_dt_(free_list *fl, const struct timespec *ctim);
 static t_str *get_dt_arena_(Arena *arena, const struct timespec *ctim);
 static t_str *get_symlink_(free_list *fl, const t_entry *entry);
 static t_str *get_symlink_arena_(Arena *arena, const t_entry *entry);
-static bool has_xattr_(const char *path, const char *name);
-static t_str *join_paths_(Arena *arena, const t_str *lhs, const t_str *rhs);
 static void free_info_(free_list *fl, t_file_info *info);
+static char get_attr_marker_(const char *path);
+static bool fill_perm_(const t_entry *entry, t_str *str);
+static void fill_dt_(t_str *new_str, const char *dt);
 
 typedef enum {
     P_LINK,
@@ -53,9 +54,11 @@ static gid_t cached_gid = (gid_t)-1;
 static char cached_user[LOGIN_NAME_MAX] = "";
 static char cached_group[LOGIN_NAME_MAX] = "";
 
-t_entry *new_entry(Arena *arena, t_entry *entry, const struct dirent *dp) {
+t_entry *new_entry(Arena *arena, const t_entry *entry,
+                   const struct dirent *dp) {
     t_shell_scan scan;
-    t_entry *ent = arena_push_no_zero(arena, sizeof(*ent));
+    Arena_Mark mark = arena_get_mark(arena);
+    t_entry *ent = arena_push(arena, sizeof(*ent));
     if (!ent) {
         return NULL;
     }
@@ -63,25 +66,28 @@ t_entry *new_entry(Arena *arena, t_entry *entry, const struct dirent *dp) {
     shell_scan_cstr(dp->d_name, &scan);
     ent->name = init_str_arena(arena, scan.len);
     if (!ent->name) {
-        return NULL;
+        goto failed;
     }
 
     ft_memcpy(ent->name->str, dp->d_name, scan.len);
     ent->name->len = scan.len;
     ent->name->str[ent->name->len] = '\0';
 
-    ent->path = join_paths_(arena, entry->path, ent->name);
-    if (!ent->path) {
-        return NULL;
-    }
+    ent->path = NULL;
+    ent->parent_path = entry->path;
 
     ent->quote = scan.quote;
+    ent->path_has_colon = entry->path_has_colon ||
+                          ft_memchr(dp->d_name, ':', (size_t)scan.len) != NULL;
     ent->is_escaped = false;
     ent->is_operand = false;
     ent->info = NULL;
     ent->display_len = scan.display_len;
     ent->padded_display_len = scan.padded_display_len;
     return ent;
+failed:
+    arena_pop_to_mark(arena, mark);
+    return NULL;
 }
 
 bool get_file_info(free_list *fl, t_entry *entry) {
@@ -141,49 +147,54 @@ failed:
 }
 
 bool get_file_info_arena(Arena *arena, t_entry *entry) {
-    t_file_info *info = arena_push_no_zero(arena, sizeof(*info));
+    Arena_Mark mark = arena_get_mark(arena);
+    t_file_info *info = arena_push(arena, sizeof(*info));
     if (!info) {
-        return false;
+        goto failed;
     }
 
     info->perm = get_perm_arena_(arena, entry);
     if (!info->perm) {
-        return false;
+        goto failed;
     }
 
     info->links = uint_to_str_arena(arena, entry->st.st_nlink);
     if (!info->links) {
-        return false;
+        goto failed;
     }
 
     info->username = get_user_arena_(arena, entry->st.st_uid);
     if (!info->username) {
-        return false;
+        goto failed;
     }
 
     info->groupname = get_group_arena_(arena, entry->st.st_gid);
     if (!info->groupname) {
-        return false;
+        goto failed;
     }
 
     info->size = uint_to_str_arena(arena, (uint64_t)entry->st.st_size);
     if (!info->size) {
-        return false;
+        goto failed;
     }
 
     info->dt = get_dt_arena_(arena, &entry->st.st_mtim);
     if (!info->dt) {
-        return false;
+        goto failed;
     }
 
     info->symlink = get_symlink_arena_(arena, entry);
     if (!info->symlink) {
-        return false;
+        goto failed;
     }
 
     info->blocks = (uint64_t)entry->st.st_blocks;
     entry->info = info;
     return true;
+failed:
+    arena_pop_to_mark(arena, mark);
+    entry->info = NULL;
+    return false;
 }
 
 void init_entry_display(t_entry *entry) {
@@ -221,123 +232,24 @@ static t_str *get_perm_(free_list *fl, const t_entry *entry) {
         return NULL;
     }
 
-    for (uint64_t index = 0; index < P_TOTAL; ++index) {
-        switch (index) {
-            case P_LINK:
-                if ((entry->st.st_mode & S_IFMT) == S_IFLNK) {
-                    append_chars_str(str, "l");
-                }
-                break;
-            case P_REG:
-                if ((entry->st.st_mode & S_IFMT) == S_IFREG) {
-                    append_chars_str(str, "-");
-                }
-                break;
-            case P_DIR:
-                if ((entry->st.st_mode & S_IFMT) == S_IFDIR) {
-                    append_chars_str(str, "d");
-                }
-                break;
-            case P_RUSER:
-                append_chars_str(str, entry->st.st_mode & S_IRUSR ? "r" : "-");
-                break;
-            case P_WUSER:
-                append_chars_str(str, entry->st.st_mode & S_IWUSR ? "w" : "-");
-                break;
-            case P_XUSER:
-                append_chars_str(str, entry->st.st_mode & S_IXUSR ? "x" : "-");
-                break;
-            case P_RGROUP:
-                append_chars_str(str, entry->st.st_mode & S_IRGRP ? "r" : "-");
-                break;
-            case P_WGROUP:
-                append_chars_str(str, entry->st.st_mode & S_IWGRP ? "w" : "-");
-                break;
-            case P_XGROUP:
-                append_chars_str(str, entry->st.st_mode & S_IXGRP ? "x" : "-");
-                break;
-            case P_ROTHER:
-                append_chars_str(str, entry->st.st_mode & S_IROTH ? "r" : "-");
-                break;
-            case P_WOTHER:
-                append_chars_str(str, entry->st.st_mode & S_IWOTH ? "w" : "-");
-                break;
-            case P_XOTHER:
-                append_chars_str(str, entry->st.st_mode & S_IXOTH ? "x" : "-");
-                break;
-            case P_ATTR:
-                if (has_xattr_(entry->path->str, "system.posix_acl_access")) {
-                    append_chars_str(str, "+");
-                } else if (has_xattr_(entry->path->str, "security.selinux")) {
-                    append_chars_str(str, ".");
-                }
-                break;
-            default: free_str(fl, str); return NULL;
-        }
+    if (!fill_perm_(entry, str)) {
+        free_str(fl, str);
+        return NULL;
     }
 
     return str;
 }
 
 static t_str *get_perm_arena_(Arena *arena, const t_entry *entry) {
+    Arena_Mark mark = arena_get_mark(arena);
     t_str *str = init_str_arena(arena, PERMISSION_SIZE);
     if (!str) {
         return NULL;
     }
 
-    for (uint64_t index = 0; index < P_TOTAL; ++index) {
-        switch (index) {
-            case P_LINK:
-                if ((entry->st.st_mode & S_IFMT) == S_IFLNK) {
-                    append_chars_str(str, "l");
-                }
-                break;
-            case P_REG:
-                if ((entry->st.st_mode & S_IFMT) == S_IFREG) {
-                    append_chars_str(str, "-");
-                }
-                break;
-            case P_DIR:
-                if ((entry->st.st_mode & S_IFMT) == S_IFDIR) {
-                    append_chars_str(str, "d");
-                }
-                break;
-            case P_RUSER:
-                append_chars_str(str, entry->st.st_mode & S_IRUSR ? "r" : "-");
-                break;
-            case P_WUSER:
-                append_chars_str(str, entry->st.st_mode & S_IWUSR ? "w" : "-");
-                break;
-            case P_XUSER:
-                append_chars_str(str, entry->st.st_mode & S_IXUSR ? "x" : "-");
-                break;
-            case P_RGROUP:
-                append_chars_str(str, entry->st.st_mode & S_IRGRP ? "r" : "-");
-                break;
-            case P_WGROUP:
-                append_chars_str(str, entry->st.st_mode & S_IWGRP ? "w" : "-");
-                break;
-            case P_XGROUP:
-                append_chars_str(str, entry->st.st_mode & S_IXGRP ? "x" : "-");
-                break;
-            case P_ROTHER:
-                append_chars_str(str, entry->st.st_mode & S_IROTH ? "r" : "-");
-                break;
-            case P_WOTHER:
-                append_chars_str(str, entry->st.st_mode & S_IWOTH ? "w" : "-");
-                break;
-            case P_XOTHER:
-                append_chars_str(str, entry->st.st_mode & S_IXOTH ? "x" : "-");
-                break;
-            case P_ATTR:
-                if (has_xattr_(entry->path->str, "system.posix_acl_access")) {
-                    append_chars_str(str, "+");
-                } else if (has_xattr_(entry->path->str, "security.selinux")) {
-                    append_chars_str(str, ".");
-                }
-                break;
-            default: return NULL;
-        }
+    if (!fill_perm_(entry, str)) {
+        arena_pop_to_mark(arena, mark);
+        return NULL;
     }
 
     return str;
@@ -467,11 +379,7 @@ static t_str *get_dt_(free_list *fl, const struct timespec *ctim) {
         return NULL;
     }
 
-    ft_memcpy(new_str->str, dt + 4, 7);
-    ft_memcpy(new_str->str + 7, dt + 11, 5);
-    new_str->len = 12;
-    new_str->str[new_str->len] = '\0';
-
+    fill_dt_(new_str, dt);
     return new_str;
 }
 
@@ -491,10 +399,7 @@ static t_str *get_dt_arena_(Arena *arena, const struct timespec *ctim) {
         return NULL;
     }
 
-    ft_memcpy(new_str->str, dt + 4, 7);
-    ft_memcpy(new_str->str + 7, dt + 11, 5);
-    new_str->len = 12;
-    new_str->str[new_str->len] = '\0';
+    fill_dt_(new_str, dt);
     return new_str;
 }
 
@@ -503,7 +408,7 @@ static t_str *get_symlink_(free_list *fl, const t_entry *entry) {
         return init_str(fl, 1);
     }
 
-    uint64_t cap = (entry->st.st_size > 0) ? (uint64_t)entry->st.st_size
+    uint64_t cap = (entry->st.st_size > 0) ? (uint64_t)entry->st.st_size + 1
                                            : (uint64_t)PATH_MAX;
     while (true) {
         t_str *new_str = init_str(fl, cap);
@@ -513,7 +418,9 @@ static t_str *get_symlink_(free_list *fl, const t_entry *entry) {
 
         ssize_t len = readlink(entry->path->str, new_str->str, (size_t)cap);
         if (len < 0) {
-            return init_str(fl, 1);
+            new_str->len = 0;
+            new_str->str[0] = '\0';
+            return new_str;
         }
 
         if ((uint64_t)len < cap) {
@@ -522,12 +429,11 @@ static t_str *get_symlink_(free_list *fl, const t_entry *entry) {
             return new_str;
         }
 
+        free_str(fl, new_str);
         if (cap > UINT64_MAX / 2) {
-            free_str(fl, new_str);
-            break;
+            return NULL;
         }
 
-        free_str(fl, new_str);
         cap *= 2;
     }
 
@@ -539,17 +445,20 @@ static t_str *get_symlink_arena_(Arena *arena, const t_entry *entry) {
         return init_str_arena(arena, 1);
     }
 
-    uint64_t cap = (entry->st.st_size > 0) ? (uint64_t)entry->st.st_size
+    Arena_Mark mark = arena_get_mark(arena);
+    uint64_t cap = (entry->st.st_size > 0) ? (uint64_t)entry->st.st_size + 1
                                            : (uint64_t)PATH_MAX;
     while (true) {
         t_str *new_str = init_str_arena(arena, cap);
         if (!new_str) {
-            break;
+            return NULL;
         }
 
         ssize_t len = readlink(entry->path->str, new_str->str, (size_t)cap);
         if (len < 0) {
-            break;
+            new_str->len = 0;
+            new_str->str[0] = '\0';
+            return new_str;
         }
 
         if ((uint64_t)len < cap) {
@@ -558,43 +467,13 @@ static t_str *get_symlink_arena_(Arena *arena, const t_entry *entry) {
             return new_str;
         }
 
+        arena_pop_to_mark(arena, mark);
         if (cap > UINT64_MAX / 2) {
-            break;
+            return NULL;
         }
 
         cap *= 2;
     }
-
-    return NULL;
-}
-
-static bool has_xattr_(const char *path, const char *name) {
-    ssize_t n = getxattr(path, name, NULL, 0);
-    if (n < 0) {
-        return false;
-    }
-
-    return true;
-}
-
-static t_str *join_paths_(Arena *arena, const t_str *lhs, const t_str *rhs) {
-    const bool need_slash = lhs->len == 0 || lhs->str[lhs->len - 1] != '/';
-    const size_t new_len = lhs->len + rhs->len + (need_slash ? 1U : 0U) + 1U;
-    t_str *fullname = init_str_arena(arena, new_len);
-    if (!fullname) {
-        return NULL;
-    }
-
-    ft_memcpy(fullname->str, lhs->str, lhs->len);
-    fullname->len = lhs->len;
-    if (need_slash) {
-        fullname->str[fullname->len++] = '/';
-    }
-
-    ft_memcpy(fullname->str + fullname->len, rhs->str, rhs->len);
-    fullname->len += rhs->len;
-    fullname->str[fullname->len] = '\0';
-    return fullname;
 }
 
 static void free_info_(free_list *fl, t_file_info *info) {
@@ -627,4 +506,105 @@ static void free_info_(free_list *fl, t_file_info *info) {
     }
 
     fl_free(fl, info);
+}
+
+static char get_attr_marker_(const char *path) {
+    ssize_t len = listxattr(path, NULL, 0);
+    if (len <= 0) {
+        return '\0';
+    }
+
+    char *buf = malloc((size_t)len);
+    if (!buf) {
+        return '\0';
+    }
+
+    len = listxattr(path, buf, (size_t)len);
+    if (len <= 0) {
+        free(buf);
+        return '\0';
+    }
+
+    bool has_selinux = false;
+    const char *end = buf + len;
+    for (char *name = buf; name < end; name += strlen(name) + 1) {
+        if (strcmp(name, "system.posix_acl_access") == 0) {
+            free(buf);
+            return '+';
+        }
+        if (strcmp(name, "security.selinux") == 0) {
+            has_selinux = true;
+        }
+    }
+
+    free(buf);
+    return has_selinux ? '.' : '\0';
+}
+
+static bool fill_perm_(const t_entry *entry, t_str *str) {
+    for (uint64_t index = 0; index < P_TOTAL; ++index) {
+        switch (index) {
+            case P_LINK:
+                if ((entry->st.st_mode & S_IFMT) == S_IFLNK) {
+                    append_chars_str(str, "l");
+                }
+                break;
+            case P_REG:
+                if ((entry->st.st_mode & S_IFMT) == S_IFREG) {
+                    append_chars_str(str, "-");
+                }
+                break;
+            case P_DIR:
+                if ((entry->st.st_mode & S_IFMT) == S_IFDIR) {
+                    append_chars_str(str, "d");
+                }
+                break;
+            case P_RUSER:
+                append_chars_str(str, entry->st.st_mode & S_IRUSR ? "r" : "-");
+                break;
+            case P_WUSER:
+                append_chars_str(str, entry->st.st_mode & S_IWUSR ? "w" : "-");
+                break;
+            case P_XUSER:
+                append_chars_str(str, entry->st.st_mode & S_IXUSR ? "x" : "-");
+                break;
+            case P_RGROUP:
+                append_chars_str(str, entry->st.st_mode & S_IRGRP ? "r" : "-");
+                break;
+            case P_WGROUP:
+                append_chars_str(str, entry->st.st_mode & S_IWGRP ? "w" : "-");
+                break;
+            case P_XGROUP:
+                append_chars_str(str, entry->st.st_mode & S_IXGRP ? "x" : "-");
+                break;
+            case P_ROTHER:
+                append_chars_str(str, entry->st.st_mode & S_IROTH ? "r" : "-");
+                break;
+            case P_WOTHER:
+                append_chars_str(str, entry->st.st_mode & S_IWOTH ? "w" : "-");
+                break;
+            case P_XOTHER:
+                append_chars_str(str, entry->st.st_mode & S_IXOTH ? "x" : "-");
+                break;
+            case P_ATTR: {
+                char marker = get_attr_marker_(entry->path->str);
+                if (marker == '+') {
+                    append_chars_str(str, "+");
+                } else if (marker == '.') {
+                    append_chars_str(str, ".");
+                }
+                break;
+            }
+            default: return false;
+        }
+    }
+
+    return true;
+}
+
+static void fill_dt_(t_str *new_str, const char *dt) {
+    ft_memcpy(new_str->str, dt + 4, 7);
+    ft_memcpy(new_str->str + 7, dt + 11, 5);
+    new_str->len = 12;
+    new_str->str[new_str->len] = '\0';
 }

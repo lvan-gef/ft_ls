@@ -21,8 +21,8 @@ typedef struct {
 static uint64_t display_len_(const t_entry *entry, bool quoted);
 static void init_print_row_(t_ps *ps);
 static uint64_t *calc_cols_(t_array *array, t_map *map, bool quoted);
-static bool calc_width_(t_array *array, uint64_t num_cols,
-                        uint64_t *col_widths, bool quoted);
+static bool calc_width_(const uint64_t *name_lengths, uint64_t file_count,
+                        uint64_t num_cols, uint64_t *col_widths);
 static bool create_row_(t_str *out, t_array *array, const t_map *map,
                         const uint64_t *col_widths, bool quoted);
 static bool indent_(t_str *out, uint64_t from, uint64_t to);
@@ -58,8 +58,8 @@ static void init_print_row_(t_ps *ps) {
     }
 
     if (ps->dir_entry) {
-        if (!escaped_out_len(&out, ps->dir_entry->name, ps->dir_entry->quote,
-                             ps->dir_entry->display_len, false) ||
+        if (!escaped_out(&out, ps->dir_entry->name, ps->dir_entry->quote,
+                         false) ||
             !put_mem(&out, ":\n", 2)) {
             err_msg = "Failed to write dir header";
             goto done;
@@ -94,8 +94,7 @@ static bool create_row_(t_str *out, t_array *array, const t_map *map,
             const uint64_t name_length = display_len_(entry, quoted);
             const uint64_t max_name_length = col_widths[col++];
 
-            if (!escaped_out_len(out, entry->name, entry->quote, name_length,
-                                 quoted)) {
+            if (!escaped_out(out, entry->name, entry->quote, quoted)) {
                 return false;
             }
 
@@ -123,38 +122,58 @@ static bool create_row_(t_str *out, t_array *array, const t_map *map,
 static uint64_t *calc_cols_(t_array *array, t_map *map, bool quoted) {
     const uint64_t width_count = map->max ? map->max : 1;
     uint64_t *col_widths = malloc((size_t)width_count * sizeof(*col_widths));
+    uint64_t *name_lengths;
     if (!col_widths) {
         return NULL;
     }
 
-    uint64_t try_cols = map->max;
-    while (try_cols > 1) {
-        if (calc_width_(array, try_cols, col_widths, quoted)) {
-            map->cols = try_cols;
-            map->rows = (array->len + map->cols - 1) / map->cols;
-            return col_widths;
-        }
-        --try_cols;
+    name_lengths = malloc((size_t)array->len * sizeof(*name_lengths));
+    if (!name_lengths) {
+        free(col_widths);
+        return NULL;
     }
 
-    (void)calc_width_(array, 1, col_widths, quoted);
+    for (uint64_t index = 0; index < array->len; ++index) {
+        const t_entry *entry = array->data[index];
+        name_lengths[index] = display_len_(entry, quoted);
+    }
+
+    uint64_t lo = 1;
+    uint64_t hi = width_count;
+    uint64_t best = 1;
+    while (lo <= hi) {
+        const uint64_t mid = lo + (hi - lo) / 2;
+
+        if (calc_width_(name_lengths, array->len, mid, col_widths)) {
+            best = mid;
+            lo = mid + 1;
+        } else {
+            if (mid == 1) {
+                break;
+            }
+            hi = mid - 1;
+        }
+    }
+
+    map->cols = best;
+    map->rows = (array->len + best - 1) / best;
+    (void)calc_width_(name_lengths, array->len, best, col_widths);
+    free(name_lengths);
     return col_widths;
 }
 
-static bool calc_width_(t_array *array, uint64_t num_cols,
-                        uint64_t *col_widths, bool quoted) {
-    const uint64_t num_rows = (array->len + num_cols - 1) / num_cols;
+static bool calc_width_(const uint64_t *name_lengths, uint64_t file_count,
+                        uint64_t num_cols, uint64_t *col_widths) {
+    const uint64_t num_rows = (file_count + num_cols - 1) / num_cols;
     uint64_t line_len = num_cols * MIN_COLUMN_WIDTH;
 
-    // Seed each column with the same minimum width GNU ls uses.
     for (uint64_t index = 0; index < num_cols; ++index) {
         col_widths[index] = MIN_COLUMN_WIDTH;
     }
 
-    for (uint64_t filesno = 0; filesno < array->len; ++filesno) {
-        const t_entry *entry = array->data[filesno];
+    for (uint64_t filesno = 0; filesno < file_count; ++filesno) {
         const uint64_t index = filesno / num_rows;
-        uint64_t real_length = display_len_(entry, quoted);
+        uint64_t real_length = name_lengths[filesno];
 
         if (index != num_cols - 1) {
             real_length += SPACE_GAP;

@@ -6,8 +6,6 @@
 #include "../include/ft_entry.h"
 #include "../include/ft_sort.h"
 
-#include "../libft/include/libft.h"
-
 typedef int (*t_cmp_entry)(const t_entry *a, const t_entry *b);
 
 static void merge_sort_(t_array *array, t_cmp_entry cmp);
@@ -119,12 +117,14 @@ static int cmp_time_entry_(const t_entry *a, const t_entry *b) {
 }
 
 static int compare_(const t_str *lhs, const t_str *rhs) {
+    const unsigned char *a = (const unsigned char *)lhs->str;
+    const unsigned char *b = (const unsigned char *)rhs->str;
     const uint64_t limit = lhs->len < rhs->len ? lhs->len : rhs->len;
-    const int cmp = ft_memcmp((const void *)lhs->str, (const void *)rhs->str,
-                              (size_t)limit);
 
-    if (cmp != 0) {
-        return cmp;
+    for (uint64_t index = 0; index < limit; ++index) {
+        if (a[index] != b[index]) {
+            return (int)a[index] - (int)b[index];
+        }
     }
 
     if (lhs->len == rhs->len) {

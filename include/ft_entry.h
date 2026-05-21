@@ -45,7 +45,9 @@ typedef struct {
 typedef struct {
     t_str *name;
     t_str *path;
+    const t_str *parent_path;
     char quote;
+    bool path_has_colon;
     bool is_operand;
     t_file_info *info;
     struct stat st;
@@ -54,7 +56,7 @@ typedef struct {
     uint64_t padded_display_len;
 } t_entry;
 
-t_entry *new_entry(Arena *arena, t_entry *entry, const struct dirent *dp);
+t_entry *new_entry(Arena *arena, const t_entry *entry, const struct dirent *dp);
 bool get_file_info(free_list *fl, t_entry *entry);
 bool get_file_info_arena(Arena *arena, t_entry *entry);
 void init_entry_display(t_entry *entry);

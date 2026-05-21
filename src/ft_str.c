@@ -35,7 +35,7 @@ t_str *init_str_arena(Arena *arena, uint64_t cap) {
         return NULL;
     }
 
-    t_str *str = arena_push_no_zero(arena, sizeof(*str) + cap + 1);
+    t_str *str = arena_push(arena, sizeof(*str) + cap + 1);
     if (!str) {
         return NULL;
     }

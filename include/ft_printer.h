@@ -17,7 +17,6 @@
 typedef struct {
     t_args *args;
     t_array *array;
-    Arena *sort_arena;
     t_entry *dir_entry;
     bool print_total;
     uint64_t min_len_links;

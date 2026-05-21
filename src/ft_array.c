@@ -19,6 +19,7 @@ t_array *init_array(free_list *fl, uint64_t size) {
 
     array->data = (void **)fl_alloc(fl, size * sizeof(*array->data), 8);
     if (!array->data) {
+        fl_free(fl, array);
         return NULL;
     }
 
