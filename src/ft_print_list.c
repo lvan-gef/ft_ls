@@ -32,12 +32,8 @@ void print_list(t_ps *ps) {
     out.str[0] = '\0';
 
     get_sizes_(ps->array, &sizes);
-    if (ps->dir_entry) {
-        if (!escaped_out(&out, ps->dir_entry->name, ps->dir_entry->quote,
-                         false) ||
-            !put_mem(&out, ":\n", 2)) {
-            goto done;
-        }
+    if (!put_dir_header(&out, ps->dir_entry)) {
+        goto done;
     }
 
     if (ps->print_total) {
@@ -53,7 +49,6 @@ void print_list(t_ps *ps) {
     }
 
     (void)flush_str(&out);
-
 done:
     return;
 }

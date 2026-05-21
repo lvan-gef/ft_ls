@@ -6,6 +6,8 @@
 #include "../include/ft_entry.h"
 #include "../include/ft_printer_helper.h"
 #include "../include/ft_str.h"
+#include "../include/ft_shell_escape.h"
+
 #include "../libft/include/libft.h"
 
 bool put_mem(t_str *out, const char *src, uint64_t len) {
@@ -49,4 +51,13 @@ bool have_quotes(t_array *array) {
     }
 
     return false;
+}
+
+bool put_dir_header(t_str *out, const t_entry *dir_entry) {
+    if (!dir_entry) {
+        return true;
+    }
+
+    return escaped_out(out, dir_entry->name, dir_entry->quote, false) &&
+           put_mem(out, ":\n", 2);
 }

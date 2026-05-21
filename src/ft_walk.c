@@ -51,6 +51,7 @@ static bool has_quoted_operands_(const t_array *array);
 static void clean_up_(t_params *params);
 static void print_err_(free_list *fl, t_str *str, int e, const char *prefix);
 static void set_entry_(t_entry *entry, t_str *str, struct stat *st);
+static void fill_dir_entry_display_(t_entry *entry, const t_entry *src);
 
 typedef enum { SINGLE_QUOTE = '\'', DOUBLE_QUOTE = '\"', SPACE = ' ' } t_quote;
 
@@ -532,21 +533,9 @@ static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
         goto failed;
     }
 
-    t_shell_scan scan;
-    shell_scan_str(entry->path, &scan);
     entry->st = src->st;
-    entry->quote = scan.quote;
-    entry->path_has_colon = src->path_has_colon;
+    fill_dir_entry_display_(entry, src);
     entry->parent_path = NULL;
-    entry->display_len = scan.display_len;
-    entry->padded_display_len = scan.padded_display_len;
-    if (entry->quote == '\0' && entry->path_has_colon) {
-        entry->quote = '\'';
-        entry->display_len = entry->path->len + 2;
-        entry->padded_display_len = entry->display_len;
-    }
-    entry->is_escaped = false;
-    entry->info = NULL;
     entry->is_operand = is_operand;
     return entry;
 failed:
@@ -604,6 +593,21 @@ static void print_err_(free_list *fl, t_str *str, int e, const char *prefix) {
 static void set_entry_(t_entry *entry, t_str *str, struct stat *st) {
     entry->name = str;
     entry->path = str;
-    entry->path_has_colon = ft_memchr(str->str + str->pos, ':', (size_t)str->len) != NULL,
+    entry->path_has_colon =
+        ft_memchr(str->str + str->pos, ':', (size_t)str->len) != NULL,
     entry->st = *st;
+}
+
+static void fill_dir_entry_display_(t_entry *entry, const t_entry *src) {
+    t_shell_scan scan;
+    shell_scan_str(entry->path, &scan);
+    entry->quote = scan.quote;
+    entry->path_has_colon = src->path_has_colon;
+    entry->display_len = scan.display_len;
+    entry->padded_display_len = scan.padded_display_len;
+    if (entry->quote == '\0' && entry->path_has_colon) {
+        entry->quote = '\'';
+        entry->display_len = entry->path->len + 2;
+        entry->padded_display_len = entry->display_len;
+    }
 }

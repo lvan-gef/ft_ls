@@ -57,13 +57,9 @@ static void init_print_row_(t_ps *ps) {
         goto done;
     }
 
-    if (ps->dir_entry) {
-        if (!escaped_out(&out, ps->dir_entry->name, ps->dir_entry->quote,
-                         false) ||
-            !put_mem(&out, ":\n", 2)) {
-            err_msg = "Failed to write dir header";
-            goto done;
-        }
+    if (!put_dir_header(&out, ps->dir_entry)) {
+        err_msg = "Failed to write dir header";
+        goto done;
     }
 
     if (!create_row_(&out, ps->array, &map, col_widths, quoted) ||

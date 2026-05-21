@@ -510,6 +510,9 @@ static void fill_perm_(const t_entry *entry, t_str *str) {
     if (marker == '+' || marker == '.') {
         str->str[index++] = marker;
     }
+
+    str->len = index;
+    str->str[index] = '\0';
 }
 
 static bool fill_dt_(t_str *new_str, const struct timespec *ctim) {
