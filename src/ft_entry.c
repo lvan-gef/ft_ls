@@ -72,16 +72,15 @@ t_entry *new_entry(Arena *arena, const t_entry *entry,
     ft_memcpy(ent->name->str, dp->d_name, scan.len);
     ent->name->len = scan.len;
     ent->name->str[ent->name->len] = '\0';
-
     ent->path = NULL;
     ent->parent_path = entry->path;
-
     ent->quote = scan.quote;
     ent->path_has_colon = entry->path_has_colon ||
                           ft_memchr(dp->d_name, ':', (size_t)scan.len) != NULL;
-    ent->is_escaped = false;
     ent->is_operand = false;
     ent->info = NULL;
+    ent->st = (struct stat){0};
+    ent->is_escaped = false;
     ent->display_len = scan.display_len;
     ent->padded_display_len = scan.padded_display_len;
     return ent;

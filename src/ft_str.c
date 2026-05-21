@@ -9,8 +9,9 @@
 
 #include "../libft/include/libft.h"
 
-static uint64_t strlcpy_(t_str *dst, const t_str *src, uint64_t dstsize);
 static void to_uint_(t_str *str, uint64_t nbr);
+static void init_str_(t_str *str, uint64_t cap);
+static void fill_str_(t_str *dst, const char *src, uint64_t len);
 
 t_str *init_str(free_list *fl, uint64_t cap) {
     if (cap > UINT64_MAX - 1 - sizeof(t_str)) {
@@ -22,11 +23,7 @@ t_str *init_str(free_list *fl, uint64_t cap) {
         return NULL;
     }
 
-    str->str = (char *)(str + 1);
-    str->cap = cap + 1;
-    str->len = 0;
-    str->pos = 0;
-    str->str[0] = '\0';
+    init_str_(str, cap);
     return str;
 }
 
@@ -40,11 +37,7 @@ t_str *init_str_arena(Arena *arena, uint64_t cap) {
         return NULL;
     }
 
-    str->str = (char *)(str + 1);
-    str->cap = cap + 1;
-    str->len = 0;
-    str->pos = 0;
-    str->str[0] = '\0';
+    init_str_(str, cap);
     return str;
 }
 
@@ -59,10 +52,7 @@ t_str *create_str(free_list *fl, const char *str) {
         return NULL;
     }
 
-    ft_memcpy(new_str->str, str, len);
-    new_str->len = len;
-    new_str->str[new_str->len] = '\0';
-
+    fill_str_(new_str, str, len);
     return new_str;
 }
 
@@ -77,9 +67,7 @@ t_str *create_str_arena(Arena *arena, const char *str) {
         return NULL;
     }
 
-    ft_memcpy(new_str->str, str, len);
-    new_str->len = len;
-    new_str->str[new_str->len] = '\0';
+    fill_str_(new_str, str, len);
     return new_str;
 }
 
@@ -89,8 +77,9 @@ t_str *dup_str(free_list *fl, const t_str *str) {
         return NULL;
     }
 
-    uint64_t len = strlcpy_(new_str, str, str->len + 1);
-    new_str->len = len;
+    ft_memcpy(new_str->str, str->str + str->pos, str->len);
+    new_str->str[str->len] = '\0';
+    new_str->len = str->len;
 
     return new_str;
 }
@@ -136,25 +125,6 @@ void free_str(free_list *fl, t_str *str) {
     fl_free(fl, str);
 }
 
-static uint64_t strlcpy_(t_str *dst, const t_str *src, uint64_t dstsize) {
-    if (!dstsize) {
-        return 0;
-    }
-
-    uint64_t index = 0;
-    uint64_t copied = 0;
-    while (src->str[src->pos + index] && dst->pos + index < dst->cap) {
-        if (index < dstsize - 1) {
-            dst->str[dst->pos + index] = src->str[src->pos + index];
-            copied = index + 1;
-        }
-        ++index;
-    }
-
-    dst->str[dst->pos + copied] = '\0';
-    return copied;
-}
-
 static void to_uint_(t_str *str, uint64_t nbr) {
     str->str[str->cap - 1] = '\0';
     str->pos = str->cap - 1;
@@ -164,4 +134,18 @@ static void to_uint_(t_str *str, uint64_t nbr) {
         nbr /= 10;
         ++str->len;
     }
+}
+
+static void init_str_(t_str *str, uint64_t cap) {
+    str->str = (char *)(str + 1);
+    str->cap = cap + 1;
+    str->len = 0;
+    str->pos = 0;
+    str->str[0] = '\0';
+}
+
+static void fill_str_(t_str *dst, const char *src, uint64_t len) {
+    ft_memcpy(dst->str, src, len);
+    dst->len = len;
+    dst->str[dst->len] = '\0';
 }

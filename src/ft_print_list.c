@@ -18,8 +18,8 @@ typedef struct {
     bool have_quote;
 } t_sizes;
 
-static void get_sizes_(t_array *array, t_sizes *sizes);
 static bool printer_(t_str *out, t_array *array, const t_sizes *sizes);
+static void get_sizes_(t_array *array, t_sizes *sizes);
 static bool left_pad_(t_str *out, uint64_t src_len, uint64_t max_size);
 static bool put_uint_(t_str *out, uint64_t value);
 

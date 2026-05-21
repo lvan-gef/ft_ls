@@ -13,22 +13,26 @@ static uint64_t add_capped_(uint64_t lhs, uint64_t rhs, uint64_t cap);
 static void merge_(void **data, void **tmp, uint64_t left, uint64_t mid,
                    uint64_t right, t_cmp_entry cmp);
 static int cmp_name_entry_(const t_entry *a, const t_entry *b);
+static int cmp_name_entry_rev_(const t_entry *a, const t_entry *b);
 static int cmp_time_entry_(const t_entry *a, const t_entry *b);
+static int cmp_time_entry_rev_(const t_entry *a, const t_entry *b);
 static int compare_(const t_str *lhs, const t_str *rhs);
 static int compare_time_(const struct timespec *a, const struct timespec *b);
-static void reverse_(t_array *array);
 
 void sort(t_array *array, bool reverse, bool sort_time) {
     if (array->len <= 1) {
         return;
     }
 
-    const t_cmp_entry cmp = sort_time ? cmp_time_entry_ : cmp_name_entry_;
-    merge_sort_(array, cmp);
+    t_cmp_entry cmp;
 
-    if (reverse) {
-        reverse_(array);
+    if (sort_time) {
+        cmp = reverse ? cmp_time_entry_rev_ : cmp_time_entry_;
+    } else {
+        cmp = reverse ? cmp_name_entry_rev_ : cmp_name_entry_;
     }
+
+    merge_sort_(array, cmp);
 }
 
 static void merge_sort_(t_array *array, t_cmp_entry cmp) {
@@ -107,6 +111,10 @@ static int cmp_name_entry_(const t_entry *a, const t_entry *b) {
     return compare_(a->name, b->name);
 }
 
+static int cmp_name_entry_rev_(const t_entry *a, const t_entry *b) {
+    return cmp_name_entry_(b, a);
+}
+
 static int cmp_time_entry_(const t_entry *a, const t_entry *b) {
     const int cmp = compare_time_(&a->st.st_mtim, &b->st.st_mtim);
     if (cmp != 0) {
@@ -114,6 +122,10 @@ static int cmp_time_entry_(const t_entry *a, const t_entry *b) {
     }
 
     return compare_(a->name, b->name);
+}
+
+static int cmp_time_entry_rev_(const t_entry *a, const t_entry *b) {
+    return cmp_time_entry_(b, a);
 }
 
 static int compare_(const t_str *lhs, const t_str *rhs) {
@@ -140,17 +152,4 @@ static int compare_time_(const struct timespec *a, const struct timespec *b) {
     }
 
     return (a->tv_nsec > b->tv_nsec) - (a->tv_nsec < b->tv_nsec);
-}
-
-static void reverse_(t_array *array) {
-    size_t index = 0;
-    size_t end = array->len - 1;
-
-    while (index < end) {
-        t_entry *tmp = array->data[index];
-        array->data[index] = array->data[end];
-        array->data[end] = tmp;
-        ++index;
-        --end;
-    }
 }

@@ -99,6 +99,7 @@ void arena_pop_to_mark(Arena *arena, Arena_Mark mark) {
         if (prev) {
             prev->next = NULL;
         }
+
         free(block);
         block = prev;
     }

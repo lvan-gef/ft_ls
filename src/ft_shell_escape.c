@@ -34,8 +34,6 @@ static void escape_str_(t_str *dst, const t_str *str, char quote,
                         bool pad_unquoted);
 static void append_bytes_(t_str *dst, const char *src, uint64_t len);
 static void emit_bytes_(t_shell_out *out, const char *src, uint64_t len);
-static uint64_t ansi_byte_repr_(unsigned char byte, char octal[4],
-                                const char **repr);
 static void emit_ansi_byte_(t_shell_out *out, unsigned char byte);
 static void enter_single_(t_shell_out *out, t_escape_state *state);
 static void leave_single_(t_shell_out *out, t_escape_state *state);
@@ -134,34 +132,49 @@ static void emit_bytes_(t_shell_out *out, const char *src, uint64_t len) {
     out->len += len;
 }
 
-static uint64_t ansi_byte_repr_(unsigned char byte, char octal[4],
-                                const char **repr) {
-    switch (byte) {
-        case '\a': *repr = "\\a"; return 2;
-        case '\b': *repr = "\\b"; return 2;
-        case '\t': *repr = "\\t"; return 2;
-        case '\n': *repr = "\\n"; return 2;
-        case '\v': *repr = "\\v"; return 2;
-        case '\f': *repr = "\\f"; return 2;
-        case '\r': *repr = "\\r"; return 2;
-        default: break;
-    }
-
-    octal[0] = '\\';
-    octal[1] =
-        (char)('0' + ((byte >> BYTE_OCTAL_HIGH_SHIFT) & OCTAL_DIGIT_MASK));
-    octal[2] =
-        (char)('0' + ((byte >> BYTE_OCTAL_MID_SHIFT) & OCTAL_DIGIT_MASK));
-    octal[3] = (char)('0' + (byte & OCTAL_DIGIT_MASK));
-
-    *repr = octal;
-    return 4;
-}
-
 static void emit_ansi_byte_(t_shell_out *out, unsigned char byte) {
-    char octal[4];
-    const char *repr;
-    const uint64_t len = ansi_byte_repr_(byte, octal, &repr);
+    char repr[4];
+    uint64_t len = 2;
+
+    switch (byte) {
+        case '\a':
+            repr[0] = '\\';
+            repr[1] = 'a';
+            break;
+        case '\b':
+            repr[0] = '\\';
+            repr[1] = 'b';
+            break;
+        case '\t':
+            repr[0] = '\\';
+            repr[1] = 't';
+            break;
+        case '\n':
+            repr[0] = '\\';
+            repr[1] = 'n';
+            break;
+        case '\v':
+            repr[0] = '\\';
+            repr[1] = 'v';
+            break;
+        case '\f':
+            repr[0] = '\\';
+            repr[1] = 'f';
+            break;
+        case '\r':
+            repr[0] = '\\';
+            repr[1] = 'r';
+            break;
+        default:
+            len = 4;
+            repr[0] = '\\';
+            repr[1] = (char)('0' + ((byte >> BYTE_OCTAL_HIGH_SHIFT) &
+                                    OCTAL_DIGIT_MASK));
+            repr[2] = (char)('0' + ((byte >> BYTE_OCTAL_MID_SHIFT) &
+                                    OCTAL_DIGIT_MASK));
+            repr[3] = (char)('0' + (byte & OCTAL_DIGIT_MASK));
+            break;
+    }
 
     emit_bytes_(out, repr, len);
 }
@@ -199,7 +212,6 @@ static void leave_ansi_(t_shell_out *out, t_escape_state *state) {
     }
 
     emit_bytes_(out, "'", 1);
-
     state->in_ansi = false;
 }
 
@@ -221,18 +233,16 @@ static void shell_escape_bytes_(t_shell_out *out, const char *src,
 
 static void escape_byte_(t_shell_out *out, t_escape_state *state,
                          unsigned char c) {
-    char ch;
     if (ft_isprint(c) && c != '\'') {
         leave_ansi_(out, state);
         enter_single_(out, state);
-        ch = (char)c;
+        char ch = (char)c;
         emit_bytes_(out, &ch, 1);
         return;
     }
 
     if (c == '\'') {
         leave_ansi_(out, state);
-
         emit_bytes_(out, state->in_single ? "'\\''" : "\\'",
                     state->in_single ? 4U : 2U);
         return;
@@ -240,7 +250,6 @@ static void escape_byte_(t_shell_out *out, t_escape_state *state,
 
     leave_single_(out, state);
     enter_ansi_(out, state);
-
     emit_ansi_byte_(out, c);
 }
 
@@ -260,7 +269,7 @@ static uint64_t shell_display_len_(const char *src, uint64_t len, char quote,
 static uint64_t shell_escaped_len_(const char *src, uint64_t len) {
     t_shell_out out = {.dst = NULL, .len = 0};
 
-    (void)shell_escape_bytes_(&out, src, len);
+    shell_escape_bytes_(&out, src, len);
     return out.len;
 }
 
