@@ -29,26 +29,9 @@ static t_str *get_symlink_(free_list *fl, const t_entry *entry);
 static t_str *get_symlink_arena_(Arena *arena, const t_entry *entry);
 static void free_info_(free_list *fl, t_file_info *info);
 static char get_attr_marker_(const char *path);
-static bool fill_perm_(const t_entry *entry, t_str *str);
+static void fill_perm_(const t_entry *entry, t_str *str);
 static bool fill_dt_(t_str *new_str, const struct timespec *ctim);
 static bool read_symlink_(const t_entry *entry, t_str *new_str, uint64_t cap);
-
-typedef enum {
-    P_LINK,
-    P_REG,
-    P_DIR,
-    P_RUSER,
-    P_WUSER,
-    P_XUSER,
-    P_RGROUP,
-    P_WGROUP,
-    P_XGROUP,
-    P_ROTHER,
-    P_WOTHER,
-    P_XOTHER,
-    P_ATTR,
-    P_TOTAL
-} t_perm_lttr;
 
 static uid_t cached_uid = (uid_t)-1;
 static gid_t cached_gid = (gid_t)-1;
@@ -232,26 +215,17 @@ static t_str *get_perm_(free_list *fl, const t_entry *entry) {
         return NULL;
     }
 
-    if (!fill_perm_(entry, str)) {
-        free_str(fl, str);
-        return NULL;
-    }
-
+    fill_perm_(entry, str);
     return str;
 }
 
 static t_str *get_perm_arena_(Arena *arena, const t_entry *entry) {
-    Arena_Mark mark = arena_get_mark(arena);
     t_str *str = init_str_arena(arena, PERMISSION_SIZE);
     if (!str) {
         return NULL;
     }
 
-    if (!fill_perm_(entry, str)) {
-        arena_pop_to_mark(arena, mark);
-        return NULL;
-    }
-
+    fill_perm_(entry, str);
     return str;
 }
 
@@ -511,65 +485,28 @@ static char get_attr_marker_(const char *path) {
     return has_selinux ? '.' : '\0';
 }
 
-static bool fill_perm_(const t_entry *entry, t_str *str) {
-    for (uint64_t index = 0; index < P_TOTAL; ++index) {
-        switch (index) {
-            case P_LINK:
-                if ((entry->st.st_mode & S_IFMT) == S_IFLNK) {
-                    append_chars_str(str, "l");
-                }
-                break;
-            case P_REG:
-                if ((entry->st.st_mode & S_IFMT) == S_IFREG) {
-                    append_chars_str(str, "-");
-                }
-                break;
-            case P_DIR:
-                if ((entry->st.st_mode & S_IFMT) == S_IFDIR) {
-                    append_chars_str(str, "d");
-                }
-                break;
-            case P_RUSER:
-                append_chars_str(str, entry->st.st_mode & S_IRUSR ? "r" : "-");
-                break;
-            case P_WUSER:
-                append_chars_str(str, entry->st.st_mode & S_IWUSR ? "w" : "-");
-                break;
-            case P_XUSER:
-                append_chars_str(str, entry->st.st_mode & S_IXUSR ? "x" : "-");
-                break;
-            case P_RGROUP:
-                append_chars_str(str, entry->st.st_mode & S_IRGRP ? "r" : "-");
-                break;
-            case P_WGROUP:
-                append_chars_str(str, entry->st.st_mode & S_IWGRP ? "w" : "-");
-                break;
-            case P_XGROUP:
-                append_chars_str(str, entry->st.st_mode & S_IXGRP ? "x" : "-");
-                break;
-            case P_ROTHER:
-                append_chars_str(str, entry->st.st_mode & S_IROTH ? "r" : "-");
-                break;
-            case P_WOTHER:
-                append_chars_str(str, entry->st.st_mode & S_IWOTH ? "w" : "-");
-                break;
-            case P_XOTHER:
-                append_chars_str(str, entry->st.st_mode & S_IXOTH ? "x" : "-");
-                break;
-            case P_ATTR: {
-                char marker = get_attr_marker_(entry->path->str);
-                if (marker == '+') {
-                    append_chars_str(str, "+");
-                } else if (marker == '.') {
-                    append_chars_str(str, ".");
-                }
-                break;
-            }
-            default: return false;
-        }
-    }
+static void fill_perm_(const t_entry *entry, t_str *str) {
+    const bool is_link = (entry->st.st_mode & S_IFMT) == S_IFLNK;
+    const bool is_reg = (entry->st.st_mode & S_IFMT) == S_IFREG;
+    const bool is_dir = (entry->st.st_mode & S_IFMT) == S_IFDIR;
 
-    return true;
+    append_chars_str(str, is_link ? "l" : is_reg ? "-" : is_dir ? "d" : "");
+    append_chars_str(str, entry->st.st_mode & S_IRUSR ? "r" : "-");
+    append_chars_str(str, entry->st.st_mode & S_IWUSR ? "w" : "-");
+    append_chars_str(str, entry->st.st_mode & S_IXUSR ? "x" : "-");
+    append_chars_str(str, entry->st.st_mode & S_IRGRP ? "r" : "-");
+    append_chars_str(str, entry->st.st_mode & S_IWGRP ? "w" : "-");
+    append_chars_str(str, entry->st.st_mode & S_IXGRP ? "x" : "-");
+    append_chars_str(str, entry->st.st_mode & S_IROTH ? "r" : "-");
+    append_chars_str(str, entry->st.st_mode & S_IWOTH ? "w" : "-");
+    append_chars_str(str, entry->st.st_mode & S_IXOTH ? "x" : "-");
+
+    char marker = get_attr_marker_(entry->path->str);
+    if (marker == '+') {
+        append_chars_str(str, "+");
+    } else if (marker == '.') {
+        append_chars_str(str, ".");
+    }
 }
 
 static bool fill_dt_(t_str *new_str, const struct timespec *ctim) {
