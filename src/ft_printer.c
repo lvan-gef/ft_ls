@@ -46,34 +46,27 @@ static void init_print_row_(t_ps *ps) {
                  .max = ps->array->len < max_cols ? ps->array->len : max_cols};
 
     const bool quoted = ps->quote_padding || have_quotes(ps->array);
-    const char *err_msg = NULL;
     char buffer[OUTPUT_BUFFER_CAP];
     t_str out = {.str = buffer, .cap = sizeof(buffer), .len = 0, .pos = 0};
     out.str[0] = '\0';
 
     uint64_t *col_widths = calc_cols_(ps->array, &map, quoted);
     if (!col_widths) {
-        err_msg = "Failed to calc column leng";
         goto done;
     }
 
     if (!put_dir_header(&out, ps->dir_entry)) {
-        err_msg = "Failed to write dir header";
         goto done;
     }
 
-    if (!create_row_(&out, ps->array, &map, col_widths, quoted) ||
-        !flush_str(&out)) {
-        err_msg = "Failed to write output";
+    if (!create_row_(&out, ps->array, &map, col_widths, quoted)) {
+        goto done;
     }
 
 done:
+    flush_str(&out);
     if (col_widths) {
         free(col_widths);
-    }
-
-    if (err_msg) {
-        ft_fprintf(STDERR_FILENO, "%s\n", err_msg);
     }
 }
 

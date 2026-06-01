@@ -50,7 +50,8 @@ t_entry *new_entry(Arena *arena, const t_entry *entry,
     shell_scan_cstr(dp->d_name, &scan);
     ent->name = init_str_arena(arena, scan.len);
     if (!ent->name) {
-        goto failed;
+        arena_pop_to_mark(arena, mark);
+        return NULL;
     }
 
     ft_memcpy(ent->name->str, dp->d_name, scan.len);
@@ -68,9 +69,6 @@ t_entry *new_entry(Arena *arena, const t_entry *entry,
     ent->display_len = scan.display_len;
     ent->padded_display_len = scan.padded_display_len;
     return ent;
-failed:
-    arena_pop_to_mark(arena, mark);
-    return NULL;
 }
 
 bool get_file_info(free_list *fl, t_entry *entry) {

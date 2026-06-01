@@ -62,13 +62,8 @@ void process(t_args *args, t_array *array, int *exit_code) {
     params.args = args;
     fl_init(&params.fl, buffer, sizeof(buffer));
     params.dirs_arena = arena_alloc(ARENA_SIZE);
-    if (!params.dirs_arena) {
-        *exit_code = 2;
-        goto cleanup;
-    }
-
     params.temp_arena = arena_alloc(ARENA_SIZE);
-    if (!params.temp_arena) {
+    if (!params.dirs_arena || !params.temp_arena) {
         *exit_code = 2;
         goto cleanup;
     }
@@ -95,7 +90,7 @@ cleanup:
 static bool run_(t_args *args, t_params *params, t_array *array,
                  int *exit_code) {
     if (!process_args_(params, array, exit_code)) {
-        goto failed;
+        return false;
     }
 
     const bool has_quoted_operands = has_quoted_operands_(array);
@@ -125,7 +120,7 @@ static bool run_(t_args *args, t_params *params, t_array *array,
 
         if (!inserted_files_dirs_gap && printed_files && dir_path->is_operand) {
             if (write(STDOUT_FILENO, "\n", 1) < 0) {
-                goto failed;
+                return false;
             }
             inserted_files_dirs_gap = true;
         }
@@ -137,7 +132,7 @@ static bool run_(t_args *args, t_params *params, t_array *array,
 
         if (printed_dir) {
             if (write(STDOUT_FILENO, "\n", 1) < 0) {
-                goto failed;
+                return false;
             }
         }
 
@@ -155,12 +150,9 @@ static bool run_(t_args *args, t_params *params, t_array *array,
     }
 
     return true;
-failed:
-    return false;
 }
 
 static bool process_args_(t_params *params, t_array *array, int *exit_code) {
-    const char *err_msg = NULL;
     bool ok = false;
     struct stat st;
     unsigned char buffer[FL_DEFAULT_SIZE];
@@ -169,7 +161,6 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
     t_array *dir_entries = init_array(&fl, ARRAY_SIZE);
 
     if (!dir_entries) {
-        err_msg = "Failed to init dir entries";
         goto failed;
     }
 
@@ -188,12 +179,10 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
             set_entry_(&src, str, &st);
             t_entry *dir_entry = queue_dir_entry_(params, &src, true);
             if (!dir_entry) {
-                err_msg = "Failed to alloc dir entry";
                 goto failed;
             }
 
             if (!append_array(dir_entries, dir_entry)) {
-                err_msg = "Failed to append dir entry";
                 goto failed;
             }
             continue;
@@ -201,14 +190,12 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
 
         t_entry *entry = fl_alloc(&params->fl, sizeof(*entry), 8);
         if (!entry) {
-            err_msg = "Failed to alloc entry";
             goto failed;
         }
 
         *entry = (t_entry){0};
         entry->name = dup_str(&params->fl, str);
         if (!entry->name) {
-            err_msg = "Failed to duplicate entry name";
             free_entry(&params->fl, entry);
             goto failed;
         }
@@ -222,14 +209,12 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
         init_entry_display(entry);
         if (params->args->list) {
             if (!get_file_info(&params->fl, entry)) {
-                err_msg = "Failed to get file info";
                 free_entry(&params->fl, entry);
                 goto failed;
             }
         }
 
         if (!append_array(params->files, entry)) {
-            err_msg = "Failed to append file entry";
             free_entry(&params->fl, entry);
             goto failed;
         }
@@ -241,7 +226,6 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
             t_entry *entry = pop_array(dir_entries);
             entry->is_operand = true;
             if (!append_array(params->dirs, entry)) {
-                err_msg = "Failed to append dir";
                 goto failed;
             }
         }
@@ -252,7 +236,6 @@ cleanup:
     fl_free_all(&fl);
     return ok;
 failed:
-    ft_fprintf(STDERR_FILENO, "Error: %s\n", err_msg);
     *exit_code = 2;
     goto cleanup;
 }
@@ -260,7 +243,6 @@ failed:
 static int check_links_(t_params *params, t_str *str, t_array *dir_entries,
                         struct stat *st, int *exit_code) {
     int e = 0;
-    const char *err_msg = NULL;
     if (lstat(str->str, st) == -1) {
         e = errno;
         const char *prefix = "cannot access";
@@ -311,24 +293,16 @@ static int check_links_(t_params *params, t_str *str, t_array *dir_entries,
         set_entry_(&src, str, st_dir);
         t_entry *dir_entry = queue_dir_entry_(params, &src, true);
         if (!dir_entry) {
-            err_msg = "Failed to alloc dir entry";
-            goto failed;
+            return -1;
         }
 
         if (!append_array(dir_entries, dir_entry)) {
-            err_msg = "Failed to append dir entry";
-            goto failed;
+            return -1;
         }
         return 0;
     }
 
     return 1;
-failed:
-    if (err_msg) {
-        ft_fprintf(STDERR_FILENO, "%s\n", err_msg);
-    }
-
-    return -1;
 }
 
 static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
@@ -362,6 +336,7 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
             if (!ensure_entry_path_(params->temp_arena, entry)) {
                 goto cleanup;
             }
+
             if (lstat(entry->path->str, &entry->st) == -1) {
                 *exit_code = 2;
                 continue;
@@ -517,10 +492,11 @@ static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
         goto failed;
     }
 
-    if (src->path == NULL) {
+    if (!src->path) {
         if (!src->parent_path || !entry->name) {
             goto failed;
         }
+
         entry->path =
             join_dir_path_(params->dirs_arena, src->parent_path, entry->name);
     } else if (src->path == src->name) {

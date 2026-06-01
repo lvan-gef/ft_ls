@@ -14,19 +14,11 @@
 
 size_t ft_strlcpy(char *dst, const char *src, size_t dstsize) {
     size_t src_len;
-    size_t index;
 
     src_len = ft_strlen(src);
-    index = 0;
     if (!dstsize)
         return (src_len);
-    while (*src != '\0') {
-        if (index < dstsize - 1) {
-            *dst++ = *src;
-            index++;
-        }
-        src++;
-    }
+    ft_memcpy(dst, src, dstsize);
     *dst = '\0';
     return (src_len);
 }
