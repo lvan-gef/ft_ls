@@ -65,7 +65,6 @@ t_entry *new_entry(Arena *arena, const t_entry *entry,
     ent->is_operand = false;
     ent->info = NULL;
     ent->st = (struct stat){0};
-    ent->is_escaped = false;
     ent->display_len = scan.display_len;
     ent->padded_display_len = scan.padded_display_len;
     return ent;

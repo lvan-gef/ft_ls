@@ -204,7 +204,6 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
         entry->path_has_colon =
             ft_memchr(str->str + str->pos, ':', (size_t)str->len) != NULL;
         entry->st = st;
-        entry->is_escaped = false;
         entry->is_operand = false;
         init_entry_display(entry);
         if (params->args->list) {

@@ -46,14 +46,13 @@ typedef struct {
     t_str *name;
     t_str *path;
     const t_str *parent_path;
+    t_file_info *info;
+    struct stat st;
+    uint64_t display_len;
+    uint64_t padded_display_len;
     char quote;
     bool path_has_colon;
     bool is_operand;
-    t_file_info *info;
-    struct stat st;
-    bool is_escaped;
-    uint64_t display_len;
-    uint64_t padded_display_len;
 } t_entry;
 
 t_entry *new_entry(Arena *arena, const t_entry *entry, const struct dirent *dp);

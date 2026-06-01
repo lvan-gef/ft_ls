@@ -18,9 +18,9 @@ typedef struct {
     t_args *args;
     t_array *array;
     t_entry *dir_entry;
-    bool print_total;
     uint64_t min_len_links;
     uint64_t min_len_sizes;
+    bool print_total;
     bool quote_padding;
 } t_ps;
 

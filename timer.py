@@ -25,11 +25,11 @@ def print_stats(name: str, durations: list[float]):
 
 
 def run():
-    p = '/media/lvan-gef/essd'
+    p = '/media/luuk/essd'
 
     flags = ['R', 'a', 'l', 'r', 't']
     cmd_own = ['./ft_ls', p]
-    cmd_ls = ['ls', '-R', p]
+    cmd_ls = ['ls', p]
     runs = 20
 
     for size in range(1, len(flags) + 1):
