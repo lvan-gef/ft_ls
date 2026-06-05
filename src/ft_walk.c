@@ -38,12 +38,10 @@ static bool walk_recurssive_(t_params *params);
 static bool process_args_(t_params *params, t_array *array, int *exit_code);
 static void clear_temp_dir_(t_params *params);
 static void free_entry_array_(t_params *params, t_array *array);
-static t_str *join_dir_path_(Arena *arena, const t_str *lhs, const t_str *rhs);
-static t_str *join_dir_path_fl_(free_list *fl, const t_str *lhs,
-                                const t_str *rhs);
+static t_str *join_dir_path_(const t_alloc *alloc, const t_str *lhs, const t_str *rhs);
 static void fill_join_dir_path_(t_str *path, const t_str *lhs,
                                 const t_str *rhs);
-static bool ensure_entry_path_(Arena *arena, t_entry *entry);
+static bool ensure_entry_path_(const t_alloc *alloc, t_entry *entry);
 static mode_t mode_from_dtype_(unsigned char dtype);
 static bool entry_needs_lstat_(const t_args *args, unsigned char dtype);
 static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
@@ -169,16 +167,16 @@ static bool run_(t_args *args, t_params *params, t_array *array,
 
 static bool process_args_(t_params *params, t_array *array, int *exit_code) {
     bool ok = false;
-    struct stat st;
     unsigned char buffer[FL_DEFAULT_SIZE];
     free_list fl;
     fl_init(&fl, buffer, sizeof(buffer));
     t_array *dir_entries = init_array(&fl, ARRAY_SIZE);
-
     if (!dir_entries) {
         goto failed;
     }
 
+    struct stat st;
+    const t_alloc alloc = {.kind = ALLOC_FL, .as.fl = &params->fl};
     for (uint64_t index = 0; index < array->len; ++index) {
         t_str *str = array->data[index];
 
@@ -209,7 +207,7 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
         }
 
         *entry = (t_entry){0};
-        entry->name = dup_str(&params->fl, str);
+        entry->name = dup_str(&alloc, str);
         if (!entry->name) {
             free_entry(&params->fl, entry);
             goto failed;
@@ -222,7 +220,7 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
         entry->is_operand = false;
         init_entry_display(entry);
         if (params->args->list) {
-            if (!get_file_info(&params->fl, entry)) {
+            if (!get_file_info(&alloc, entry)) {
                 free_entry(&params->fl, entry);
                 goto failed;
             }
@@ -334,6 +332,7 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
     clear_temp_dir_(params);
     const struct dirent *dp;
 
+    const t_alloc alloc = {.kind = ALLOC_ARENA, .as.arena = params->temp_arena};
     while ((dp = readdir(d)) != NULL) {
         const unsigned char dtype = dp->d_type;
         const bool need_lstat = entry_needs_lstat_(params->args, dtype);
@@ -342,13 +341,13 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
             continue;
         }
 
-        t_entry *entry = new_entry(params->temp_arena, path, dp);
+        t_entry *entry = new_entry(&alloc, path, dp);
         if (!entry) {
             goto cleanup;
         }
 
         if (need_lstat) {
-            if (!ensure_entry_path_(params->temp_arena, entry)) {
+            if (!ensure_entry_path_(&alloc, entry)) {
                 goto cleanup;
             }
 
@@ -361,7 +360,7 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
         }
 
         if (params->args->list) {
-            if (!get_file_info_arena(params->temp_arena, entry)) {
+            if (!get_file_info(&alloc, entry)) {
                 goto cleanup;
             }
         }
@@ -396,24 +395,10 @@ static void free_entry_array_(t_params *params, t_array *array) {
     }
 }
 
-static t_str *join_dir_path_(Arena *arena, const t_str *lhs, const t_str *rhs) {
+static t_str *join_dir_path_(const t_alloc *alloc, const t_str *lhs, const t_str *rhs) {
     const bool need_slash = lhs->len == 0 || lhs->str[lhs->len - 1] != '/';
     const uint64_t total_len = lhs->len + rhs->len + (need_slash ? 1U : 0U);
-    t_str *path = init_str_arena(arena, total_len);
-
-    if (!path) {
-        return NULL;
-    }
-
-    fill_join_dir_path_(path, lhs, rhs);
-    return path;
-}
-
-static t_str *join_dir_path_fl_(free_list *fl, const t_str *lhs,
-                                const t_str *rhs) {
-    const bool need_slash = lhs->len == 0 || lhs->str[lhs->len - 1] != '/';
-    const uint64_t total_len = lhs->len + rhs->len + (need_slash ? 1U : 0U);
-    t_str *path = init_str(fl, total_len);
+    t_str *path = init_str(alloc, total_len);
 
     if (!path) {
         return NULL;
@@ -438,7 +423,7 @@ static void fill_join_dir_path_(t_str *path, const t_str *lhs,
     path->str[path->len] = '\0';
 }
 
-static bool ensure_entry_path_(Arena *arena, t_entry *entry) {
+static bool ensure_entry_path_(const t_alloc *alloc, t_entry *entry) {
     if (entry->path) {
         return true;
     }
@@ -447,7 +432,7 @@ static bool ensure_entry_path_(Arena *arena, t_entry *entry) {
         return false;
     }
 
-    entry->path = join_dir_path_(arena, entry->parent_path, entry->name);
+    entry->path = join_dir_path_(alloc, entry->parent_path, entry->name);
     return entry->path != NULL;
 }
 
@@ -506,7 +491,8 @@ static bool walk_recurssive_(t_params *params) {
 
 static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
                                  bool is_operand) {
-    t_entry *entry = fl_alloc(&params->fl, sizeof(*entry), 8);
+    const t_alloc alloc = {.kind = ALLOC_FL, .as.fl = &params->fl};
+    t_entry *entry = fl_alloc(alloc.as.fl, sizeof(*entry), 8);
     if (!entry) {
         return NULL;
     }
@@ -517,10 +503,9 @@ static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
             goto failed;
         }
 
-        entry->path =
-            join_dir_path_fl_(&params->fl, src->parent_path, src->name);
+        entry->path = join_dir_path_(&alloc, src->parent_path, src->name);
     } else {
-        entry->path = dup_str(&params->fl, src->path);
+        entry->path = dup_str(&alloc, src->path);
     }
 
     if (!entry->path) {
@@ -533,7 +518,7 @@ static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
     entry->is_operand = is_operand;
     return entry;
 failed:
-    free_entry(&params->fl, entry);
+    free_entry(alloc.as.fl, entry);
     return NULL;
 }
 

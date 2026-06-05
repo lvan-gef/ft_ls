@@ -17,7 +17,7 @@ static int cmp_name_entry_(const t_entry *a, const t_entry *b);
 static int cmp_name_entry_rev_(const t_entry *a, const t_entry *b);
 static int cmp_time_entry_(const t_entry *a, const t_entry *b);
 static int cmp_time_entry_rev_(const t_entry *a, const t_entry *b);
-static const t_str *entry_name_(const t_entry *entry);
+static t_str *entry_name_(const t_entry *entry);
 static int compare_(const t_str *lhs, const t_str *rhs);
 static int compare_time_(const struct timespec *a, const struct timespec *b);
 
@@ -130,7 +130,7 @@ static int cmp_time_entry_rev_(const t_entry *a, const t_entry *b) {
     return cmp_time_entry_(b, a);
 }
 
-static const t_str *entry_name_(const t_entry *entry) {
+static t_str *entry_name_(const t_entry *entry) {
     return entry->name ? entry->name : entry->path;
 }
 

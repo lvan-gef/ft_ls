@@ -17,43 +17,66 @@
 
 #include "../libft/include/libft.h"
 
-static t_str *get_perm_(free_list *fl, const t_entry *entry);
-static t_str *get_perm_arena_(Arena *arena, const t_entry *entry);
-static t_str *get_user_(free_list *fl, uid_t user_id);
-static t_str *get_user_arena_(Arena *arena, uid_t user_id);
-static t_str *get_group_(free_list *fl, gid_t group_id);
-static t_str *get_group_arena_(Arena *arena, gid_t group_id);
-static t_str *get_dt_(free_list *fl, const struct timespec *ctim);
-static t_str *get_dt_arena_(Arena *arena, const struct timespec *ctim);
-static t_str *get_symlink_(free_list *fl, const t_entry *entry);
-static t_str *get_symlink_arena_(Arena *arena, const t_entry *entry);
+#ifndef CACHE_SIZE
+#define CACHE_SIZE UINT64_C(8)
+#endif
+
+typedef struct s_user {
+    char name[LOGIN_NAME_MAX];
+    uid_t user_id;
+} t_user;
+
+typedef struct s_group {
+    char name[LOGIN_NAME_MAX];
+    gid_t group_id;
+} t_group;
+
+static bool fill_file_info_(const t_alloc *alloc, t_file_info *info,
+                            const t_entry *entry);
+static t_str *get_perm_(const t_alloc *alloc, const t_entry *entry);
+static t_str *get_user_(const t_alloc *alloc, uid_t user_id);
+static t_str *get_group_(const t_alloc *alloc, gid_t group_id);
+static t_str *get_dt_(const t_alloc *alloc, const struct timespec *ctim);
+static t_str *get_symlink_(const t_alloc *alloc, const t_entry *entry);
 static void free_info_(free_list *fl, t_file_info *info);
 static void fill_perm_(const t_entry *entry, t_str *str);
 static bool fill_dt_(t_str *new_str, const struct timespec *ctim);
 static bool read_symlink_(const t_entry *entry, t_str *new_str, uint64_t cap);
-static char get_attr_marker_(free_list *fl, const char *path);
-static char get_attr_marker_arena_(Arena *arena, const char *path);
+static char get_attr_marker_(const t_alloc *alloc, const char *path);
 static char fill_attr_marker_(const char *path, char *buf, size_t p_len);
+static char *user_cached(uid_t user_id);
+static void add_user_cache_(uid_t user_id, const char *username);
+static char *group_cached(gid_t group_id);
+static void add_group_cache_(gid_t group_id, const char *groupname);
 
-static uid_t cached_uid = (uid_t)-1;
-static gid_t cached_gid = (gid_t)-1;
-static char cached_user[LOGIN_NAME_MAX] = "";
-static char cached_group[LOGIN_NAME_MAX] = "";
+static uint64_t user_index = 0;
+static t_user user_cache[CACHE_SIZE] = {0};
 
-t_entry *new_entry(Arena *arena, const t_entry *entry,
+static uint64_t group_index = 0;
+static t_group group_cache[CACHE_SIZE] = {0};
+
+t_entry *new_entry(const t_alloc *alloc, const t_entry *entry,
                    const struct dirent *dp) {
-    t_shell_scan scan;
-    Arena_Mark mark = arena_get_mark(arena);
-    t_entry *ent = arena_push(arena, sizeof(*ent));
+    Arena_Mark mark;
+    t_entry *ent;
+
+    switch (alloc->kind) {
+        case ALLOC_FL: ent = fl_alloc(alloc->as.fl, sizeof(*ent), 8); break;
+        case ALLOC_ARENA:
+            mark = arena_get_mark(alloc->as.arena);
+            ent = arena_push(alloc->as.arena, sizeof(*ent));
+            break;
+    }
+
     if (!ent) {
         return NULL;
     }
 
+    t_shell_scan scan;
     shell_scan_cstr(dp->d_name, &scan);
-    ent->name = init_str_arena(arena, scan.len);
+    ent->name = init_str(alloc, scan.len);
     if (!ent->name) {
-        arena_pop_to_mark(arena, mark);
-        return NULL;
+        goto failed;
     }
 
     ft_memcpy(ent->name->str, dp->d_name, scan.len);
@@ -70,111 +93,43 @@ t_entry *new_entry(Arena *arena, const t_entry *entry,
     ent->display_len = scan.display_len;
     ent->padded_display_len = scan.padded_display_len;
     return ent;
+failed:
+    if (ent) {
+        switch (alloc->kind) {
+            case ALLOC_FL: fl_free(alloc->as.fl, ent); break;
+            case ALLOC_ARENA: arena_pop_to_mark(alloc->as.arena, mark); break;
+        }
+    }
+    return NULL;
 }
 
-bool get_file_info(free_list *fl, t_entry *entry) {
-    t_file_info *info = fl_alloc(fl, sizeof(*info), 8);
-    if (!info) {
-        goto failed;
+bool get_file_info(const t_alloc *alloc, t_entry *entry) {
+    t_file_info *info;
+    Arena_Mark mark;
+    switch (alloc->kind) {
+        case ALLOC_FL: info = fl_alloc(alloc->as.fl, sizeof(*info), 8); break;
+        case ALLOC_ARENA:
+            mark = arena_get_mark(alloc->as.arena);
+            info = arena_push(alloc->as.arena, sizeof(*info));
+            break;
     }
 
     *info = (t_file_info){0};
-
-    info->perm = get_perm_(fl, entry);
-    if (!info->perm) {
+    if (!fill_file_info_(alloc, info, entry)) {
         goto failed;
     }
-
-    info->links = uint_to_str(fl, entry->st.st_nlink);
-    if (!info->links) {
-        goto failed;
-    }
-
-    info->username = get_user_(fl, entry->st.st_uid);
-    if (!info->username) {
-        goto failed;
-    }
-
-    info->groupname = get_group_(fl, entry->st.st_gid);
-    if (!info->groupname) {
-        goto failed;
-    }
-
-    info->size = uint_to_str(fl, (uint64_t)entry->st.st_size);
-    if (!info->size) {
-        goto failed;
-    }
-
-    info->dt = get_dt_(fl, &entry->st.st_mtim);
-    if (!info->dt) {
-        goto failed;
-    }
-
-    info->symlink = get_symlink_(fl, entry);
-    if (!info->symlink) {
-        goto failed;
-    }
-
-    info->blocks = (uint64_t)entry->st.st_blocks;
 
     entry->info = info;
     return true;
+
 failed:
     if (info) {
-        free_info_(fl, info);
+        switch (alloc->kind) {
+            case ALLOC_FL: free_info_(alloc->as.fl, info); break;
+            case ALLOC_ARENA: arena_pop_to_mark(alloc->as.arena, mark); break;
+        }
     }
 
-    entry->info = NULL;
-    return false;
-}
-
-bool get_file_info_arena(Arena *arena, t_entry *entry) {
-    Arena_Mark mark = arena_get_mark(arena);
-    t_file_info *info = arena_push(arena, sizeof(*info));
-    if (!info) {
-        goto failed;
-    }
-
-    info->perm = get_perm_arena_(arena, entry);
-    if (!info->perm) {
-        goto failed;
-    }
-
-    info->links = uint_to_str_arena(arena, entry->st.st_nlink);
-    if (!info->links) {
-        goto failed;
-    }
-
-    info->username = get_user_arena_(arena, entry->st.st_uid);
-    if (!info->username) {
-        goto failed;
-    }
-
-    info->groupname = get_group_arena_(arena, entry->st.st_gid);
-    if (!info->groupname) {
-        goto failed;
-    }
-
-    info->size = uint_to_str_arena(arena, (uint64_t)entry->st.st_size);
-    if (!info->size) {
-        goto failed;
-    }
-
-    info->dt = get_dt_arena_(arena, &entry->st.st_mtim);
-    if (!info->dt) {
-        goto failed;
-    }
-
-    info->symlink = get_symlink_arena_(arena, entry);
-    if (!info->symlink) {
-        goto failed;
-    }
-
-    info->blocks = (uint64_t)entry->st.st_blocks;
-    entry->info = info;
-    return true;
-failed:
-    arena_pop_to_mark(arena, mark);
     entry->info = NULL;
     return false;
 }
@@ -208,30 +163,55 @@ void free_entry(free_list *fl, t_entry *entry) {
     fl_free(fl, entry);
 }
 
-static t_str *get_perm_(free_list *fl, const t_entry *entry) {
-    t_str *str = init_str(fl, PERMISSION_SIZE);
+static bool fill_file_info_(const t_alloc *alloc, t_file_info *info,
+                            const t_entry *entry) {
+    info->perm = get_perm_(alloc, entry);
+    if (!info->perm) {
+        return false;
+    }
+
+    info->links = uint_to_str(alloc, entry->st.st_nlink);
+    if (!info->links) {
+        return false;
+    }
+
+    info->username = get_user_(alloc, entry->st.st_uid);
+    if (!info->username) {
+        return false;
+    }
+
+    info->groupname = get_group_(alloc, entry->st.st_gid);
+    if (!info->groupname) {
+        return false;
+    }
+
+    info->size = uint_to_str(alloc, (uint64_t)entry->st.st_size);
+    if (!info->size) {
+        return false;
+    }
+
+    info->dt = get_dt_(alloc, &entry->st.st_mtim);
+    if (!info->dt) {
+        return false;
+    }
+
+    info->symlink = get_symlink_(alloc, entry);
+    if (!info->symlink) {
+        return false;
+    }
+
+    info->blocks = (uint64_t)entry->st.st_blocks;
+    return true;
+}
+
+static t_str *get_perm_(const t_alloc *alloc, const t_entry *entry) {
+    t_str *str = init_str(alloc, PERMISSION_SIZE);
     if (!str) {
         return NULL;
     }
 
     fill_perm_(entry, str);
-    char marker = get_attr_marker_(fl, entry->path->str);
-    if (marker == '+' || marker == '.') {
-        str->str[str->len++] = marker;
-    }
-    str->str[str->len] = '\0';
-
-    return str;
-}
-
-static t_str *get_perm_arena_(Arena *arena, const t_entry *entry) {
-    t_str *str = init_str_arena(arena, PERMISSION_SIZE);
-    if (!str) {
-        return NULL;
-    }
-
-    fill_perm_(entry, str);
-    char marker = get_attr_marker_arena_(arena, entry->path->str);
+    char marker = get_attr_marker_(alloc, entry->path->str);
     if (marker == '+' || marker == '.') {
         str->str[str->len++] = marker;
     }
@@ -239,180 +219,96 @@ static t_str *get_perm_arena_(Arena *arena, const t_entry *entry) {
     return str;
 }
 
-static t_str *get_user_(free_list *fl, uid_t user_id) {
-    if (user_id == cached_uid) {
-        return create_str(fl, cached_user);
+static t_str *get_user_(const t_alloc *alloc, uid_t user_id) {
+    char *user_name = user_cached(user_id);
+    if (user_name) {
+        return create_str(alloc, user_name);
     }
 
     const struct passwd *pwd = getpwuid(user_id);
     t_str *new_str = NULL;
     if (pwd) {
-        new_str = create_str(fl, pwd->pw_name);
+        new_str = create_str(alloc, pwd->pw_name);
         if (!new_str) {
             return NULL;
         }
-
-        ft_strlcpy(cached_user, pwd->pw_name, sizeof(cached_user));
+        add_user_cache_(user_id, pwd->pw_name);
     } else {
-        new_str = uint_to_str(fl, user_id);
+        new_str = uint_to_str(alloc, (uint64_t)user_id);
         if (!new_str) {
             return NULL;
         }
-
-        ft_strlcpy(cached_user, new_str->str, sizeof(cached_user));
+        add_user_cache_(user_id, new_str->str);
     }
-
-    cached_uid = user_id;
     return new_str;
 }
 
-static t_str *get_user_arena_(Arena *arena, uid_t user_id) {
-    if (user_id == cached_uid) {
-        return create_str_arena(arena, cached_user);
-    }
-
-    const struct passwd *pwd = getpwuid(user_id);
-    t_str *new_str = NULL;
-    if (pwd) {
-        new_str = create_str_arena(arena, pwd->pw_name);
-        if (!new_str) {
-            return NULL;
-        }
-
-        ft_strlcpy(cached_user, pwd->pw_name, sizeof(cached_user));
-    } else {
-        new_str = uint_to_str_arena(arena, user_id);
-        if (!new_str) {
-            return NULL;
-        }
-
-        ft_strlcpy(cached_user, new_str->str, sizeof(cached_user));
-    }
-
-    cached_uid = user_id;
-    return new_str;
-}
-
-static t_str *get_group_(free_list *fl, gid_t group_id) {
-    if (group_id == cached_gid) {
-        return create_str(fl, cached_group);
+static t_str *get_group_(const t_alloc *alloc, gid_t group_id) {
+    char *group_name = group_cached(group_id);
+    if (group_name) {
+        return create_str(alloc, group_name);
     }
 
     const struct group *grp = getgrgid(group_id);
     t_str *new_str = NULL;
     if (grp) {
-        new_str = create_str(fl, grp->gr_name);
+        new_str = create_str(alloc, grp->gr_name);
         if (!new_str) {
             return NULL;
         }
 
-        ft_strlcpy(cached_group, grp->gr_name, sizeof(cached_group));
+        add_group_cache_(group_id, grp->gr_name);
     } else {
-        new_str = uint_to_str(fl, group_id);
+        new_str = uint_to_str(alloc, (uint64_t)group_id);
         if (!new_str) {
             return NULL;
         }
 
-        ft_strlcpy(cached_group, new_str->str, sizeof(cached_group));
+        add_group_cache_(group_id, new_str->str);
     }
-
-    cached_gid = group_id;
     return new_str;
 }
 
-static t_str *get_group_arena_(Arena *arena, gid_t group_id) {
-    if (group_id == cached_gid) {
-        return create_str_arena(arena, cached_group);
+static t_str *get_dt_(const t_alloc *alloc, const struct timespec *ctim) {
+    Arena_Mark mark;
+    t_str *new_str;
+
+    if (alloc->kind == ALLOC_ARENA) {
+        mark = arena_get_mark(alloc->as.arena);
     }
 
-    const struct group *grp = getgrgid(group_id);
-    t_str *new_str = NULL;
-    if (grp) {
-        new_str = create_str_arena(arena, grp->gr_name);
-        if (!new_str) {
-            return NULL;
-        }
-
-        ft_strlcpy(cached_group, grp->gr_name, sizeof(cached_group));
-    } else {
-        new_str = uint_to_str_arena(arena, group_id);
-        if (!new_str) {
-            return NULL;
-        }
-
-        ft_strlcpy(cached_group, new_str->str, sizeof(cached_group));
-    }
-
-    cached_gid = group_id;
-    return new_str;
-}
-
-static t_str *get_dt_(free_list *fl, const struct timespec *ctim) {
-    t_str *new_str = init_str(fl, DT_LEN);
+    new_str = init_str(alloc, DT_LEN);
     if (!new_str) {
         return NULL;
     }
 
     if (!fill_dt_(new_str, ctim)) {
-        fl_free(fl, new_str);
+        if (alloc->kind == ALLOC_ARENA) {
+            arena_pop_to_mark(alloc->as.arena, mark);
+        } else {
+            free_str(alloc->as.fl, new_str);
+        }
         return NULL;
     }
 
     return new_str;
 }
 
-static t_str *get_dt_arena_(Arena *arena, const struct timespec *ctim) {
-    Arena_Mark mark = arena_get_mark(arena);
-    t_str *new_str = init_str_arena(arena, DT_LEN);
-    if (!new_str) {
-        return NULL;
-    }
+static t_str *get_symlink_(const t_alloc *alloc, const t_entry *entry) {
+    Arena_Mark mark;
+    uint64_t cap;
 
-    if (!fill_dt_(new_str, ctim)) {
-        arena_pop_to_mark(arena, mark);
-        return NULL;
-    }
-    return new_str;
-}
-
-static t_str *get_symlink_(free_list *fl, const t_entry *entry) {
     if (!S_ISLNK(entry->st.st_mode)) {
-        return init_str(fl, 1);
+        return init_str(alloc, 1);
     }
 
-    uint64_t cap = (entry->st.st_size > 0) ? (uint64_t)entry->st.st_size + 1
-                                           : (uint64_t)PATH_MAX;
+    if (alloc->kind == ALLOC_ARENA) {
+        mark = arena_get_mark(alloc->as.arena);
+    }
+    cap = (entry->st.st_size > 0) ? (uint64_t)entry->st.st_size + 1
+                                  : (uint64_t)PATH_MAX;
     while (true) {
-        t_str *new_str = init_str(fl, cap);
-        if (!new_str) {
-            break;
-        }
-
-        if (!read_symlink_(entry, new_str, cap)) {
-            return new_str;
-        }
-
-        free_str(fl, new_str);
-        if (cap > UINT64_MAX / 2) {
-            return NULL;
-        }
-
-        cap *= 2;
-    }
-
-    return NULL;
-}
-
-static t_str *get_symlink_arena_(Arena *arena, const t_entry *entry) {
-    if (!S_ISLNK(entry->st.st_mode)) {
-        return init_str_arena(arena, 1);
-    }
-
-    Arena_Mark mark = arena_get_mark(arena);
-    uint64_t cap = (entry->st.st_size > 0) ? (uint64_t)entry->st.st_size + 1
-                                           : (uint64_t)PATH_MAX;
-    while (true) {
-        t_str *new_str = init_str_arena(arena, cap);
+        t_str *new_str = init_str(alloc, cap);
         if (!new_str) {
             return NULL;
         }
@@ -421,7 +317,12 @@ static t_str *get_symlink_arena_(Arena *arena, const t_entry *entry) {
             return new_str;
         }
 
-        arena_pop_to_mark(arena, mark);
+        if (alloc->kind == ALLOC_ARENA) {
+            arena_pop_to_mark(alloc->as.arena, mark);
+        } else {
+            free_str(alloc->as.fl, new_str);
+        }
+
         if (cap > UINT64_MAX / 2) {
             return NULL;
         }
@@ -485,37 +386,33 @@ static void fill_perm_(const t_entry *entry, t_str *str) {
     str->len = index;
 }
 
-static char get_attr_marker_(free_list *fl, const char *path) {
+static char get_attr_marker_(const t_alloc *alloc, const char *path) {
     ssize_t len = listxattr(path, NULL, 0);
     if (len <= 0) {
         return '\0';
     }
 
-    char *buf = fl_alloc(fl, (size_t)len, 8);
+    char *buf;
+    Arena_Mark mark;
+    if (alloc->kind == ALLOC_ARENA) {
+        mark = arena_get_mark(alloc->as.arena);
+        buf = arena_push(alloc->as.arena, (size_t)len);
+    } else {
+        buf = fl_alloc(alloc->as.fl, (size_t)len, 8);
+    }
+
     if (!buf) {
         return '\0';
     }
 
-    char lttr = fill_attr_marker_(path, buf, (size_t)len);
-    fl_free(fl, buf);
-    return lttr;
-}
-
-static char get_attr_marker_arena_(Arena *arena, const char *path) {
-    ssize_t len = listxattr(path, NULL, 0);
-    if (len <= 0) {
-        return '\0';
+    char marker = fill_attr_marker_(path, buf, (size_t)len);
+    if (alloc->kind == ALLOC_ARENA) {
+        arena_pop_to_mark(alloc->as.arena, mark);
+    } else {
+        fl_free(alloc->as.fl, buf);
     }
 
-    Arena_Mark marker = arena_get_mark(arena);
-    char *buf = arena_push(arena, (size_t)len);
-    if (!buf) {
-        return '\0';
-    }
-
-    char lttr = fill_attr_marker_(path, buf, (size_t)len);
-    arena_pop_to_mark(arena, marker);
-    return lttr;
+    return marker;
 }
 
 static char fill_attr_marker_(const char *path, char *buf, size_t p_len) {
@@ -527,11 +424,11 @@ static char fill_attr_marker_(const char *path, char *buf, size_t p_len) {
     bool has_selinux = false;
     const char *end = buf + len;
     for (char *name = buf; name < end; name += strlen(name) + 1) {
-        if (strcmp(name, "system.posix_acl_access") == 0) {
+        if (ft_strncmp(name, "system.posix_acl_access", 24) == 0) {
             return '+';
         }
 
-        if (strcmp(name, "security.selinux") == 0) {
+        if (ft_strncmp(name, "security.selinux", 17) == 0) {
             has_selinux = true;
         }
     }
@@ -572,4 +469,50 @@ static bool read_symlink_(const t_entry *entry, t_str *new_str, uint64_t cap) {
     }
 
     return true;
+}
+
+static char *user_cached(uid_t user_id) {
+    for (uint64_t index = 0; index < CACHE_SIZE; ++index) {
+        if (!*user_cache[index].name) {
+            return NULL;
+        }
+
+        if (user_id == user_cache[index].user_id) {
+            return user_cache[index].name;
+        }
+    }
+
+    return NULL;
+}
+
+static void add_user_cache_(uid_t user_id, const char *username) {
+    user_cache[user_index].user_id = user_id;
+    ft_strlcpy(user_cache[user_index].name, username, LOGIN_NAME_MAX);
+    ++user_index;
+    if (user_index >= CACHE_SIZE) {
+        user_index = 0;
+    }
+}
+
+static char *group_cached(gid_t group_id) {
+    for (uint64_t index = 0; index < CACHE_SIZE; ++index) {
+        if (!*group_cache[index].name) {
+            return NULL;
+        }
+
+        if (group_id == group_cache[index].group_id) {
+            return group_cache[index].name;
+        }
+    }
+
+    return NULL;
+}
+
+static void add_group_cache_(gid_t group_id, const char *groupname) {
+    group_cache[group_index].group_id = group_id;
+    ft_strlcpy(group_cache[group_index].name, groupname, LOGIN_NAME_MAX);
+    ++group_index;
+    if (group_index >= CACHE_SIZE) {
+        group_index = 0;
+    }
 }

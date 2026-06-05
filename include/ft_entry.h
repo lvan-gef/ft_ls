@@ -9,7 +9,7 @@
 #include <sys/stat.h>
 
 #include "./ft_str.h"
-#include "ft_free_list.h"
+#include "./ft_free_list.h"
 
 #ifndef LOGIN_NAME_MAX
 #define LOGIN_NAME_MAX INT64_C(256)
@@ -55,9 +55,8 @@ typedef struct {
     bool is_operand;
 } t_entry;
 
-t_entry *new_entry(Arena *arena, const t_entry *entry, const struct dirent *dp);
-bool get_file_info(free_list *fl, t_entry *entry);
-bool get_file_info_arena(Arena *arena, t_entry *entry);
+t_entry *new_entry(const t_alloc *alloc, const t_entry *entry, const struct dirent *dp);
+bool get_file_info(const t_alloc *alloc, t_entry *entry);
 void init_entry_display(t_entry *entry);
 void free_entry(free_list *fl, t_entry *entry);
 

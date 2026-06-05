@@ -76,7 +76,9 @@ bool escaped_out(t_str *dst, const t_str *str, char quote, bool pad_unquoted) {
 t_str *shell_escape_str(free_list *fl, const t_str *str, char quote) {
     const uint64_t escaped_len =
         shell_display_len_(str->str, str->len, quote, false);
-    t_str *new_str = init_str(fl, escaped_len);
+
+    const t_alloc alloc = {.kind = ALLOC_FL, .as.fl = fl};
+    t_str *new_str = init_str(&alloc, escaped_len);
 
     if (!new_str) {
         return NULL;
