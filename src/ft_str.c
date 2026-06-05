@@ -14,7 +14,7 @@ t_str *init_str(const t_alloc *alloc, uint64_t cap) {
         return NULL;
     }
 
-    t_str *str;
+    t_str *str = NULL;
     switch (alloc->kind) {
         case ALLOC_ARENA:
             str = arena_push(alloc->as.arena, sizeof(*str) + cap + 1);

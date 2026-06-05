@@ -8,8 +8,8 @@
 #include <stdint.h>
 #include <sys/stat.h>
 
-#include "./ft_str.h"
 #include "./ft_free_list.h"
+#include "./ft_str.h"
 
 #ifndef LOGIN_NAME_MAX
 #define LOGIN_NAME_MAX INT64_C(256)
@@ -45,6 +45,7 @@ typedef struct {
 typedef struct {
     t_str *name;
     t_str *path;
+    t_str *symlink;
     const t_str *parent_path;
     t_file_info *info;
     struct stat st;
@@ -53,9 +54,11 @@ typedef struct {
     char quote;
     bool path_has_colon;
     bool is_operand;
+    bool symlink_ready;
 } t_entry;
 
-t_entry *new_entry(const t_alloc *alloc, const t_entry *entry, const struct dirent *dp);
+t_entry *new_entry(const t_alloc *alloc, const t_entry *entry,
+                   const struct dirent *dp);
 bool get_file_info(const t_alloc *alloc, t_entry *entry);
 void init_entry_display(t_entry *entry);
 void free_entry(free_list *fl, t_entry *entry);

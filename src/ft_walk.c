@@ -46,12 +46,14 @@ static bool entry_needs_lstat_(const t_args *args, unsigned char dtype);
 static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
                                  bool is_operand);
 static int check_links_(t_params *params, t_str *str, t_array *dir_entries,
-                        struct stat *st, int *exit_code);
+                        struct stat *st, t_str **symlink, int *exit_code);
 static bool has_quoted_operands_(const t_array *array);
 static void clean_up_(t_params *params);
 static void print_err_(free_list *fl, t_str *str, int e, const char *prefix);
 static void set_entry_(t_entry *entry, t_str *str, const struct stat *st);
 static void fill_dir_entry_display_(t_entry *entry, const t_entry *src);
+static t_str *read_symlink_(const t_alloc *alloc, const t_str *path,
+                            uint64_t target_size, int *read_err);
 
 typedef enum { SINGLE_QUOTE = '\'', DOUBLE_QUOTE = '\"', SPACE = ' ' } t_quote;
 
@@ -178,9 +180,14 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
     const t_alloc alloc = {.kind = ALLOC_FL, .as.fl = &params->fl};
     for (uint64_t index = 0; index < array->len; ++index) {
         t_str *str = array->data[index];
+        t_str *symlink = NULL;
 
-        int state = check_links_(params, str, dir_entries, &st, exit_code);
+        int state =
+            check_links_(params, str, dir_entries, &st, &symlink, exit_code);
         if (state == 0) {
+            if (symlink) {
+                free_str(&params->fl, symlink);
+            }
             continue;
         } else if (state < 0) {
             goto failed;
@@ -216,6 +223,8 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
         entry->path_has_colon =
             ft_memchr(str->str + str->pos, ':', (size_t)str->len) != NULL;
         entry->st = st;
+        entry->symlink = symlink;
+        entry->symlink_ready = symlink != NULL;
         entry->is_operand = false;
         init_entry_display(entry);
         if (params->args->list) {
@@ -253,8 +262,10 @@ failed:
 }
 
 static int check_links_(t_params *params, t_str *str, t_array *dir_entries,
-                        struct stat *st, int *exit_code) {
+                        struct stat *st, t_str **symlink, int *exit_code) {
     int e;
+
+    *symlink = NULL;
     if (lstat(str->str, st) == -1) {
         e = errno;
         const char *prefix = "cannot access";
@@ -279,25 +290,26 @@ static int check_links_(t_params *params, t_str *str, t_array *dir_entries,
     struct stat *st_dir = st;
     struct stat st_target;
     if (S_ISLNK(st->st_mode)) {
+        const t_alloc alloc = {.kind = ALLOC_FL, .as.fl = &params->fl};
         if (stat(str->str, &st_target) == 0 && S_ISDIR(st_target.st_mode)) {
             is_dir_operand = true;
             st_dir = &st_target;
         }
 
-        Arena_Mark arena_mark = arena_get_mark(params->temp_arena);
-        char *buf = arena_push(params->temp_arena, str->len + 1);
-        if (readlink(str->str, buf, str->len) < 0) {
-            e = errno;
+        *symlink = read_symlink_(&alloc, str, (uint64_t)st->st_size, &e);
+        if (!*symlink) {
+            return -1;
+        }
+
+        if (e != 0) {
             *exit_code = 2;
             if (params->args->list) {
                 print_err_(&params->fl, str, e, "cannot read symbolic link");
             } else {
                 print_err_(&params->fl, str, e, "cannot access");
-                arena_pop_to_mark(params->temp_arena, arena_mark);
                 return 0;
             }
         }
-        arena_pop_to_mark(params->temp_arena, arena_mark);
     }
 
     if (is_dir_operand && !params->args->list) {
@@ -353,6 +365,16 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
             if (lstat(entry->path->str, &entry->st) == -1) {
                 *exit_code = 2;
                 continue;
+            }
+
+            if (params->args->list && S_ISLNK(entry->st.st_mode)) {
+                entry->symlink = read_symlink_(
+                    &alloc, entry->path, (uint64_t)entry->st.st_size, NULL);
+                if (!entry->symlink) {
+                    goto cleanup;
+                }
+
+                entry->symlink_ready = true;
             }
         } else {
             entry->st.st_mode = mode_from_dtype_(dtype);
@@ -463,10 +485,6 @@ static bool walk_recurssive_(t_params *params) {
 
             if (ft_strncmp(entry->name->str, ".", entry->name->len) == 0 ||
                 ft_strncmp(entry->name->str, "..", entry->name->len) == 0) {
-                // if (entry->name->str[0] == '.' &&
-                //     (entry->name->str[1] == '\0' ||
-                //      (entry->name->str[1] == '.' && entry->name->str[2] ==
-                //      '\0'))) {
                 continue;
             }
 
@@ -584,5 +602,65 @@ static void fill_dir_entry_display_(t_entry *entry, const t_entry *src) {
         entry->quote = '\'';
         entry->display_len = entry->path->len + 2;
         entry->padded_display_len = entry->display_len;
+    }
+}
+
+static t_str *read_symlink_(const t_alloc *alloc, const t_str *path,
+                     uint64_t target_size, int *read_err) {
+    Arena_Mark mark;
+
+    if (read_err) {
+        *read_err = 0;
+    }
+
+    if (alloc->kind == ALLOC_ARENA) {
+        mark = arena_get_mark(alloc->as.arena);
+    }
+
+    uint64_t cap = (target_size > 0) ? target_size + 1 : (uint64_t)PATH_MAX;
+    while (true) {
+        t_str *new_str = init_str(alloc, cap);
+        if (!new_str) {
+            return NULL;
+        }
+
+        const size_t read_size = (cap > (size_t)-1) ? (size_t)-1 : (size_t)cap;
+        ssize_t len = readlink(path->str, new_str->str, read_size);
+        if (len < 0) {
+            const int err = errno;
+            switch (alloc->kind) {
+                case ALLOC_ARENA:
+                    arena_pop_to_mark(alloc->as.arena, mark);
+                    break;
+                case ALLOC_FL: free_str(alloc->as.fl, new_str); break;
+            }
+
+            if (err == ENOENT || err == EINVAL || err == EACCES ||
+                err == EPERM) {
+                if (read_err) {
+                    *read_err = err;
+                }
+                return init_str(alloc, 1);
+            }
+
+            return NULL;
+        }
+
+        if ((uint64_t)len < cap) {
+            new_str->len = len < 0 ? 0 : (uint64_t)len;
+            new_str->str[new_str->len] = '\0';
+            return new_str;
+        }
+
+        switch (alloc->kind) {
+            case ALLOC_ARENA: arena_pop_to_mark(alloc->as.arena, mark); break;
+            case ALLOC_FL: free_str(alloc->as.fl, new_str); break;
+        }
+
+        if (cap > 0x3FFFFFFFFFFFFFFF) {
+            return NULL;
+        }
+
+        cap *= 2;
     }
 }

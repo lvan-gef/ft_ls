@@ -55,7 +55,7 @@ static void add_group_cache_(gid_t group_id, const char *groupname);
 t_entry *new_entry(const t_alloc *alloc, const t_entry *entry,
                    const struct dirent *dp) {
     Arena_Mark mark;
-    t_entry *ent;
+    t_entry *ent = NULL;
 
     switch (alloc->kind) {
         case ALLOC_ARENA:
@@ -80,11 +80,13 @@ t_entry *new_entry(const t_alloc *alloc, const t_entry *entry,
     ent->name->len = scan.len;
     ent->name->str[ent->name->len] = '\0';
     ent->path = NULL;
+    ent->symlink = NULL;
     ent->parent_path = entry->path;
     ent->quote = scan.quote;
     ent->path_has_colon = entry->path_has_colon ||
                           ft_memchr(dp->d_name, ':', (size_t)scan.len) != NULL;
     ent->is_operand = false;
+    ent->symlink_ready = false;
     ent->info = NULL;
     ent->st = (struct stat){0};
     ent->display_len = scan.display_len;
@@ -101,7 +103,7 @@ failed:
 }
 
 bool get_file_info(const t_alloc *alloc, t_entry *entry) {
-    t_file_info *info;
+    t_file_info *info = NULL;
     Arena_Mark mark;
     switch (alloc->kind) {
         case ALLOC_ARENA:
@@ -111,7 +113,12 @@ bool get_file_info(const t_alloc *alloc, t_entry *entry) {
         case ALLOC_FL: info = fl_alloc(alloc->as.fl, sizeof(*info), 8); break;
     }
 
+    if (!info) {
+        goto failed;
+    }
+
     *info = (t_file_info){0};
+
     if (!fill_file_info_(alloc, info, entry)) {
         goto failed;
     }
@@ -151,6 +158,10 @@ void free_entry(free_list *fl, t_entry *entry) {
 
     if (entry->path && entry->path != entry->name) {
         free_str(fl, entry->path);
+    }
+
+    if (entry->symlink) {
+        free_str(fl, entry->symlink);
     }
 
     if (entry->info) {
@@ -327,59 +338,19 @@ static t_str *get_dt_(const t_alloc *alloc, const struct timespec *ctim) {
 }
 
 static t_str *get_symlink_(const t_alloc *alloc, const t_entry *entry) {
-    Arena_Mark mark;
-    uint64_t cap;
-
     if (!S_ISLNK(entry->st.st_mode)) {
         return init_str(alloc, 1);
     }
 
-    if (alloc->kind == ALLOC_ARENA) {
-        mark = arena_get_mark(alloc->as.arena);
+    if (!entry->symlink_ready) {
+        return NULL;
     }
-    cap = (entry->st.st_size > 0) ? (uint64_t)entry->st.st_size + 1
-                                  : (uint64_t)PATH_MAX;
 
-    while (true) {
-        t_str *new_str = init_str(alloc, cap);
-        if (!new_str) {
-            return NULL;
-        }
-
-        const size_t read_size = (cap > (size_t)-1) ? (size_t)-1 : (size_t)cap;
-        ssize_t len = readlink(entry->path->str, new_str->str, read_size);
-        if (len < 0) {
-            switch (alloc->kind) {
-                case ALLOC_ARENA:
-                    arena_pop_to_mark(alloc->as.arena, mark);
-                    break;
-                case ALLOC_FL: free_str(alloc->as.fl, new_str); break;
-            }
-
-            if (errno == ENOENT || errno == EINVAL) {
-                return init_str(alloc, 1);
-            }
-
-            return NULL;
-        }
-
-        if ((uint64_t)len < cap) {
-            new_str->len = len < 0 ? 0 : (uint64_t)len;
-            new_str->str[new_str->len] = '\0';
-            return new_str;
-        }
-
-        switch (alloc->kind) {
-            case ALLOC_ARENA: arena_pop_to_mark(alloc->as.arena, mark); break;
-            case ALLOC_FL: free_str(alloc->as.fl, new_str); break;
-        }
-
-        if (cap > 0x3FFFFFFFFFFFFFFF) {
-            return NULL;
-        }
-
-        cap *= 2;
+    if (entry->symlink) {
+        return dup_str(alloc, entry->symlink);
     }
+
+    return init_str(alloc, 1);
 }
 
 static void free_info_(free_list *fl, t_file_info *info) {
@@ -420,7 +391,7 @@ static char get_attr_marker_(const t_alloc *alloc, const char *path) {
         return '\0';
     }
 
-    char *buf;
+    char *buf = NULL;
     Arena_Mark mark;
     switch (alloc->kind) {
         case ALLOC_ARENA:
@@ -509,6 +480,7 @@ static void add_group_cache_(gid_t group_id, const char *groupname) {
     if (!groupname || !*groupname) {
         return;
     }
+
     const uint64_t index = group_index % CACHE_SIZE;
     group_cache[index].group_id = group_id;
     ft_strlcpy(group_cache[index].name, groupname, LOGIN_NAME_MAX);

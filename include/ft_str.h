@@ -15,16 +15,13 @@ typedef struct {
     uint64_t pos;
 } t_str;
 
-typedef enum e_alloc_kind {
-    ALLOC_FL,
-    ALLOC_ARENA
-} t_alloc_kind;
+typedef enum e_alloc_kind { ALLOC_FL, ALLOC_ARENA } t_alloc_kind;
 
 typedef struct {
     t_alloc_kind kind;
     union {
         free_list *fl;
-        Arena     *arena;
+        Arena *arena;
     } as;
 } t_alloc;
 

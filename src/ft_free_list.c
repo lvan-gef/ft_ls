@@ -197,7 +197,8 @@ static void fl_node_remove_(free_list_node **phead, free_list_node *prev_node,
     }
 }
 
-static size_t calc_padding_(uintptr_t ptr, uintptr_t align, size_t header_size) {
+static size_t calc_padding_(uintptr_t ptr, uintptr_t align,
+                            size_t header_size) {
     if (!is_power_of_two_(align)) {
         return 0;
     }
