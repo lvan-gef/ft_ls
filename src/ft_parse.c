@@ -42,7 +42,7 @@ t_array *parse_args(free_list *fl, uint64_t argc, char **argv, t_args *args) {
             continue;
         }
 
-        if (!create_and_append_(&alloc , argv[index], inputs)) {
+        if (!create_and_append_(&alloc, argv[index], inputs)) {
             return NULL;
         }
     }

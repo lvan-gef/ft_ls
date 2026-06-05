@@ -38,9 +38,8 @@ static bool walk_recurssive_(t_params *params);
 static bool process_args_(t_params *params, t_array *array, int *exit_code);
 static void clear_temp_dir_(t_params *params);
 static void free_entry_array_(t_params *params, t_array *array);
-static t_str *join_dir_path_(const t_alloc *alloc, const t_str *lhs, const t_str *rhs);
-static void fill_join_dir_path_(t_str *path, const t_str *lhs,
-                                const t_str *rhs);
+static t_str *join_dir_path_(const t_alloc *alloc, const t_str *lhs,
+                             const t_str *rhs);
 static bool ensure_entry_path_(const t_alloc *alloc, t_entry *entry);
 static mode_t mode_from_dtype_(unsigned char dtype);
 static bool entry_needs_lstat_(const t_args *args, unsigned char dtype);
@@ -395,7 +394,8 @@ static void free_entry_array_(t_params *params, t_array *array) {
     }
 }
 
-static t_str *join_dir_path_(const t_alloc *alloc, const t_str *lhs, const t_str *rhs) {
+static t_str *join_dir_path_(const t_alloc *alloc, const t_str *lhs,
+                             const t_str *rhs) {
     const bool need_slash = lhs->len == 0 || lhs->str[lhs->len - 1] != '/';
     const uint64_t total_len = lhs->len + rhs->len + (need_slash ? 1U : 0U);
     t_str *path = init_str(alloc, total_len);
@@ -403,14 +403,6 @@ static t_str *join_dir_path_(const t_alloc *alloc, const t_str *lhs, const t_str
     if (!path) {
         return NULL;
     }
-
-    fill_join_dir_path_(path, lhs, rhs);
-    return path;
-}
-
-static void fill_join_dir_path_(t_str *path, const t_str *lhs,
-                                const t_str *rhs) {
-    const bool need_slash = lhs->len == 0 || lhs->str[lhs->len - 1] != '/';
 
     ft_memcpy(path->str, lhs->str + lhs->pos, (size_t)lhs->len);
     path->len = lhs->len;
@@ -421,6 +413,7 @@ static void fill_join_dir_path_(t_str *path, const t_str *lhs,
     ft_memcpy(path->str + path->len, rhs->str + rhs->pos, (size_t)rhs->len);
     path->len += rhs->len;
     path->str[path->len] = '\0';
+    return path;
 }
 
 static bool ensure_entry_path_(const t_alloc *alloc, t_entry *entry) {
@@ -468,9 +461,12 @@ static bool walk_recurssive_(t_params *params) {
                 continue;
             }
 
-            if (entry->name->str[0] == '.' &&
-                (entry->name->str[1] == '\0' ||
-                 (entry->name->str[1] == '.' && entry->name->str[2] == '\0'))) {
+            if (ft_strncmp(entry->name->str, ".", entry->name->len) == 0 ||
+                ft_strncmp(entry->name->str, "..", entry->name->len) == 0) {
+                // if (entry->name->str[0] == '.' &&
+                //     (entry->name->str[1] == '\0' ||
+                //      (entry->name->str[1] == '.' && entry->name->str[2] ==
+                //      '\0'))) {
                 continue;
             }
 

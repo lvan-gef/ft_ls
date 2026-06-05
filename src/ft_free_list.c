@@ -8,7 +8,7 @@
 static free_list_node *fl_find_best_(free_list *fl, size_t size, size_t align,
                                      size_t *padding_,
                                      free_list_node **prev_node_);
-static void fl_coalescence_(free_list *fl, free_list_node *prev_node,
+static void fl_coalescence_(free_list_node *prev_node,
                             free_list_node *free_node);
 static void fl_node_insert_(free_list_node **phead, free_list_node *prev_node,
                             free_list_node *new_node);
@@ -122,7 +122,7 @@ void fl_free(free_list *fl, void *ptr) {
     }
 
     fl->used -= free_node->block_size;
-    fl_coalescence_(fl, prev_node, free_node);
+    fl_coalescence_(prev_node, free_node);
 }
 
 static free_list_node *fl_find_best_(free_list *fl, size_t size, size_t align,
@@ -162,22 +162,18 @@ static free_list_node *fl_find_best_(free_list *fl, size_t size, size_t align,
     return best_node;
 }
 
-static void fl_coalescence_(free_list *fl, free_list_node *prev_node,
+static void fl_coalescence_(free_list_node *prev_node,
                             free_list_node *free_node) {
-    if (!prev_node) {
-        return;
-    }
-
-    if ((void *)((char *)free_node + free_node->block_size) ==
-        (void *)free_node->next) {
+    if (free_node->next && (uintptr_t)free_node + free_node->block_size ==
+                               (uintptr_t)free_node->next) {
         free_node->block_size += free_node->next->block_size;
-        fl_node_remove_(&fl->head, free_node, free_node->next);
+        free_node->next = free_node->next->next;
     }
 
-    if ((void *)((char *)prev_node + prev_node->block_size) ==
-        (void *)free_node) {
+    if (prev_node &&
+        (uintptr_t)prev_node + prev_node->block_size == (uintptr_t)free_node) {
         prev_node->block_size += free_node->block_size;
-        fl_node_remove_(&fl->head, prev_node, free_node);
+        prev_node->next = free_node->next;
     }
 }
 
@@ -201,8 +197,7 @@ static void fl_node_remove_(free_list_node **phead, free_list_node *prev_node,
     }
 }
 
-static size_t calc_padding_(uintptr_t ptr, uintptr_t align,
-                            size_t header_size) {
+static size_t calc_padding_(uintptr_t ptr, uintptr_t align, size_t header_size) {
     if (!is_power_of_two_(align)) {
         return 0;
     }

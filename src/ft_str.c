@@ -9,16 +9,21 @@
 
 #include "../libft/include/libft.h"
 
-static void *alloc_push_(const t_alloc *alloc, uint64_t size, uint64_t align);
-static void to_uint_(t_str *str, uint64_t nbr);
-static void fill_str_(t_str *dst, const char *src, uint64_t len);
-
 t_str *init_str(const t_alloc *alloc, uint64_t cap) {
     if (cap > UINT64_MAX - 1 - sizeof(t_str)) {
         return NULL;
     }
 
-    t_str *str = alloc_push_(alloc, sizeof(*str) + cap + 1, 8);
+    t_str *str;
+    switch (alloc->kind) {
+        case ALLOC_ARENA:
+            str = arena_push(alloc->as.arena, sizeof(*str) + cap + 1);
+            break;
+        case ALLOC_FL:
+            str = fl_alloc(alloc->as.fl, sizeof(*str) + cap + 1, 8);
+            break;
+    }
+
     if (!str) {
         return NULL;
     }
@@ -31,7 +36,6 @@ t_str *init_str(const t_alloc *alloc, uint64_t cap) {
     return str;
 }
 
-
 t_str *create_str(const t_alloc *alloc, const char *str) {
     const size_t len = ft_strlen(str);
     if (len + 1 < len) {
@@ -43,7 +47,9 @@ t_str *create_str(const t_alloc *alloc, const char *str) {
         return NULL;
     }
 
-    fill_str_(new_str, str, len);
+    ft_memcpy(new_str->str, str, len);
+    new_str->len = len;
+    new_str->str[new_str->len] = '\0';
     return new_str;
 }
 
@@ -67,7 +73,15 @@ t_str *uint_to_str(const t_alloc *alloc, uint64_t nbr) {
         return NULL;
     }
 
-    to_uint_(str, nbr);
+    str->str[str->cap - 1] = '\0';
+    str->pos = str->cap - 1;
+    while (str->pos) {
+        --str->pos;
+        str->str[str->pos] = (char)((nbr % 10) + '0');
+        nbr /= 10;
+        ++str->len;
+    }
+
     return str;
 }
 
@@ -77,30 +91,4 @@ void free_str(free_list *fl, t_str *str) {
     }
 
     fl_free(fl, str);
-}
-
-static void *alloc_push_(const t_alloc *alloc, uint64_t size, uint64_t align) {
-    if (alloc->kind == ALLOC_ARENA) {
-        (void)align;
-        return arena_push(alloc->as.arena, size);
-    }
-
-    return fl_alloc(alloc->as.fl, size, align);
-}
-
-static void to_uint_(t_str *str, uint64_t nbr) {
-    str->str[str->cap - 1] = '\0';
-    str->pos = str->cap - 1;
-    while (str->pos) {
-        --str->pos;
-        str->str[str->pos] = (char)((nbr % 10) + '0');
-        nbr /= 10;
-        ++str->len;
-    }
-}
-
-static void fill_str_(t_str *dst, const char *src, uint64_t len) {
-    ft_memcpy(dst->str, src, len);
-    dst->len = len;
-    dst->str[dst->len] = '\0';
 }
