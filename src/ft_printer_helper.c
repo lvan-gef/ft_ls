@@ -2,11 +2,10 @@
 #include <stdint.h>
 #include <unistd.h>
 
-#include "../include/ft_array.h"
 #include "../include/ft_entry.h"
 #include "../include/ft_printer_helper.h"
-#include "../include/ft_str.h"
 #include "../include/ft_shell_escape.h"
+#include "../include/ft_str.h"
 
 #include "../libft/include/libft.h"
 
@@ -40,17 +39,6 @@ bool flush_str(t_str *out) {
     out->len = 0;
     out->str[0] = '\0';
     return true;
-}
-
-bool have_quotes(t_array *array) {
-    for (uint64_t index = 0; index < array->len; ++index) {
-        const t_entry *entry = array->data[index];
-        if (entry->quote != '\0') {
-            return true;
-        }
-    }
-
-    return false;
 }
 
 bool put_dir_header(t_str *out, const t_entry *dir_entry) {

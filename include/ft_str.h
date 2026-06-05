@@ -4,7 +4,6 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
 
 #include "./ft_arena.h"
 #include "./ft_free_list.h"
@@ -24,5 +23,4 @@ t_str *dup_str(free_list *fl, const t_str *str);
 t_str *uint_to_str(free_list *fl, uint64_t nbr);
 t_str *uint_to_str_arena(Arena *arena, uint64_t nbr);
 void free_str(free_list *fl, t_str *str);
-ssize_t append_chars_str(t_str *dst, const char *src);
 #endif // !FT_STR_H

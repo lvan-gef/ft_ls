@@ -106,17 +106,6 @@ t_str *uint_to_str_arena(Arena *arena, uint64_t nbr) {
     return str;
 }
 
-ssize_t append_chars_str(t_str *dst, const char *src) {
-    const size_t src_len = ft_strlen(src);
-    if ((uint64_t)src_len >= dst->cap - dst->len) {
-        return -1;
-    }
-
-    ft_memcpy(dst->str + dst->len, src, src_len + 1);
-    dst->len += (uint64_t)src_len;
-    return (ssize_t)src_len;
-}
-
 void free_str(free_list *fl, t_str *str) {
     if (!str) {
         return;

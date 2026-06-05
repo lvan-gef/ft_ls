@@ -4,10 +4,6 @@ MAKEFLAGS += -j
 
 TERM_SIZE ?= 80
 
-ifeq ($(shell test "$(TERM_SIZE)" -gt 0 2>/dev/null && printf valid || printf invalid),invalid)
-$(error TERM_SIZE must be a positive integer, got '$(TERM_SIZE)')
-endif
-
 LIBFT_DIR := libft
 LIBFT     := $(LIBFT_DIR)/libft.a
 LIBFT_D   := $(LIBFT_DIR)/libft_d.a
@@ -27,10 +23,16 @@ CFLAGS    := -std=c11 -D_DEFAULT_SOURCE                                        \
 
 DEPSFLAGS := -MMD -MP
 
+# Release flags (with hardening)
 R_CFLAGS  := -DNDEBUG -O3 -march=native -fomit-frame-pointer -fPIE -fstack-clash-protection
 R_LDFLAGS := -pie -Wl,-z,relro,-z,now
 
+# Debug flags
 SANITIZERS := -fsanitize=address,undefined,null,leak,integer-divide-by-zero,signed-integer-overflow
+# SANITIZERS := -fsanitize=undefined,null,integer-divide-by-zero,signed-integer-overflow
+
+# SANITIZERS :=
+# D_CFLAGS   := -g3 -fno-omit-frame-pointer -fstack-protector-strong $(SANITIZERS)
 D_CFLAGS   := -g3 -fno-omit-frame-pointer -fstack-protector-strong $(SANITIZERS)
 D_LDFLAGS  := $(SANITIZERS) -rdynamic
 
@@ -42,10 +44,12 @@ SRC_FILES := ft_arena.c ft_array.c ft_entry.c ft_free_list.c ft_helper.c       \
 
 SRCS := $(addprefix $(SRC_DIR)/, $(SRC_FILES))
 
+# Release objects
 R_OBJ_DIR := obj
 R_OBJECTS := $(SRCS:$(SRC_DIR)/%.c=$(R_OBJ_DIR)/%.o)
 R_DEPS    := $(R_OBJECTS:.o=.d)
 
+# Debug objects
 D_OBJ_DIR := obj_debug
 D_OBJECTS := $(SRCS:$(SRC_DIR)/%.c=$(D_OBJ_DIR)/%.o)
 D_DEPS    := $(D_OBJECTS:.o=.d)
@@ -54,11 +58,13 @@ BLUE := \033[36m
 MARGENTA := \033[35m
 NC := \033[0m
 
+
+# Build rules
 .PHONY: all
-all: $(NAME)  ## Build release version (default)
+all: check-term-size $(NAME)  ## Build release version (default)
 
 .PHONY: debug
-debug: $(NAME_D)  ## Build debug version with ASAN
+debug: check-term-size $(NAME_D)  ## Build debug version with ASAN
 
 .PHONY: tester
 tester:  ## run the tester
@@ -91,6 +97,15 @@ fmt:  ## Format code via clang-format
 	@find . -type f -name "*.c" -print0 | xargs -0 clang-format -i
 	@find . -type f -name "*.h" -print0 | xargs -0 clang-format -i
 
+.PHONY: check-term-size
+check-term-size:
+	@case "$(TERM_SIZE)" in \
+		''|*[!0-9]*|0) \
+			echo "error: TERM_SIZE must be a positive integer, got '$(TERM_SIZE)'"; \
+			exit 1; \
+			;; \
+	esac
+
 .PHONY: help
 help:  ## Get help
 	@echo -e 'Usage: make ${BLUE}<target>${NC}'
@@ -99,8 +114,7 @@ help:  ## Get help
 
 # Release build
 $(NAME): $(LIBFT) $(R_OBJECTS)
-	$(CC) $(R_OBJECTS) $(R_LDFLAGS) -g3 $(LIBFT) -o $@
-	# $(CC) $(R_OBJECTS) $(R_LDFLAGS) -s $(LIBFT) -o $@
+	$(CC) $(R_OBJECTS) $(R_LDFLAGS) -s $(LIBFT) -o $@
 	@echo "Build complete: $(NAME) (release)"
 
 # Debug build
@@ -109,11 +123,11 @@ $(NAME_D): $(LIBFT_D) $(D_OBJECTS)
 	@echo "Build complete: $(NAME_D) (debug)"
 
 # Release pattern rule
-$(R_OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(R_OBJ_DIR)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(R_CFLAGS) -g3 $(DEPSFLAGS) -c $< -o $@
+$(R_OBJ_DIR)/%.o: $(SRC_DIR)/%.c | check-term-size $(R_OBJ_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(R_CFLAGS) $(DEPSFLAGS) -c $< -o $@
 
 # Debug pattern rule
-$(D_OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(D_OBJ_DIR)
+$(D_OBJ_DIR)/%.o: $(SRC_DIR)/%.c | check-term-size $(D_OBJ_DIR)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(D_CFLAGS) $(DEPSFLAGS) -c $< -o $@
 
 $(LIBFT):

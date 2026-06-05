@@ -23,11 +23,10 @@
 typedef struct {
     t_args *args;
     free_list fl;
-    Arena *dirs_arena;
     Arena *temp_arena;
+    Arena *sort_arena;
     t_array *dirs;
     t_array *files;
-    t_array *entries;
     uint64_t max_len_links;
     uint64_t max_len_sizes;
 } t_params;
@@ -40,6 +39,10 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code);
 static void clear_temp_dir_(t_params *params);
 static void free_entry_array_(t_params *params, t_array *array);
 static t_str *join_dir_path_(Arena *arena, const t_str *lhs, const t_str *rhs);
+static t_str *join_dir_path_fl_(free_list *fl, const t_str *lhs,
+                                const t_str *rhs);
+static void fill_join_dir_path_(t_str *path, const t_str *lhs,
+                                const t_str *rhs);
 static bool ensure_entry_path_(Arena *arena, t_entry *entry);
 static mode_t mode_from_dtype_(unsigned char dtype);
 static bool entry_needs_lstat_(const t_args *args, unsigned char dtype);
@@ -50,7 +53,7 @@ static int check_links_(t_params *params, t_str *str, t_array *dir_entries,
 static bool has_quoted_operands_(const t_array *array);
 static void clean_up_(t_params *params);
 static void print_err_(free_list *fl, t_str *str, int e, const char *prefix);
-static void set_entry_(t_entry *entry, t_str *str, struct stat *st);
+static void set_entry_(t_entry *entry, t_str *str, const struct stat *st);
 static void fill_dir_entry_display_(t_entry *entry, const t_entry *src);
 
 typedef enum { SINGLE_QUOTE = '\'', DOUBLE_QUOTE = '\"', SPACE = ' ' } t_quote;
@@ -61,21 +64,20 @@ void process(t_args *args, t_array *array, int *exit_code) {
 
     params.args = args;
     fl_init(&params.fl, buffer, sizeof(buffer));
-    params.dirs_arena = arena_alloc(ARENA_SIZE);
     params.temp_arena = arena_alloc(ARENA_SIZE);
-    if (!params.dirs_arena || !params.temp_arena) {
+    params.sort_arena = arena_alloc(ARENA_SIZE);
+    if (!params.temp_arena || !params.sort_arena) {
         *exit_code = 2;
         goto cleanup;
     }
 
-    arena_auto_align(params.dirs_arena, 8);
     arena_auto_align(params.temp_arena, 8);
+    arena_auto_align(params.sort_arena, 8);
 
     params.dirs = init_array(&params.fl, ARRAY_SIZE);
     params.files = init_array(&params.fl, ARRAY_SIZE);
-    params.entries = init_array(&params.fl, ARRAY_SIZE);
 
-    if (!params.dirs || !params.files || !params.entries) {
+    if (!params.dirs || !params.files) {
         *exit_code = 2;
         goto cleanup;
     }
@@ -103,6 +105,8 @@ static bool run_(t_args *args, t_params *params, t_array *array,
                .min_len_sizes = params->max_len_sizes,
                .quote_padding = has_quoted_operands};
     if (params->files->len) {
+        sort(params->sort_arena, params->files, params->args->reverse,
+             params->args->time);
         printer(&ps);
         printed_files = true;
         free_entry_array_(params, params->files);
@@ -120,6 +124,7 @@ static bool run_(t_args *args, t_params *params, t_array *array,
 
         if (!inserted_files_dirs_gap && printed_files && dir_path->is_operand) {
             if (write(STDOUT_FILENO, "\n", 1) < 0) {
+                free_entry(&params->fl, dir_path);
                 return false;
             }
             inserted_files_dirs_gap = true;
@@ -127,11 +132,20 @@ static bool run_(t_args *args, t_params *params, t_array *array,
 
         if (!read_dir_(params, dir_path, exit_code)) {
             clear_temp_dir_(params);
+            free_entry(&params->fl, dir_path);
             continue;
+        }
+
+        sort(params->sort_arena, params->files, params->args->reverse,
+             params->args->time);
+        if (!walk_recurssive_(params)) {
+            free_entry(&params->fl, dir_path);
+            return false;
         }
 
         if (printed_dir) {
             if (write(STDOUT_FILENO, "\n", 1) < 0) {
+                free_entry(&params->fl, dir_path);
                 return false;
             }
         }
@@ -147,6 +161,7 @@ static bool run_(t_args *args, t_params *params, t_array *array,
         printer(&ps);
         printed_dir = true;
         clear_temp_dir_(params);
+        free_entry(&params->fl, dir_path);
     }
 
     return true;
@@ -220,7 +235,8 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
     }
 
     if (dir_entries->len) {
-        sort(dir_entries, params->args->reverse, params->args->time);
+        sort(params->sort_arena, dir_entries, params->args->reverse,
+             params->args->time);
         while (dir_entries->len) {
             t_entry *entry = pop_array(dir_entries);
             entry->is_operand = true;
@@ -241,7 +257,7 @@ failed:
 
 static int check_links_(t_params *params, t_str *str, t_array *dir_entries,
                         struct stat *st, int *exit_code) {
-    int e = 0;
+    int e;
     if (lstat(str->str, st) == -1) {
         e = errno;
         const char *prefix = "cannot access";
@@ -353,16 +369,9 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
         if (!append_array(params->files, entry)) {
             goto cleanup;
         }
-
-        if (params->args->recursive && S_ISDIR(entry->st.st_mode)) {
-            if (!append_array(params->entries, entry)) {
-                (void)pop_array(params->files);
-                goto cleanup;
-            }
-        }
     }
 
-    ok = walk_recurssive_(params);
+    ok = true;
 cleanup:
     if (d) {
         closedir(d);
@@ -376,7 +385,6 @@ cleanup:
 }
 
 static void clear_temp_dir_(t_params *params) {
-    clear_array(params->entries);
     clear_array(params->files);
     arena_clear(params->temp_arena);
 }
@@ -397,6 +405,28 @@ static t_str *join_dir_path_(Arena *arena, const t_str *lhs, const t_str *rhs) {
         return NULL;
     }
 
+    fill_join_dir_path_(path, lhs, rhs);
+    return path;
+}
+
+static t_str *join_dir_path_fl_(free_list *fl, const t_str *lhs,
+                                const t_str *rhs) {
+    const bool need_slash = lhs->len == 0 || lhs->str[lhs->len - 1] != '/';
+    const uint64_t total_len = lhs->len + rhs->len + (need_slash ? 1U : 0U);
+    t_str *path = init_str(fl, total_len);
+
+    if (!path) {
+        return NULL;
+    }
+
+    fill_join_dir_path_(path, lhs, rhs);
+    return path;
+}
+
+static void fill_join_dir_path_(t_str *path, const t_str *lhs,
+                                const t_str *rhs) {
+    const bool need_slash = lhs->len == 0 || lhs->str[lhs->len - 1] != '/';
+
     ft_memcpy(path->str, lhs->str + lhs->pos, (size_t)lhs->len);
     path->len = lhs->len;
     if (need_slash) {
@@ -406,7 +436,6 @@ static t_str *join_dir_path_(Arena *arena, const t_str *lhs, const t_str *rhs) {
     ft_memcpy(path->str + path->len, rhs->str + rhs->pos, (size_t)rhs->len);
     path->len += rhs->len;
     path->str[path->len] = '\0';
-    return path;
 }
 
 static bool ensure_entry_path_(Arena *arena, t_entry *entry) {
@@ -444,14 +473,13 @@ static bool entry_needs_lstat_(const t_args *args, unsigned char dtype) {
 }
 
 static bool walk_recurssive_(t_params *params) {
-    if (params->args->recursive && params->entries->len) {
-        sort(params->entries, params->args->reverse, params->args->time);
-        size_t index = params->entries->len;
+    if (params->args->recursive && params->files->len) {
+        uint64_t index = params->files->len;
         while (index > 0) {
             --index;
-            const t_entry *entry = pop_array(params->entries);
+            const t_entry *entry = params->files->data[index];
             t_entry *dir_entry;
-            if (!entry->name) {
+            if (!entry || !entry->name || !S_ISDIR(entry->st.st_mode)) {
                 continue;
             }
 
@@ -478,30 +506,21 @@ static bool walk_recurssive_(t_params *params) {
 
 static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
                                  bool is_operand) {
-    Arena_Mark mark = arena_get_mark(params->dirs_arena);
-    t_entry *entry = arena_push(params->dirs_arena, sizeof(*entry));
+    t_entry *entry = fl_alloc(&params->fl, sizeof(*entry), 8);
     if (!entry) {
         return NULL;
     }
 
     *entry = (t_entry){0};
-    entry->name =
-        src->name ? create_str_arena(params->dirs_arena, src->name->str) : NULL;
-    if (src->name && !entry->name) {
-        goto failed;
-    }
-
     if (!src->path) {
-        if (!src->parent_path || !entry->name) {
+        if (!src->parent_path || !src->name) {
             goto failed;
         }
 
         entry->path =
-            join_dir_path_(params->dirs_arena, src->parent_path, entry->name);
-    } else if (src->path == src->name) {
-        entry->path = entry->name;
+            join_dir_path_fl_(&params->fl, src->parent_path, src->name);
     } else {
-        entry->path = create_str_arena(params->dirs_arena, src->path->str);
+        entry->path = dup_str(&params->fl, src->path);
     }
 
     if (!entry->path) {
@@ -514,18 +533,18 @@ static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
     entry->is_operand = is_operand;
     return entry;
 failed:
-    arena_pop_to_mark(params->dirs_arena, mark);
+    free_entry(&params->fl, entry);
     return NULL;
 }
 
 static bool has_quoted_operands_(const t_array *array) {
     for (uint64_t index = 0; index < array->len; ++index) {
         const t_str *operand = array->data[index];
-        t_shell_scan scan;
         if (!operand) {
             continue;
         }
 
+        t_shell_scan scan;
         shell_scan_str(operand, &scan);
         if (scan.quote != '\0') {
             return true;
@@ -536,12 +555,12 @@ static bool has_quoted_operands_(const t_array *array) {
 }
 
 static void clean_up_(t_params *params) {
-    if (params->dirs_arena) {
-        arena_release(params->dirs_arena);
-    }
-
     if (params->temp_arena) {
         arena_release(params->temp_arena);
+    }
+
+    if (params->sort_arena) {
+        arena_release(params->sort_arena);
     }
 
     fl_free_all(&params->fl);
@@ -565,7 +584,7 @@ static void print_err_(free_list *fl, t_str *str, int e, const char *prefix) {
     ft_fprintf(STDERR_FILENO, "ft_ls: %s '%s': %s\n", prefix, str->str, msg);
 }
 
-static void set_entry_(t_entry *entry, t_str *str, struct stat *st) {
+static void set_entry_(t_entry *entry, t_str *str, const struct stat *st) {
     entry->name = str;
     entry->path = str;
     entry->path_has_colon =

@@ -1,6 +1,5 @@
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <unistd.h>
 
 #include "../include/ft_array.h"
@@ -8,9 +7,6 @@
 #include "../include/ft_printer.h"
 #include "../include/ft_printer_helper.h"
 #include "../include/ft_shell_escape.h"
-#include "../include/ft_sort.h"
-
-#include "../libft/include/ft_fprintf.h"
 
 typedef struct {
     uint64_t rows;
@@ -20,18 +16,15 @@ typedef struct {
 
 static uint64_t display_len_(const t_entry *entry, bool quoted);
 static void init_print_row_(t_ps *ps);
-static uint64_t *calc_cols_(t_array *array, t_map *map, bool quoted);
-static bool calc_width_(const uint64_t *name_lengths, uint64_t file_count,
-                        uint64_t num_cols, uint64_t *col_widths);
+static void calc_cols_(t_array *array, t_map *map, bool *quoted,
+                       uint64_t *col_widths);
+static bool calc_width_(t_array *array, bool quoted, uint64_t num_cols,
+                        uint64_t *col_widths);
 static bool create_row_(t_str *out, t_array *array, const t_map *map,
                         const uint64_t *col_widths, bool quoted);
 static bool indent_(t_str *out, uint64_t from, uint64_t to);
 
 void printer(t_ps *ps) {
-    if (ps->array->len) {
-        sort(ps->array, ps->args->reverse, ps->args->time);
-    }
-
     if (ps->args->list) {
         print_list(ps);
     } else {
@@ -45,15 +38,13 @@ static void init_print_row_(t_ps *ps) {
                  .rows = ps->array->len,
                  .max = ps->array->len < max_cols ? ps->array->len : max_cols};
 
-    const bool quoted = ps->quote_padding || have_quotes(ps->array);
+    bool quoted = ps->quote_padding;
     char buffer[OUTPUT_BUFFER_CAP];
+    uint64_t col_widths[(TERM_SIZE + SPACE_GAP) / (1 + SPACE_GAP)];
     t_str out = {.str = buffer, .cap = sizeof(buffer), .len = 0, .pos = 0};
     out.str[0] = '\0';
 
-    uint64_t *col_widths = calc_cols_(ps->array, &map, quoted);
-    if (!col_widths) {
-        goto done;
-    }
+    calc_cols_(ps->array, &map, &quoted, col_widths);
 
     if (!put_dir_header(&out, ps->dir_entry)) {
         goto done;
@@ -65,9 +56,6 @@ static void init_print_row_(t_ps *ps) {
 
 done:
     flush_str(&out);
-    if (col_widths) {
-        free(col_widths);
-    }
 }
 
 static bool create_row_(t_str *out, t_array *array, const t_map *map,
@@ -108,23 +96,18 @@ static bool create_row_(t_str *out, t_array *array, const t_map *map,
     return true;
 }
 
-static uint64_t *calc_cols_(t_array *array, t_map *map, bool quoted) {
+static void calc_cols_(t_array *array, t_map *map, bool *quoted,
+                       uint64_t *col_widths) {
     const uint64_t width_count = map->max ? map->max : 1;
-    uint64_t *col_widths = malloc((size_t)width_count * sizeof(*col_widths));
-    uint64_t *name_lengths;
-    if (!col_widths) {
-        return NULL;
-    }
 
-    name_lengths = malloc((size_t)array->len * sizeof(*name_lengths));
-    if (!name_lengths) {
-        free(col_widths);
-        return NULL;
-    }
-
-    for (uint64_t index = 0; index < array->len; ++index) {
-        const t_entry *entry = array->data[index];
-        name_lengths[index] = display_len_(entry, quoted);
+    if (!*quoted) {
+        for (uint64_t index = 0; index < array->len; ++index) {
+            const t_entry *entry = array->data[index];
+            if (entry->quote != '\0') {
+                *quoted = true;
+                break;
+            }
+        }
     }
 
     uint64_t lo = 1;
@@ -133,7 +116,7 @@ static uint64_t *calc_cols_(t_array *array, t_map *map, bool quoted) {
     while (lo <= hi) {
         const uint64_t mid = lo + (hi - lo) / 2;
 
-        if (calc_width_(name_lengths, array->len, mid, col_widths)) {
+        if (calc_width_(array, *quoted, mid, col_widths)) {
             best = mid;
             lo = mid + 1;
         } else {
@@ -146,13 +129,12 @@ static uint64_t *calc_cols_(t_array *array, t_map *map, bool quoted) {
 
     map->cols = best;
     map->rows = (array->len + best - 1) / best;
-    (void)calc_width_(name_lengths, array->len, best, col_widths);
-    free(name_lengths);
-    return col_widths;
+    (void)calc_width_(array, *quoted, best, col_widths);
 }
 
-static bool calc_width_(const uint64_t *name_lengths, uint64_t file_count,
-                        uint64_t num_cols, uint64_t *col_widths) {
+static bool calc_width_(t_array *array, bool quoted, uint64_t num_cols,
+                        uint64_t *col_widths) {
+    const uint64_t file_count = array->len;
     const uint64_t num_rows = (file_count + num_cols - 1) / num_cols;
     uint64_t line_len = num_cols * MIN_COLUMN_WIDTH;
 
@@ -162,7 +144,8 @@ static bool calc_width_(const uint64_t *name_lengths, uint64_t file_count,
 
     for (uint64_t filesno = 0; filesno < file_count; ++filesno) {
         const uint64_t index = filesno / num_rows;
-        uint64_t real_length = name_lengths[filesno];
+        const t_entry *entry = array->data[filesno];
+        uint64_t real_length = display_len_(entry, quoted);
 
         if (index != num_cols - 1) {
             real_length += SPACE_GAP;

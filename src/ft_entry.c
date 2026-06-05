@@ -28,10 +28,12 @@ static t_str *get_dt_arena_(Arena *arena, const struct timespec *ctim);
 static t_str *get_symlink_(free_list *fl, const t_entry *entry);
 static t_str *get_symlink_arena_(Arena *arena, const t_entry *entry);
 static void free_info_(free_list *fl, t_file_info *info);
-static char get_attr_marker_(const char *path);
 static void fill_perm_(const t_entry *entry, t_str *str);
 static bool fill_dt_(t_str *new_str, const struct timespec *ctim);
 static bool read_symlink_(const t_entry *entry, t_str *new_str, uint64_t cap);
+static char get_attr_marker_(free_list *fl, const char *path);
+static char get_attr_marker_arena_(Arena *arena, const char *path);
+static char fill_attr_marker_(const char *path, char *buf, size_t p_len);
 
 static uid_t cached_uid = (uid_t)-1;
 static gid_t cached_gid = (gid_t)-1;
@@ -213,6 +215,12 @@ static t_str *get_perm_(free_list *fl, const t_entry *entry) {
     }
 
     fill_perm_(entry, str);
+    char marker = get_attr_marker_(fl, entry->path->str);
+    if (marker == '+' || marker == '.') {
+        str->str[str->len++] = marker;
+    }
+    str->str[str->len] = '\0';
+
     return str;
 }
 
@@ -223,6 +231,11 @@ static t_str *get_perm_arena_(Arena *arena, const t_entry *entry) {
     }
 
     fill_perm_(entry, str);
+    char marker = get_attr_marker_arena_(arena, entry->path->str);
+    if (marker == '+' || marker == '.') {
+        str->str[str->len++] = marker;
+    }
+    str->str[str->len] = '\0';
     return str;
 }
 
@@ -449,44 +462,10 @@ static void free_info_(free_list *fl, t_file_info *info) {
     fl_free(fl, info);
 }
 
-static char get_attr_marker_(const char *path) {
-    ssize_t len = listxattr(path, NULL, 0);
-    if (len <= 0) {
-        return '\0';
-    }
-
-    char *buf = malloc((size_t)len);
-    if (!buf) {
-        return '\0';
-    }
-
-    len = listxattr(path, buf, (size_t)len);
-    if (len <= 0) {
-        free(buf);
-        return '\0';
-    }
-
-    bool has_selinux = false;
-    const char *end = buf + len;
-    for (char *name = buf; name < end; name += strlen(name) + 1) {
-        if (strcmp(name, "system.posix_acl_access") == 0) {
-            free(buf);
-            return '+';
-        }
-        if (strcmp(name, "security.selinux") == 0) {
-            has_selinux = true;
-        }
-    }
-
-    free(buf);
-    return has_selinux ? '.' : '\0';
-}
-
 static void fill_perm_(const t_entry *entry, t_str *str) {
     uint64_t index = 0;
     if ((entry->st.st_mode & S_IFMT) == S_IFLNK) {
         str->str[index++] = 'l';
-
     } else if ((entry->st.st_mode & S_IFMT) == S_IFREG) {
         str->str[index++] = '-';
     } else if ((entry->st.st_mode & S_IFMT) == S_IFDIR) {
@@ -503,13 +482,61 @@ static void fill_perm_(const t_entry *entry, t_str *str) {
     str->str[index++] = entry->st.st_mode & S_IWOTH ? 'w' : '-';
     str->str[index++] = entry->st.st_mode & S_IXOTH ? 'x' : '-';
 
-    char marker = get_attr_marker_(entry->path->str);
-    if (marker == '+' || marker == '.') {
-        str->str[index++] = marker;
+    str->len = index;
+}
+
+static char get_attr_marker_(free_list *fl, const char *path) {
+    ssize_t len = listxattr(path, NULL, 0);
+    if (len <= 0) {
+        return '\0';
     }
 
-    str->len = index;
-    str->str[index] = '\0';
+    char *buf = fl_alloc(fl, (size_t)len, 8);
+    if (!buf) {
+        return '\0';
+    }
+
+    char lttr = fill_attr_marker_(path, buf, (size_t)len);
+    fl_free(fl, buf);
+    return lttr;
+}
+
+static char get_attr_marker_arena_(Arena *arena, const char *path) {
+    ssize_t len = listxattr(path, NULL, 0);
+    if (len <= 0) {
+        return '\0';
+    }
+
+    Arena_Mark marker = arena_get_mark(arena);
+    char *buf = arena_push(arena, (size_t)len);
+    if (!buf) {
+        return '\0';
+    }
+
+    char lttr = fill_attr_marker_(path, buf, (size_t)len);
+    arena_pop_to_mark(arena, marker);
+    return lttr;
+}
+
+static char fill_attr_marker_(const char *path, char *buf, size_t p_len) {
+    ssize_t len = listxattr(path, buf, p_len);
+    if (len <= 0) {
+        return '\0';
+    }
+
+    bool has_selinux = false;
+    const char *end = buf + len;
+    for (char *name = buf; name < end; name += strlen(name) + 1) {
+        if (strcmp(name, "system.posix_acl_access") == 0) {
+            return '+';
+        }
+
+        if (strcmp(name, "security.selinux") == 0) {
+            has_selinux = true;
+        }
+    }
+
+    return has_selinux ? '.' : '\0';
 }
 
 static bool fill_dt_(t_str *new_str, const struct timespec *ctim) {

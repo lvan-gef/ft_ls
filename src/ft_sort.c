@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "../include/ft_array.h"
 #include "../include/ft_entry.h"
@@ -8,7 +9,7 @@
 
 typedef int (*t_cmp_entry)(const t_entry *a, const t_entry *b);
 
-static void merge_sort_(t_array *array, t_cmp_entry cmp);
+static void merge_sort_(Arena *arena, t_array *array, t_cmp_entry cmp);
 static uint64_t add_capped_(uint64_t lhs, uint64_t rhs, uint64_t cap);
 static void merge_(void **data, void **tmp, uint64_t left, uint64_t mid,
                    uint64_t right, t_cmp_entry cmp);
@@ -16,10 +17,11 @@ static int cmp_name_entry_(const t_entry *a, const t_entry *b);
 static int cmp_name_entry_rev_(const t_entry *a, const t_entry *b);
 static int cmp_time_entry_(const t_entry *a, const t_entry *b);
 static int cmp_time_entry_rev_(const t_entry *a, const t_entry *b);
+static const t_str *entry_name_(const t_entry *entry);
 static int compare_(const t_str *lhs, const t_str *rhs);
 static int compare_time_(const struct timespec *a, const struct timespec *b);
 
-void sort(t_array *array, bool reverse, bool sort_time) {
+void sort(Arena *arena, t_array *array, bool reverse, bool sort_time) {
     if (array->len <= 1) {
         return;
     }
@@ -32,16 +34,16 @@ void sort(t_array *array, bool reverse, bool sort_time) {
         cmp = reverse ? cmp_name_entry_rev_ : cmp_name_entry_;
     }
 
-    merge_sort_(array, cmp);
+    merge_sort_(arena, array, cmp);
 }
 
-static void merge_sort_(t_array *array, t_cmp_entry cmp) {
+static void merge_sort_(Arena *arena, t_array *array, t_cmp_entry cmp) {
     const uint64_t max_len = (uint64_t)(SIZE_MAX / sizeof(void *));
     if (array->len > max_len) {
         return;
     }
 
-    void **tmp = (void **)malloc((size_t)array->len * sizeof(*tmp));
+    void **tmp = (void **)arena_push(arena, (size_t)array->len * sizeof(*tmp));
     if (!tmp) {
         return;
     }
@@ -66,7 +68,7 @@ static void merge_sort_(t_array *array, t_cmp_entry cmp) {
         width += width;
     }
 
-    free((void *)tmp);
+    arena_clear(arena);
 }
 
 static uint64_t add_capped_(uint64_t lhs, uint64_t rhs, uint64_t cap) {
@@ -108,7 +110,7 @@ static void merge_(void **data, void **tmp, uint64_t left, uint64_t mid,
 }
 
 static int cmp_name_entry_(const t_entry *a, const t_entry *b) {
-    return compare_(a->name, b->name);
+    return compare_(entry_name_(a), entry_name_(b));
 }
 
 static int cmp_name_entry_rev_(const t_entry *a, const t_entry *b) {
@@ -121,11 +123,15 @@ static int cmp_time_entry_(const t_entry *a, const t_entry *b) {
         return -cmp;
     }
 
-    return compare_(a->name, b->name);
+    return compare_(entry_name_(a), entry_name_(b));
 }
 
 static int cmp_time_entry_rev_(const t_entry *a, const t_entry *b) {
     return cmp_time_entry_(b, a);
+}
+
+static const t_str *entry_name_(const t_entry *entry) {
+    return entry->name ? entry->name : entry->path;
 }
 
 static int compare_(const t_str *lhs, const t_str *rhs) {

@@ -18,13 +18,13 @@ typedef struct {
     bool have_quote;
 } t_sizes;
 
-static bool printer_(t_str *out, t_array *array, const t_sizes *sizes);
+static void printer_(t_str *out, t_array *array, const t_sizes *sizes);
 static void get_sizes_(t_array *array, t_sizes *sizes);
 static bool left_pad_(t_str *out, uint64_t src_len, uint64_t max_size);
 static bool put_uint_(t_str *out, uint64_t value);
 
 void print_list(t_ps *ps) {
-    t_sizes sizes = {.have_quote = ps->quote_padding || have_quotes(ps->array),
+    t_sizes sizes = {.have_quote = ps->quote_padding,
                      .max_len_links = ps->min_len_links,
                      .max_len_sizes = ps->min_len_sizes};
     char buffer[OUTPUT_BUFFER_CAP];
@@ -33,27 +33,22 @@ void print_list(t_ps *ps) {
 
     get_sizes_(ps->array, &sizes);
     if (!put_dir_header(&out, ps->dir_entry)) {
-        goto done;
+        return;
     }
 
     if (ps->print_total) {
         if (!put_mem(&out, "total ", 6) ||
             !put_uint_(&out, (sizes.total + 1) / 2) ||
             !put_mem(&out, "\n", 1)) {
-            goto done;
+            return;
         }
     }
 
-    if (!printer_(&out, ps->array, &sizes)) {
-        goto done;
-    }
-
+    printer_(&out, ps->array, &sizes);
     (void)flush_str(&out);
-done:
-    return;
 }
 
-static bool printer_(t_str *out, t_array *array, const t_sizes *sizes) {
+static void printer_(t_str *out, t_array *array, const t_sizes *sizes) {
     for (uint64_t index = 0; index < array->len; ++index) {
         const t_entry *entry = array->data[index];
 
@@ -75,23 +70,21 @@ static bool printer_(t_str *out, t_array *array, const t_sizes *sizes) {
             !put_mem(out, entry->info->dt->str, entry->info->dt->len) ||
             !put_mem(out, " ", 1) ||
             !escaped_out(out, entry->name, entry->quote, sizes->have_quote)) {
-            return false;
+            return;
         }
 
         if (entry->info->symlink && entry->info->symlink->len > 0) {
             if (!put_mem(out, " -> ", 4) ||
                 !put_mem(out, entry->info->symlink->str,
                          entry->info->symlink->len)) {
-                return false;
+                return;
             }
         }
 
         if (!put_mem(out, "\n", 1)) {
-            return false;
+            return;
         }
     }
-
-    return true;
 }
 
 static void get_sizes_(t_array *array, t_sizes *sizes) {
@@ -108,6 +101,10 @@ static void get_sizes_(t_array *array, t_sizes *sizes) {
 
         if (e->info->perm->len > sizes->max_len_perm) {
             sizes->max_len_perm = e->info->perm->len;
+        }
+
+        if (!sizes->have_quote && e->quote != '\0') {
+            sizes->have_quote = true;
         }
 
         sizes->total += e->info->blocks;
