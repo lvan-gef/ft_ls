@@ -5,8 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "./ft_arena.h"
 #include "./ft_free_list.h"
+#include "./ft_helper.h"
 
 typedef struct {
     char *str;
@@ -14,16 +14,6 @@ typedef struct {
     uint64_t len;
     uint64_t pos;
 } t_str;
-
-typedef enum e_alloc_kind { ALLOC_FL, ALLOC_ARENA } t_alloc_kind;
-
-typedef struct {
-    t_alloc_kind kind;
-    union {
-        free_list *fl;
-        Arena *arena;
-    } as;
-} t_alloc;
 
 t_str *init_str(const t_alloc *alloc, uint64_t cap);
 t_str *create_str(const t_alloc *alloc, const char *str);

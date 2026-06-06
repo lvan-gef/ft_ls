@@ -6,7 +6,6 @@
 #include <stdint.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <sys/xattr.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -46,7 +45,8 @@ static t_str *get_group_(const t_alloc *alloc, gid_t group_id);
 static t_str *get_dt_(const t_alloc *alloc, const struct timespec *ctim);
 static t_str *get_symlink_(const t_alloc *alloc, const t_entry *entry);
 static void free_info_(free_list *fl, t_file_info *info);
-static char get_attr_marker_(const t_alloc *alloc, const char *path);
+static void free_info_cb_(free_list *fl, void *ptr);
+static void free_str_cb_(free_list *fl, void *ptr);
 static char *user_cached(uid_t user_id);
 static void add_user_cache_(uid_t user_id, const char *username);
 static char *group_cached(gid_t group_id);
@@ -54,7 +54,7 @@ static void add_group_cache_(gid_t group_id, const char *groupname);
 
 t_entry *new_entry(const t_alloc *alloc, const t_entry *entry,
                    const struct dirent *dp) {
-    Arena_Mark mark;
+    Arena_Mark mark = {0};
     t_entry *ent = NULL;
 
     switch (alloc->kind) {
@@ -93,18 +93,13 @@ t_entry *new_entry(const t_alloc *alloc, const t_entry *entry,
     ent->padded_display_len = scan.padded_display_len;
     return ent;
 failed:
-    if (ent) {
-        switch (alloc->kind) {
-            case ALLOC_ARENA: arena_pop_to_mark(alloc->as.arena, mark); break;
-            case ALLOC_FL: fl_free(alloc->as.fl, ent); break;
-        }
-    }
+    free_alloc(alloc, mark, ent, fl_free);
     return NULL;
 }
 
 bool get_file_info(const t_alloc *alloc, t_entry *entry) {
     t_file_info *info = NULL;
-    Arena_Mark mark;
+    Arena_Mark mark = {0};
     switch (alloc->kind) {
         case ALLOC_ARENA:
             mark = arena_get_mark(alloc->as.arena);
@@ -127,12 +122,7 @@ bool get_file_info(const t_alloc *alloc, t_entry *entry) {
     return true;
 
 failed:
-    if (info) {
-        switch (alloc->kind) {
-            case ALLOC_ARENA: arena_pop_to_mark(alloc->as.arena, mark); break;
-            case ALLOC_FL: free_info_(alloc->as.fl, info); break;
-        }
-    }
+    free_alloc(alloc, mark, info, free_info_cb_);
 
     entry->info = NULL;
     return false;
@@ -238,11 +228,7 @@ static t_str *get_perm_(const t_alloc *alloc, const t_entry *entry) {
     str->str[index++] = entry->st.st_mode & S_IXOTH ? 'x' : '-';
 
     str->len = index;
-    char marker = get_attr_marker_(alloc, entry->path->str);
-    if (marker == '+' || marker == '.') {
-        str->str[str->len++] = marker;
-    }
-    str->str[str->len] = '\0';
+    str->str[index] = '\0';
     return str;
 }
 
@@ -308,7 +294,7 @@ static t_str *get_group_(const t_alloc *alloc, gid_t group_id) {
 }
 
 static t_str *get_dt_(const t_alloc *alloc, const struct timespec *ctim) {
-    Arena_Mark mark;
+    Arena_Mark mark = {0};
     t_str *new_str;
 
     if (alloc->kind == ALLOC_ARENA) {
@@ -322,10 +308,7 @@ static t_str *get_dt_(const t_alloc *alloc, const struct timespec *ctim) {
 
     const char *dt = ctime(&ctim->tv_sec);
     if (!dt) {
-        switch (alloc->kind) {
-            case ALLOC_ARENA: arena_pop_to_mark(alloc->as.arena, mark); break;
-            case ALLOC_FL: free_str(alloc->as.fl, new_str); break;
-        }
+        free_alloc(alloc, mark, new_str, free_str_cb_);
         return NULL;
     }
 
@@ -385,55 +368,12 @@ static void free_info_(free_list *fl, t_file_info *info) {
     fl_free(fl, info);
 }
 
-static char get_attr_marker_(const t_alloc *alloc, const char *path) {
-    ssize_t len = listxattr(path, NULL, 0);
-    if (len <= 0) {
-        return '\0';
-    }
+static void free_info_cb_(free_list *fl, void *ptr) {
+    free_info_(fl, ptr);
+}
 
-    char *buf = NULL;
-    Arena_Mark mark;
-    switch (alloc->kind) {
-        case ALLOC_ARENA:
-            mark = arena_get_mark(alloc->as.arena);
-            buf = arena_push(alloc->as.arena, (size_t)len);
-            break;
-        case ALLOC_FL: buf = fl_alloc(alloc->as.fl, (size_t)len, 8); break;
-    }
-
-    if (!buf) {
-        return '\0';
-    }
-
-    len = listxattr(path, buf, (size_t)len);
-    if (len <= 0) {
-        return '\0';
-    }
-
-    bool has_selinux = false;
-    const char *end = buf + len;
-    char marker = '\0';
-    for (char *name = buf; name < end; name += strlen(name) + 1) {
-        if (ft_strncmp(name, "system.posix_acl_access", 24) == 0) {
-            marker = '+';
-            break;
-        }
-
-        if (ft_strncmp(name, "security.selinux", 17) == 0) {
-            has_selinux = true;
-        }
-    }
-
-    switch (alloc->kind) {
-        case ALLOC_ARENA: arena_pop_to_mark(alloc->as.arena, mark); break;
-        case ALLOC_FL: fl_free(alloc->as.fl, buf); break;
-    }
-
-    if (marker) {
-        return marker;
-    }
-
-    return has_selinux ? '.' : '\0';
+static void free_str_cb_(free_list *fl, void *ptr) {
+    free_str(fl, ptr);
 }
 
 static char *user_cached(uid_t user_id) {

@@ -39,23 +39,16 @@ static void init_print_row_(t_ps *ps) {
                  .max = ps->array->len < max_cols ? ps->array->len : max_cols};
 
     bool quoted = ps->quote_padding;
-    char buffer[OUTPUT_BUFFER_CAP];
     uint64_t col_widths[(TERM_SIZE + SPACE_GAP) / (1 + SPACE_GAP)];
-    t_str out = {.str = buffer, .cap = sizeof(buffer), .len = 0, .pos = 0};
-    out.str[0] = '\0';
-
     calc_cols_(ps->array, &map, &quoted, col_widths);
 
-    if (!put_dir_header(&out, ps->dir_entry)) {
-        goto done;
+    if (!put_dir_header(ps->buffer, ps->dir_entry)) {
+        return;
     }
 
-    if (!create_row_(&out, ps->array, &map, col_widths, quoted)) {
-        goto done;
+    if (!create_row_(ps->buffer, ps->array, &map, col_widths, quoted)) {
+        return;
     }
-
-done:
-    flush_str(&out);
 }
 
 static bool create_row_(t_str *out, t_array *array, const t_map *map,

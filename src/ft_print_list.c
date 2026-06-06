@@ -10,45 +10,38 @@
 
 #include "../libft/include/libft.h"
 
-typedef struct {
-    uint64_t total;
-    uint64_t max_len_links;
-    uint64_t max_len_sizes;
-    uint64_t max_len_perm;
-    bool have_quote;
-} t_sizes;
-
-static void printer_(t_str *out, t_array *array, const t_sizes *sizes);
-static void get_sizes_(t_array *array, t_sizes *sizes);
+static void printer_(t_str *out, t_array *array, const t_list_stats *sizes);
 static bool left_pad_(t_str *out, uint64_t src_len, uint64_t max_size);
 static bool put_uint_(t_str *out, uint64_t value);
 
 void print_list(t_ps *ps) {
-    t_sizes sizes = {.have_quote = ps->quote_padding,
-                     .max_len_links = ps->min_len_links,
-                     .max_len_sizes = ps->min_len_sizes};
-    char buffer[OUTPUT_BUFFER_CAP];
-    t_str out = {.str = buffer, .cap = sizeof(buffer), .len = 0, .pos = 0};
-    out.str[0] = '\0';
+    t_list_stats sizes = ps->stats;
 
-    get_sizes_(ps->array, &sizes);
-    if (!put_dir_header(&out, ps->dir_entry)) {
+    if (sizes.max_len_links < ps->min_len_links) {
+        sizes.max_len_links = ps->min_len_links;
+    }
+
+    if (sizes.max_len_sizes < ps->min_len_sizes) {
+        sizes.max_len_sizes = ps->min_len_sizes;
+    }
+
+    sizes.have_quote = sizes.have_quote || ps->quote_padding;
+    if (!put_dir_header(ps->buffer, ps->dir_entry)) {
         return;
     }
 
     if (ps->print_total) {
-        if (!put_mem(&out, "total ", 6) ||
-            !put_uint_(&out, (sizes.total + 1) / 2) ||
-            !put_mem(&out, "\n", 1)) {
+        if (!put_mem(ps->buffer, "total ", 6) ||
+            !put_uint_(ps->buffer, (sizes.total + 1) / 2) ||
+            !put_mem(ps->buffer, "\n", 1)) {
             return;
         }
     }
 
-    printer_(&out, ps->array, &sizes);
-    (void)flush_str(&out);
+    printer_(ps->buffer, ps->array, &sizes);
 }
 
-static void printer_(t_str *out, t_array *array, const t_sizes *sizes) {
+static void printer_(t_str *out, t_array *array, const t_list_stats *sizes) {
     for (uint64_t index = 0; index < array->len; ++index) {
         const t_entry *entry = array->data[index];
 
@@ -84,30 +77,6 @@ static void printer_(t_str *out, t_array *array, const t_sizes *sizes) {
         if (!put_mem(out, "\n", 1)) {
             return;
         }
-    }
-}
-
-static void get_sizes_(t_array *array, t_sizes *sizes) {
-    for (uint64_t i = 0; i < array->len; ++i) {
-        const t_entry *e = array->data[i];
-
-        if (e->info->links->len > sizes->max_len_links) {
-            sizes->max_len_links = e->info->links->len;
-        }
-
-        if (e->info->size->len > sizes->max_len_sizes) {
-            sizes->max_len_sizes = e->info->size->len;
-        }
-
-        if (e->info->perm->len > sizes->max_len_perm) {
-            sizes->max_len_perm = e->info->perm->len;
-        }
-
-        if (!sizes->have_quote && e->quote != '\0') {
-            sizes->have_quote = true;
-        }
-
-        sizes->total += e->info->blocks;
     }
 }
 

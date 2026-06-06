@@ -9,7 +9,8 @@
 
 typedef int (*t_cmp_entry)(const t_entry *a, const t_entry *b);
 
-static void merge_sort_(Arena *arena, t_array *array, t_cmp_entry cmp);
+static bool ensure_sort_scratch_(t_sort_scratch *scratch, uint64_t need);
+static void merge_sort_(void **tmp, t_array *array, t_cmp_entry cmp);
 static uint64_t add_capped_(uint64_t lhs, uint64_t rhs, uint64_t cap);
 static void merge_(void **data, void **tmp, uint64_t left, uint64_t mid,
                    uint64_t right, t_cmp_entry cmp);
@@ -21,7 +22,8 @@ static t_str *entry_name_(const t_entry *entry);
 static int compare_(const t_str *lhs, const t_str *rhs);
 static int compare_time_(const struct timespec *a, const struct timespec *b);
 
-void sort(Arena *arena, t_array *array, bool reverse, bool sort_time) {
+void sort(t_sort_scratch *scratch, t_array *array, bool reverse,
+          bool sort_time) {
     if (array->len <= 1) {
         return;
     }
@@ -34,20 +36,45 @@ void sort(Arena *arena, t_array *array, bool reverse, bool sort_time) {
         cmp = reverse ? cmp_name_entry_rev_ : cmp_name_entry_;
     }
 
-    merge_sort_(arena, array, cmp);
+    if (!ensure_sort_scratch_(scratch, array->len)) {
+        return;
+    }
+
+    merge_sort_(scratch->data, array, cmp);
 }
 
-static void merge_sort_(Arena *arena, t_array *array, t_cmp_entry cmp) {
+static bool ensure_sort_scratch_(t_sort_scratch *scratch, uint64_t need) {
     const uint64_t max_len = (uint64_t)(SIZE_MAX / sizeof(void *));
-    if (array->len > max_len) {
-        return;
+    if (need > max_len) {
+        return false;
     }
 
-    void **tmp = (void **)arena_push(arena, (size_t)array->len * sizeof(*tmp));
-    if (!tmp) {
-        return;
+    if (scratch->cap >= need) {
+        return true;
     }
 
+    uint64_t new_cap = scratch->cap ? scratch->cap : 1;
+    while (new_cap < need) {
+        if (new_cap > max_len / 2) {
+            new_cap = need;
+            break;
+        }
+
+        new_cap *= 2;
+    }
+
+    void **new_data = malloc((size_t)new_cap * sizeof(*new_data));
+    if (!new_data) {
+        return false;
+    }
+
+    free(scratch->data);
+    scratch->data = new_data;
+    scratch->cap = new_cap;
+    return true;
+}
+
+static void merge_sort_(void **tmp, t_array *array, t_cmp_entry cmp) {
     for (uint64_t width = 1; width < array->len;) {
         uint64_t left = 0;
         while (left < array->len) {
@@ -67,8 +94,6 @@ static void merge_sort_(Arena *arena, t_array *array, t_cmp_entry cmp) {
 
         width += width;
     }
-
-    arena_clear(arena);
 }
 
 static uint64_t add_capped_(uint64_t lhs, uint64_t rhs, uint64_t cap) {

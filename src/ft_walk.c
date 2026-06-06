@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -12,6 +13,7 @@
 #include "../include/ft_free_list.h"
 #include "../include/ft_helper.h"
 #include "../include/ft_printer.h"
+#include "../include/ft_printer_helper.h"
 #include "../include/ft_shell_escape.h"
 #include "../include/ft_sort.h"
 #include "../include/ft_str.h"
@@ -24,14 +26,19 @@ typedef struct {
     t_args *args;
     free_list fl;
     Arena *temp_arena;
-    Arena *sort_arena;
+    t_sort_scratch sort_scratch;
     t_array *dirs;
     t_array *files;
+    char out_buf[OUTPUT_BUFFER_CAP];
+    t_str out;
+    t_list_stats file_stats;
+    t_list_stats dir_stats;
     uint64_t max_len_links;
     uint64_t max_len_sizes;
+    bool output_failed;
 } t_params;
 
-static bool run_(t_args *args, t_params *params, t_array *array,
+static bool run_(t_args *args, t_params *params, const t_array *array,
                  int *exit_code);
 static bool read_dir_(t_params *params, t_entry *path, int *exit_code);
 static bool walk_recurssive_(t_params *params);
@@ -49,9 +56,11 @@ static int check_links_(t_params *params, t_str *str, t_array *dir_entries,
                         struct stat *st, t_str **symlink, int *exit_code);
 static bool has_quoted_operands_(const t_array *array);
 static void clean_up_(t_params *params);
-static void print_err_(free_list *fl, t_str *str, int e, const char *prefix);
+static bool print_err_(t_params *params, t_str *str, int e, const char *prefix);
 static void set_entry_(t_entry *entry, t_str *str, const struct stat *st);
 static void fill_dir_entry_display_(t_entry *entry, const t_entry *src);
+static void free_str_cb_(free_list *fl, void *ptr);
+static void update_list_stats_(t_list_stats *stats, const t_entry *entry);
 static t_str *read_symlink_(const t_alloc *alloc, const t_str *path,
                             uint64_t target_size, int *read_err);
 
@@ -63,15 +72,18 @@ void process(t_args *args, t_array *array, int *exit_code) {
 
     params.args = args;
     fl_init(&params.fl, buffer, sizeof(buffer));
+    params.out = (t_str){.str = params.out_buf,
+                         .cap = sizeof(params.out_buf),
+                         .len = 0,
+                         .pos = 0};
+    params.out.str[0] = '\0';
     params.temp_arena = arena_alloc(ARENA_SIZE);
-    params.sort_arena = arena_alloc(ARENA_SIZE);
-    if (!params.temp_arena || !params.sort_arena) {
+    if (!params.temp_arena) {
         *exit_code = 2;
         goto cleanup;
     }
 
     arena_auto_align(params.temp_arena, 8);
-    arena_auto_align(params.sort_arena, 8);
 
     params.dirs = init_array(&params.fl, ARRAY_SIZE);
     params.files = init_array(&params.fl, ARRAY_SIZE);
@@ -81,30 +93,39 @@ void process(t_args *args, t_array *array, int *exit_code) {
         goto cleanup;
     }
 
+    if (!process_args_(&params, array, exit_code)) {
+        *exit_code = 2;
+        goto cleanup;
+    }
+
     if (!run_(args, &params, array, exit_code)) {
+        *exit_code = 2;
         goto cleanup;
     }
 cleanup:
     clean_up_(&params);
 }
 
-static bool run_(t_args *args, t_params *params, t_array *array,
+static bool run_(t_args *args, t_params *params, const t_array *array,
                  int *exit_code) {
-    if (!process_args_(params, array, exit_code)) {
-        return false;
-    }
-
     const bool has_quoted_operands = has_quoted_operands_(array);
     bool printed_files = false;
+    params->out.len = 0;
+    params->out.pos = 0;
+    params->out.str[0] = '\0';
+    params->output_failed = false;
+
     t_ps ps = {.args = args,
                .array = params->files,
                .dir_entry = NULL,
+               .buffer = &params->out,
+               .stats = params->file_stats,
                .print_total = false,
                .min_len_links = params->max_len_links,
                .min_len_sizes = params->max_len_sizes,
                .quote_padding = has_quoted_operands};
     if (params->files->len) {
-        sort(params->sort_arena, params->files, params->args->reverse,
+        sort(&params->sort_scratch, params->files, params->args->reverse,
              params->args->time);
         printer(&ps);
         printed_files = true;
@@ -118,34 +139,35 @@ static bool run_(t_args *args, t_params *params, t_array *array,
     ps.min_len_links = 0;
     ps.min_len_sizes = 0;
     ps.quote_padding = false;
+    t_entry *dir_path = NULL;
     while (params->dirs->len) {
-        t_entry *dir_path = pop_array(params->dirs);
+        dir_path = pop_array(params->dirs);
 
         if (!inserted_files_dirs_gap && printed_files && dir_path->is_operand) {
-            if (write(STDOUT_FILENO, "\n", 1) < 0) {
-                free_entry(&params->fl, dir_path);
-                return false;
+            if (!put_mem(ps.buffer, "\n", 1)) {
+                goto error;
             }
             inserted_files_dirs_gap = true;
         }
 
         if (!read_dir_(params, dir_path, exit_code)) {
             clear_temp_dir_(params);
+            if (params->output_failed) {
+                goto error;
+            }
             free_entry(&params->fl, dir_path);
             continue;
         }
 
-        sort(params->sort_arena, params->files, params->args->reverse,
+        sort(&params->sort_scratch, params->files, params->args->reverse,
              params->args->time);
         if (!walk_recurssive_(params)) {
-            free_entry(&params->fl, dir_path);
-            return false;
+            goto error;
         }
 
         if (printed_dir) {
-            if (write(STDOUT_FILENO, "\n", 1) < 0) {
-                free_entry(&params->fl, dir_path);
-                return false;
+            if (!put_mem(ps.buffer, "\n", 1)) {
+                goto error;
             }
         }
 
@@ -157,13 +179,18 @@ static bool run_(t_args *args, t_params *params, t_array *array,
         t_entry *ent = print_dir_path ? &entry : NULL;
         ps.array = params->files;
         ps.dir_entry = ent;
+        ps.stats = params->dir_stats;
         printer(&ps);
         printed_dir = true;
         clear_temp_dir_(params);
         free_entry(&params->fl, dir_path);
     }
 
-    return true;
+    return flush_str(&params->out);
+error:
+    free_entry(&params->fl, dir_path);
+    flush_str(&params->out);
+    return false;
 }
 
 static bool process_args_(t_params *params, t_array *array, int *exit_code) {
@@ -232,6 +259,8 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
                 free_entry(&params->fl, entry);
                 goto failed;
             }
+
+            update_list_stats_(&params->file_stats, entry);
         }
 
         if (!append_array(params->files, entry)) {
@@ -241,7 +270,7 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
     }
 
     if (dir_entries->len) {
-        sort(params->sort_arena, dir_entries, params->args->reverse,
+        sort(&params->sort_scratch, dir_entries, params->args->reverse,
              params->args->time);
         while (dir_entries->len) {
             t_entry *entry = pop_array(dir_entries);
@@ -269,7 +298,9 @@ static int check_links_(t_params *params, t_str *str, t_array *dir_entries,
     if (lstat(str->str, st) == -1) {
         e = errno;
         const char *prefix = "cannot access";
-        print_err_(&params->fl, str, e, prefix);
+        if (!print_err_(params, str, e, prefix)) {
+            return -1;
+        }
         *exit_code = 2;
         return 0;
     }
@@ -304,9 +335,13 @@ static int check_links_(t_params *params, t_str *str, t_array *dir_entries,
         if (e != 0) {
             *exit_code = 2;
             if (params->args->list) {
-                print_err_(&params->fl, str, e, "cannot read symbolic link");
+                if (!print_err_(params, str, e, "cannot read symbolic link")) {
+                    return -1;
+                }
             } else {
-                print_err_(&params->fl, str, e, "cannot access");
+                if (!print_err_(params, str, e, "cannot access")) {
+                    return -1;
+                }
                 return 0;
             }
         }
@@ -335,12 +370,15 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
     DIR *d = opendir(path->path->str);
     if (!d) {
         int e = errno;
-        print_err_(&params->fl, path->path, e, "cannot open directory");
+        if (!print_err_(params, path->path, e, "cannot open directory")) {
+            params->output_failed = true;
+        }
         *exit_code = (path->is_operand ? 2 : 1);
         return false;
     }
 
     clear_temp_dir_(params);
+    params->dir_stats = (t_list_stats){0};
     const struct dirent *dp;
 
     const t_alloc alloc = {.kind = ALLOC_ARENA, .as.arena = params->temp_arena};
@@ -384,6 +422,8 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
             if (!get_file_info(&alloc, entry)) {
                 goto cleanup;
             }
+
+            update_list_stats_(&params->dir_stats, entry);
         }
 
         if (!append_array(params->files, entry)) {
@@ -558,16 +598,20 @@ static void clean_up_(t_params *params) {
         arena_release(params->temp_arena);
     }
 
-    if (params->sort_arena) {
-        arena_release(params->sort_arena);
-    }
-
+    free(params->sort_scratch.data);
     fl_free_all(&params->fl);
 }
 
-static void print_err_(free_list *fl, t_str *str, int e, const char *prefix) {
+static bool print_err_(t_params *params, t_str *str, int e,
+                       const char *prefix) {
     const char *msg = strerror(e);
     t_shell_scan scan;
+    free_list *fl = &params->fl;
+
+    if (!flush_str(&params->out)) {
+        params->output_failed = true;
+        return false;
+    }
 
     shell_scan_str(str, &scan);
     if (scan.quote != '\0') {
@@ -576,11 +620,12 @@ static void print_err_(free_list *fl, t_str *str, int e, const char *prefix) {
             ft_fprintf(STDERR_FILENO, "ft_ls: %s %s: %s\n", prefix,
                        new_str->str, msg);
             free_str(fl, new_str);
-            return;
+            return true;
         }
     }
 
     ft_fprintf(STDERR_FILENO, "ft_ls: %s '%s': %s\n", prefix, str->str, msg);
+    return true;
 }
 
 static void set_entry_(t_entry *entry, t_str *str, const struct stat *st) {
@@ -605,9 +650,33 @@ static void fill_dir_entry_display_(t_entry *entry, const t_entry *src) {
     }
 }
 
+static void free_str_cb_(free_list *fl, void *ptr) {
+    free_str(fl, ptr);
+}
+
+static void update_list_stats_(t_list_stats *stats, const t_entry *entry) {
+    if (entry->info->links->len > stats->max_len_links) {
+        stats->max_len_links = entry->info->links->len;
+    }
+
+    if (entry->info->size->len > stats->max_len_sizes) {
+        stats->max_len_sizes = entry->info->size->len;
+    }
+
+    if (entry->info->perm->len > stats->max_len_perm) {
+        stats->max_len_perm = entry->info->perm->len;
+    }
+
+    if (!stats->have_quote && entry->quote != '\0') {
+        stats->have_quote = true;
+    }
+
+    stats->total += entry->info->blocks;
+}
+
 static t_str *read_symlink_(const t_alloc *alloc, const t_str *path,
-                     uint64_t target_size, int *read_err) {
-    Arena_Mark mark;
+                            uint64_t target_size, int *read_err) {
+    Arena_Mark mark = {0};
 
     if (read_err) {
         *read_err = 0;
@@ -628,12 +697,7 @@ static t_str *read_symlink_(const t_alloc *alloc, const t_str *path,
         ssize_t len = readlink(path->str, new_str->str, read_size);
         if (len < 0) {
             const int err = errno;
-            switch (alloc->kind) {
-                case ALLOC_ARENA:
-                    arena_pop_to_mark(alloc->as.arena, mark);
-                    break;
-                case ALLOC_FL: free_str(alloc->as.fl, new_str); break;
-            }
+            free_alloc(alloc, mark, new_str, free_str_cb_);
 
             if (err == ENOENT || err == EINVAL || err == EACCES ||
                 err == EPERM) {
@@ -647,15 +711,12 @@ static t_str *read_symlink_(const t_alloc *alloc, const t_str *path,
         }
 
         if ((uint64_t)len < cap) {
-            new_str->len = len < 0 ? 0 : (uint64_t)len;
+            new_str->len = (uint64_t)len;
             new_str->str[new_str->len] = '\0';
             return new_str;
         }
 
-        switch (alloc->kind) {
-            case ALLOC_ARENA: arena_pop_to_mark(alloc->as.arena, mark); break;
-            case ALLOC_FL: free_str(alloc->as.fl, new_str); break;
-        }
+        free_alloc(alloc, mark, new_str, free_str_cb_);
 
         if (cap > 0x3FFFFFFFFFFFFFFF) {
             return NULL;
