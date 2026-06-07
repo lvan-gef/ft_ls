@@ -24,12 +24,21 @@ static bool create_row_(t_str *out, t_array *array, const t_map *map,
                         const uint64_t *col_widths, bool quoted);
 static bool indent_(t_str *out, uint64_t from, uint64_t to);
 
-void printer(t_ps *ps) {
-    if (ps->args->list) {
+void printer(t_ps *ps, bool list_mode) {
+    if (list_mode) {
         print_list(ps);
     } else {
         init_print_row_(ps);
     }
+}
+
+bool put_dir_header(t_str *out, const t_entry *dir_entry) {
+    if (!dir_entry) {
+        return true;
+    }
+
+    return escaped_out(out, dir_entry->name, dir_entry->quote, false) &&
+           put_mem(out, ":\n", 2);
 }
 
 static void init_print_row_(t_ps *ps) {

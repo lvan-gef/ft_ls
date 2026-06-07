@@ -14,6 +14,7 @@
 #include "../include/ft_free_list.h"
 #include "../include/ft_shell_escape.h"
 #include "../include/ft_str.h"
+#include "../include/ft_helper.h"
 
 #include "../libft/include/libft.h"
 
@@ -21,50 +22,47 @@
 #define CACHE_SIZE UINT64_C(8)
 #endif
 
-typedef struct s_user {
-    char name[LOGIN_NAME_MAX];
-    uid_t user_id;
-} t_user;
+#ifndef PERMISSION_SIZE
+#define PERMISSION_SIZE UINT64_C(12)
+#endif // ifndef PERMISSION_SIZE //
 
-typedef struct s_group {
+#ifndef DT_LEN
+#define DT_LEN UINT64_C(13)
+#endif // ifndef DT_LEN //
+
+typedef struct {
     char name[LOGIN_NAME_MAX];
-    gid_t group_id;
-} t_group;
+    uint64_t id;
+} t_id_cache_entry;
 
 static uint64_t user_index = 0;
-static t_user user_cache[CACHE_SIZE] = {0};
+static t_id_cache_entry user_cache[CACHE_SIZE] = {0};
 
 static uint64_t group_index = 0;
-static t_group group_cache[CACHE_SIZE] = {0};
+static t_id_cache_entry group_cache[CACHE_SIZE] = {0};
 
 static bool fill_file_info_(const t_alloc *alloc, t_file_info *info,
                             const t_entry *entry);
+static t_str *join_dir_path_(const t_alloc *alloc, const t_str *lhs,
+                             const t_str *rhs);
+static void fill_dir_entry_display_(t_entry *entry, const t_entry *src);
 static t_str *get_perm_(const t_alloc *alloc, const t_entry *entry);
 static t_str *get_user_(const t_alloc *alloc, uid_t user_id);
 static t_str *get_group_(const t_alloc *alloc, gid_t group_id);
 static t_str *get_dt_(const t_alloc *alloc, const struct timespec *ctim);
 static t_str *get_symlink_(const t_alloc *alloc, const t_entry *entry);
+static void free_entry_cb_(free_list *fl, void *ptr);
 static void free_info_(free_list *fl, t_file_info *info);
 static void free_info_cb_(free_list *fl, void *ptr);
 static void free_str_cb_(free_list *fl, void *ptr);
-static char *user_cached(uid_t user_id);
-static void add_user_cache_(uid_t user_id, const char *username);
-static char *group_cached(gid_t group_id);
-static void add_group_cache_(gid_t group_id, const char *groupname);
+static char *cache_lookup_(t_id_cache_entry *cache, uint64_t id);
+static void cache_store_(t_id_cache_entry *cache, uint64_t *next, uint64_t id,
+                         const char *name);
 
 t_entry *new_entry(const t_alloc *alloc, const t_entry *entry,
                    const struct dirent *dp) {
     Arena_Mark mark = {0};
-    t_entry *ent = NULL;
-
-    switch (alloc->kind) {
-        case ALLOC_ARENA:
-            mark = arena_get_mark(alloc->as.arena);
-            ent = arena_push(alloc->as.arena, sizeof(*ent));
-            break;
-        case ALLOC_FL: ent = fl_alloc(alloc->as.fl, sizeof(*ent), 8); break;
-    }
-
+    t_entry *ent = alloc_mem(alloc, &mark, sizeof(*ent));
     if (!ent) {
         return NULL;
     }
@@ -98,22 +96,13 @@ failed:
 }
 
 bool get_file_info(const t_alloc *alloc, t_entry *entry) {
-    t_file_info *info = NULL;
     Arena_Mark mark = {0};
-    switch (alloc->kind) {
-        case ALLOC_ARENA:
-            mark = arena_get_mark(alloc->as.arena);
-            info = arena_push(alloc->as.arena, sizeof(*info));
-            break;
-        case ALLOC_FL: info = fl_alloc(alloc->as.fl, sizeof(*info), 8); break;
-    }
-
+    t_file_info *info = alloc_mem(alloc, &mark, sizeof(*info));
     if (!info) {
         goto failed;
     }
 
     *info = (t_file_info){0};
-
     if (!fill_file_info_(alloc, info, entry)) {
         goto failed;
     }
@@ -135,6 +124,103 @@ void init_entry_display(t_entry *entry) {
     entry->quote = scan.quote;
     entry->display_len = scan.display_len;
     entry->padded_display_len = scan.padded_display_len;
+}
+
+bool ensure_entry_path(const t_alloc *alloc, t_entry *entry) {
+    if (entry->path) {
+        return true;
+    }
+
+    if (!entry->parent_path || !entry->name) {
+        return false;
+    }
+
+    entry->path = join_dir_path_(alloc, entry->parent_path, entry->name);
+    return entry->path != NULL;
+}
+
+t_entry *dup_dir_entry(const t_alloc *alloc, const t_entry *src,
+                       bool is_operand) {
+    Arena_Mark mark = {0};
+    t_entry *entry = alloc_mem(alloc, &mark, sizeof(*entry));
+    if (!entry) {
+        return NULL;
+    }
+
+    *entry = (t_entry){0};
+    if (!src->path) {
+        if (!src->parent_path || !src->name) {
+            goto failed;
+        }
+
+        entry->path = join_dir_path_(alloc, src->parent_path, src->name);
+    } else {
+        entry->path = dup_str(alloc, src->path);
+    }
+
+    if (!entry->path) {
+        goto failed;
+    }
+
+    entry->st = src->st;
+    fill_dir_entry_display_(entry, src);
+    entry->is_operand = is_operand;
+    return entry;
+failed:
+    free_alloc(alloc, mark, entry, free_entry_cb_);
+    return NULL;
+}
+
+t_str *read_symlink_target(const t_alloc *alloc, const t_str *path,
+                           uint64_t target_size, int *read_err) {
+    Arena_Mark mark = {0};
+
+    if (read_err) {
+        *read_err = 0;
+    }
+
+    if (alloc->kind == ALLOC_ARENA) {
+        mark = arena_get_mark(alloc->as.arena);
+    }
+
+    uint64_t cap = (target_size > 0) ? target_size + 1 : (uint64_t)PATH_MAX;
+    while (true) {
+        t_str *new_str = init_str(alloc, cap);
+        if (!new_str) {
+            return NULL;
+        }
+
+        const size_t read_size = (cap > (size_t)-1) ? (size_t)-1 : (size_t)cap;
+        ssize_t len = readlink(path->str, new_str->str, read_size);
+        if (len < 0) {
+            const int err = errno;
+            free_alloc(alloc, mark, new_str, free_str_cb_);
+
+            if (err == ENOENT || err == EINVAL || err == EACCES ||
+                err == EPERM) {
+                if (read_err) {
+                    *read_err = err;
+                }
+                return init_str(alloc, 1);
+            }
+
+            return NULL;
+        }
+
+        if ((uint64_t)len < cap) {
+            new_str->len = (uint64_t)len;
+            new_str->str[new_str->len] = '\0';
+            return new_str;
+        }
+
+        free_alloc(alloc, mark, new_str, free_str_cb_);
+
+        if (cap > 0x3FFFFFFFFFFFFFFF) {
+            return NULL;
+        }
+
+        cap *= 2;
+    }
 }
 
 void free_entry(free_list *fl, t_entry *entry) {
@@ -202,6 +288,43 @@ static bool fill_file_info_(const t_alloc *alloc, t_file_info *info,
     return true;
 }
 
+static t_str *join_dir_path_(const t_alloc *alloc, const t_str *lhs,
+                             const t_str *rhs) {
+    const bool need_slash = lhs->len == 0 || lhs->str[lhs->len - 1] != '/';
+    const uint64_t total_len = lhs->len + rhs->len + (need_slash ? 1U : 0U);
+    t_str *path = init_str(alloc, total_len);
+
+    if (!path) {
+        return NULL;
+    }
+
+    ft_memcpy(path->str, lhs->str + lhs->pos, (size_t)lhs->len);
+    path->len = lhs->len;
+    if (need_slash) {
+        path->str[path->len++] = '/';
+    }
+
+    ft_memcpy(path->str + path->len, rhs->str + rhs->pos, (size_t)rhs->len);
+    path->len += rhs->len;
+    path->str[path->len] = '\0';
+    return path;
+}
+
+static void fill_dir_entry_display_(t_entry *entry, const t_entry *src) {
+    t_shell_scan scan;
+
+    shell_scan_str(entry->path, &scan);
+    entry->quote = scan.quote;
+    entry->path_has_colon = src->path_has_colon;
+    entry->display_len = scan.display_len;
+    entry->padded_display_len = scan.padded_display_len;
+    if (entry->quote == '\0' && entry->path_has_colon) {
+        entry->quote = '\'';
+        entry->display_len = entry->path->len + 2;
+        entry->padded_display_len = entry->display_len;
+    }
+}
+
 static t_str *get_perm_(const t_alloc *alloc, const t_entry *entry) {
     t_str *str = init_str(alloc, PERMISSION_SIZE);
     if (!str) {
@@ -233,9 +356,9 @@ static t_str *get_perm_(const t_alloc *alloc, const t_entry *entry) {
 }
 
 static t_str *get_user_(const t_alloc *alloc, uid_t user_id) {
-    const char *user_name = user_cached(user_id);
-    if (user_name) {
-        return create_str(alloc, user_name);
+    const char *name = cache_lookup_(user_cache, (uint64_t)user_id);
+    if (name) {
+        return create_str(alloc, name);
     }
 
     const struct passwd *pwd = getpwuid(user_id);
@@ -245,7 +368,7 @@ static t_str *get_user_(const t_alloc *alloc, uid_t user_id) {
         if (!new_str) {
             return NULL;
         }
-        add_user_cache_(user_id, pwd->pw_name);
+        cache_store_(user_cache, &user_index, (uint64_t)user_id, pwd->pw_name);
     } else {
         const int err = errno;
 
@@ -255,7 +378,8 @@ static t_str *get_user_(const t_alloc *alloc, uid_t user_id) {
         }
 
         if (!err) {
-            add_user_cache_(user_id, new_str->str);
+            cache_store_(user_cache, &user_index, (uint64_t)user_id,
+                         new_str->str);
         }
     }
 
@@ -263,9 +387,9 @@ static t_str *get_user_(const t_alloc *alloc, uid_t user_id) {
 }
 
 static t_str *get_group_(const t_alloc *alloc, gid_t group_id) {
-    const char *group_name = group_cached(group_id);
-    if (group_name) {
-        return create_str(alloc, group_name);
+    const char *name = cache_lookup_(group_cache, (uint64_t)group_id);
+    if (name) {
+        return create_str(alloc, name);
     }
 
     const struct group *grp = getgrgid(group_id);
@@ -276,7 +400,8 @@ static t_str *get_group_(const t_alloc *alloc, gid_t group_id) {
             return NULL;
         }
 
-        add_group_cache_(group_id, grp->gr_name);
+        cache_store_(group_cache, &group_index, (uint64_t)group_id,
+                     grp->gr_name);
     } else {
         const int err = errno;
 
@@ -286,7 +411,8 @@ static t_str *get_group_(const t_alloc *alloc, gid_t group_id) {
         }
 
         if (!err) {
-            add_group_cache_(group_id, new_str->str);
+            cache_store_(group_cache, &group_index, (uint64_t)group_id,
+                         new_str->str);
         }
     }
 
@@ -372,57 +498,32 @@ static void free_info_cb_(free_list *fl, void *ptr) {
     free_info_(fl, ptr);
 }
 
+static void free_entry_cb_(free_list *fl, void *ptr) {
+    free_entry(fl, ptr);
+}
+
 static void free_str_cb_(free_list *fl, void *ptr) {
     free_str(fl, ptr);
 }
 
-static char *user_cached(uid_t user_id) {
+static char *cache_lookup_(t_id_cache_entry *cache, uint64_t id) {
     for (uint64_t index = 0; index < CACHE_SIZE; ++index) {
-        if (!*user_cache[index].name) {
+        if (!*cache[index].name) {
             continue;
         }
 
-        if (user_id == user_cache[index].user_id) {
-            return user_cache[index].name;
+        if (cache[index].id == id) {
+            return cache[index].name;
         }
     }
 
     return NULL;
 }
 
-static void add_user_cache_(uid_t user_id, const char *username) {
-    if (!username || !*username) {
-        return;
-    }
-
-    const uint64_t index = user_index % CACHE_SIZE;
-    user_cache[index].user_id = user_id;
-    ft_strlcpy(user_cache[index].name, username, LOGIN_NAME_MAX);
-    ++user_index;
-}
-
-static char *group_cached(gid_t group_id) {
-    for (uint64_t index = 0; index < CACHE_SIZE; ++index) {
-        if (!*group_cache[index].name) {
-            continue;
-            ;
-        }
-
-        if (group_id == group_cache[index].group_id) {
-            return group_cache[index].name;
-        }
-    }
-
-    return NULL;
-}
-
-static void add_group_cache_(gid_t group_id, const char *groupname) {
-    if (!groupname || !*groupname) {
-        return;
-    }
-
-    const uint64_t index = group_index % CACHE_SIZE;
-    group_cache[index].group_id = group_id;
-    ft_strlcpy(group_cache[index].name, groupname, LOGIN_NAME_MAX);
-    ++group_index;
+static void cache_store_(t_id_cache_entry *cache, uint64_t *next, uint64_t id,
+                         const char *name) {
+    const uint64_t index = *next % CACHE_SIZE;
+    cache[index].id = id;
+    ft_strlcpy(cache[index].name, name, LOGIN_NAME_MAX);
+    ++(*next);
 }

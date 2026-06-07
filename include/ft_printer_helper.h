@@ -4,7 +4,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "./ft_entry.h"
 #include "./ft_str.h"
 
 #ifndef TABSIZE
@@ -25,6 +24,5 @@
 
 bool put_mem(t_str *out, const char *src, uint64_t len);
 bool flush_str(t_str *out);
-bool put_dir_header(t_str *out, const t_entry *dir_entry);
 
 #endif // !FT_PRINTER_HELPER_H

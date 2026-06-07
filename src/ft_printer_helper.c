@@ -2,9 +2,7 @@
 #include <stdint.h>
 #include <unistd.h>
 
-#include "../include/ft_entry.h"
 #include "../include/ft_printer_helper.h"
-#include "../include/ft_shell_escape.h"
 #include "../include/ft_str.h"
 
 #include "../libft/include/libft.h"
@@ -39,13 +37,4 @@ bool flush_str(t_str *out) {
     out->len = 0;
     out->str[0] = '\0';
     return true;
-}
-
-bool put_dir_header(t_str *out, const t_entry *dir_entry) {
-    if (!dir_entry) {
-        return true;
-    }
-
-    return escaped_out(out, dir_entry->name, dir_entry->quote, false) &&
-           put_mem(out, ":\n", 2);
 }

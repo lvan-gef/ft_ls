@@ -38,33 +38,20 @@ typedef struct {
     bool output_failed;
 } t_params;
 
-static bool run_(t_args *args, t_params *params, const t_array *array,
-                 int *exit_code);
+static bool run_(t_params *params, const t_array *array, int *exit_code);
 static bool read_dir_(t_params *params, t_entry *path, int *exit_code);
 static bool walk_recurssive_(t_params *params);
 static bool process_args_(t_params *params, t_array *array, int *exit_code);
 static void clear_temp_dir_(t_params *params);
 static void free_entry_array_(t_params *params, t_array *array);
-static t_str *join_dir_path_(const t_alloc *alloc, const t_str *lhs,
-                             const t_str *rhs);
-static bool ensure_entry_path_(const t_alloc *alloc, t_entry *entry);
 static mode_t mode_from_dtype_(unsigned char dtype);
 static bool entry_needs_lstat_(const t_args *args, unsigned char dtype);
-static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
-                                 bool is_operand);
 static int check_links_(t_params *params, t_str *str, t_array *dir_entries,
                         struct stat *st, t_str **symlink, int *exit_code);
 static bool has_quoted_operands_(const t_array *array);
 static void clean_up_(t_params *params);
 static bool print_err_(t_params *params, t_str *str, int e, const char *prefix);
 static void set_entry_(t_entry *entry, t_str *str, const struct stat *st);
-static void fill_dir_entry_display_(t_entry *entry, const t_entry *src);
-static void free_str_cb_(free_list *fl, void *ptr);
-static void update_list_stats_(t_list_stats *stats, const t_entry *entry);
-static t_str *read_symlink_(const t_alloc *alloc, const t_str *path,
-                            uint64_t target_size, int *read_err);
-
-typedef enum { SINGLE_QUOTE = '\'', DOUBLE_QUOTE = '\"', SPACE = ' ' } t_quote;
 
 void process(t_args *args, t_array *array, int *exit_code) {
     unsigned char buffer[FL_DEFAULT_SIZE];
@@ -98,7 +85,7 @@ void process(t_args *args, t_array *array, int *exit_code) {
         goto cleanup;
     }
 
-    if (!run_(args, &params, array, exit_code)) {
+    if (!run_(&params, array, exit_code)) {
         *exit_code = 2;
         goto cleanup;
     }
@@ -106,8 +93,7 @@ cleanup:
     clean_up_(&params);
 }
 
-static bool run_(t_args *args, t_params *params, const t_array *array,
-                 int *exit_code) {
+static bool run_(t_params *params, const t_array *array, int *exit_code) {
     const bool has_quoted_operands = has_quoted_operands_(array);
     bool printed_files = false;
     params->out.len = 0;
@@ -115,8 +101,7 @@ static bool run_(t_args *args, t_params *params, const t_array *array,
     params->out.str[0] = '\0';
     params->output_failed = false;
 
-    t_ps ps = {.args = args,
-               .array = params->files,
+    t_ps ps = {.array = params->files,
                .dir_entry = NULL,
                .buffer = &params->out,
                .stats = params->file_stats,
@@ -125,16 +110,19 @@ static bool run_(t_args *args, t_params *params, const t_array *array,
                .min_len_sizes = params->max_len_sizes,
                .quote_padding = has_quoted_operands};
     if (params->files->len) {
-        sort(&params->sort_scratch, params->files, params->args->reverse,
-             params->args->time);
-        printer(&ps);
+        if (!sort(&params->sort_scratch, params->files, params->args->reverse,
+             params->args->time)) {
+            free_entry_array_(params, params->files);
+            return false;
+        }
+        printer(&ps, params->args->list);
         printed_files = true;
         free_entry_array_(params, params->files);
     }
 
     bool printed_dir = false;
     bool inserted_files_dirs_gap = false;
-    const bool print_dir_path = args->recursive || array->len > 1;
+    const bool print_dir_path = params->args->recursive || array->len > 1;
     ps.print_total = true;
     ps.min_len_links = 0;
     ps.min_len_sizes = 0;
@@ -159,8 +147,11 @@ static bool run_(t_args *args, t_params *params, const t_array *array,
             continue;
         }
 
-        sort(&params->sort_scratch, params->files, params->args->reverse,
-             params->args->time);
+        if (!sort(&params->sort_scratch, params->files, params->args->reverse,
+             params->args->time)) {
+            goto error;
+        }
+
         if (!walk_recurssive_(params)) {
             goto error;
         }
@@ -180,7 +171,7 @@ static bool run_(t_args *args, t_params *params, const t_array *array,
         ps.array = params->files;
         ps.dir_entry = ent;
         ps.stats = params->dir_stats;
-        printer(&ps);
+        printer(&ps, params->args->list);
         printed_dir = true;
         clear_temp_dir_(params);
         free_entry(&params->fl, dir_path);
@@ -223,7 +214,7 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
         if (S_ISDIR(st.st_mode)) {
             t_entry src = {0};
             set_entry_(&src, str, &st);
-            t_entry *dir_entry = queue_dir_entry_(params, &src, true);
+            t_entry *dir_entry = dup_dir_entry(&alloc, &src, true);
             if (!dir_entry) {
                 goto failed;
             }
@@ -260,7 +251,7 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
                 goto failed;
             }
 
-            update_list_stats_(&params->file_stats, entry);
+            update_list_stats(&params->file_stats, entry);
         }
 
         if (!append_array(params->files, entry)) {
@@ -270,8 +261,11 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
     }
 
     if (dir_entries->len) {
-        sort(&params->sort_scratch, dir_entries, params->args->reverse,
-             params->args->time);
+        if (!sort(&params->sort_scratch, dir_entries, params->args->reverse,
+             params->args->time)) {
+            goto failed;
+        }
+
         while (dir_entries->len) {
             t_entry *entry = pop_array(dir_entries);
             entry->is_operand = true;
@@ -320,14 +314,14 @@ static int check_links_(t_params *params, t_str *str, t_array *dir_entries,
     bool is_dir_operand = S_ISDIR(st->st_mode);
     struct stat *st_dir = st;
     struct stat st_target;
+    const t_alloc alloc = {.kind = ALLOC_FL, .as.fl = &params->fl};
     if (S_ISLNK(st->st_mode)) {
-        const t_alloc alloc = {.kind = ALLOC_FL, .as.fl = &params->fl};
         if (stat(str->str, &st_target) == 0 && S_ISDIR(st_target.st_mode)) {
             is_dir_operand = true;
             st_dir = &st_target;
         }
 
-        *symlink = read_symlink_(&alloc, str, (uint64_t)st->st_size, &e);
+        *symlink = read_symlink_target(&alloc, str, (uint64_t)st->st_size, &e);
         if (!*symlink) {
             return -1;
         }
@@ -350,7 +344,7 @@ static int check_links_(t_params *params, t_str *str, t_array *dir_entries,
     if (is_dir_operand && !params->args->list) {
         t_entry src = {0};
         set_entry_(&src, str, st_dir);
-        t_entry *dir_entry = queue_dir_entry_(params, &src, true);
+        t_entry *dir_entry = dup_dir_entry(&alloc, &src, true);
         if (!dir_entry) {
             return -1;
         }
@@ -378,7 +372,6 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
     }
 
     clear_temp_dir_(params);
-    params->dir_stats = (t_list_stats){0};
     const struct dirent *dp;
 
     const t_alloc alloc = {.kind = ALLOC_ARENA, .as.arena = params->temp_arena};
@@ -396,7 +389,7 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
         }
 
         if (need_lstat) {
-            if (!ensure_entry_path_(&alloc, entry)) {
+            if (!ensure_entry_path(&alloc, entry)) {
                 goto cleanup;
             }
 
@@ -406,7 +399,7 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
             }
 
             if (params->args->list && S_ISLNK(entry->st.st_mode)) {
-                entry->symlink = read_symlink_(
+                entry->symlink = read_symlink_target(
                     &alloc, entry->path, (uint64_t)entry->st.st_size, NULL);
                 if (!entry->symlink) {
                     goto cleanup;
@@ -423,7 +416,7 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
                 goto cleanup;
             }
 
-            update_list_stats_(&params->dir_stats, entry);
+            update_list_stats(&params->dir_stats, entry);
         }
 
         if (!append_array(params->files, entry)) {
@@ -447,6 +440,7 @@ cleanup:
 static void clear_temp_dir_(t_params *params) {
     clear_array(params->files);
     arena_clear(params->temp_arena);
+    params->dir_stats = (t_list_stats){0};
 }
 
 static void free_entry_array_(t_params *params, t_array *array) {
@@ -454,41 +448,6 @@ static void free_entry_array_(t_params *params, t_array *array) {
         t_entry *entry = pop_array(array);
         free_entry(&params->fl, entry);
     }
-}
-
-static t_str *join_dir_path_(const t_alloc *alloc, const t_str *lhs,
-                             const t_str *rhs) {
-    const bool need_slash = lhs->len == 0 || lhs->str[lhs->len - 1] != '/';
-    const uint64_t total_len = lhs->len + rhs->len + (need_slash ? 1U : 0U);
-    t_str *path = init_str(alloc, total_len);
-
-    if (!path) {
-        return NULL;
-    }
-
-    ft_memcpy(path->str, lhs->str + lhs->pos, (size_t)lhs->len);
-    path->len = lhs->len;
-    if (need_slash) {
-        path->str[path->len++] = '/';
-    }
-
-    ft_memcpy(path->str + path->len, rhs->str + rhs->pos, (size_t)rhs->len);
-    path->len += rhs->len;
-    path->str[path->len] = '\0';
-    return path;
-}
-
-static bool ensure_entry_path_(const t_alloc *alloc, t_entry *entry) {
-    if (entry->path) {
-        return true;
-    }
-
-    if (!entry->parent_path || !entry->name) {
-        return false;
-    }
-
-    entry->path = join_dir_path_(alloc, entry->parent_path, entry->name);
-    return entry->path != NULL;
 }
 
 static mode_t mode_from_dtype_(unsigned char dtype) {
@@ -514,6 +473,7 @@ static bool entry_needs_lstat_(const t_args *args, unsigned char dtype) {
 
 static bool walk_recurssive_(t_params *params) {
     if (params->args->recursive && params->files->len) {
+        const t_alloc alloc = {.kind = ALLOC_FL, .as.fl = &params->fl};
         uint64_t index = params->files->len;
         while (index > 0) {
             --index;
@@ -528,7 +488,7 @@ static bool walk_recurssive_(t_params *params) {
                 continue;
             }
 
-            dir_entry = queue_dir_entry_(params, entry, false);
+            dir_entry = dup_dir_entry(&alloc, entry, false);
             if (!dir_entry) {
                 return false;
             }
@@ -541,39 +501,6 @@ static bool walk_recurssive_(t_params *params) {
     }
 
     return true;
-}
-
-static t_entry *queue_dir_entry_(t_params *params, const t_entry *src,
-                                 bool is_operand) {
-    const t_alloc alloc = {.kind = ALLOC_FL, .as.fl = &params->fl};
-    t_entry *entry = fl_alloc(alloc.as.fl, sizeof(*entry), 8);
-    if (!entry) {
-        return NULL;
-    }
-
-    *entry = (t_entry){0};
-    if (!src->path) {
-        if (!src->parent_path || !src->name) {
-            goto failed;
-        }
-
-        entry->path = join_dir_path_(&alloc, src->parent_path, src->name);
-    } else {
-        entry->path = dup_str(&alloc, src->path);
-    }
-
-    if (!entry->path) {
-        goto failed;
-    }
-
-    entry->st = src->st;
-    fill_dir_entry_display_(entry, src);
-    entry->parent_path = NULL;
-    entry->is_operand = is_operand;
-    return entry;
-failed:
-    free_entry(alloc.as.fl, entry);
-    return NULL;
 }
 
 static bool has_quoted_operands_(const t_array *array) {
@@ -598,7 +525,7 @@ static void clean_up_(t_params *params) {
         arena_release(params->temp_arena);
     }
 
-    free(params->sort_scratch.data);
+    free((void *)params->sort_scratch.data);
     fl_free_all(&params->fl);
 }
 
@@ -634,94 +561,4 @@ static void set_entry_(t_entry *entry, t_str *str, const struct stat *st) {
     entry->path_has_colon =
         ft_memchr(str->str + str->pos, ':', (size_t)str->len) != NULL,
     entry->st = *st;
-}
-
-static void fill_dir_entry_display_(t_entry *entry, const t_entry *src) {
-    t_shell_scan scan;
-    shell_scan_str(entry->path, &scan);
-    entry->quote = scan.quote;
-    entry->path_has_colon = src->path_has_colon;
-    entry->display_len = scan.display_len;
-    entry->padded_display_len = scan.padded_display_len;
-    if (entry->quote == '\0' && entry->path_has_colon) {
-        entry->quote = '\'';
-        entry->display_len = entry->path->len + 2;
-        entry->padded_display_len = entry->display_len;
-    }
-}
-
-static void free_str_cb_(free_list *fl, void *ptr) {
-    free_str(fl, ptr);
-}
-
-static void update_list_stats_(t_list_stats *stats, const t_entry *entry) {
-    if (entry->info->links->len > stats->max_len_links) {
-        stats->max_len_links = entry->info->links->len;
-    }
-
-    if (entry->info->size->len > stats->max_len_sizes) {
-        stats->max_len_sizes = entry->info->size->len;
-    }
-
-    if (entry->info->perm->len > stats->max_len_perm) {
-        stats->max_len_perm = entry->info->perm->len;
-    }
-
-    if (!stats->have_quote && entry->quote != '\0') {
-        stats->have_quote = true;
-    }
-
-    stats->total += entry->info->blocks;
-}
-
-static t_str *read_symlink_(const t_alloc *alloc, const t_str *path,
-                            uint64_t target_size, int *read_err) {
-    Arena_Mark mark = {0};
-
-    if (read_err) {
-        *read_err = 0;
-    }
-
-    if (alloc->kind == ALLOC_ARENA) {
-        mark = arena_get_mark(alloc->as.arena);
-    }
-
-    uint64_t cap = (target_size > 0) ? target_size + 1 : (uint64_t)PATH_MAX;
-    while (true) {
-        t_str *new_str = init_str(alloc, cap);
-        if (!new_str) {
-            return NULL;
-        }
-
-        const size_t read_size = (cap > (size_t)-1) ? (size_t)-1 : (size_t)cap;
-        ssize_t len = readlink(path->str, new_str->str, read_size);
-        if (len < 0) {
-            const int err = errno;
-            free_alloc(alloc, mark, new_str, free_str_cb_);
-
-            if (err == ENOENT || err == EINVAL || err == EACCES ||
-                err == EPERM) {
-                if (read_err) {
-                    *read_err = err;
-                }
-                return init_str(alloc, 1);
-            }
-
-            return NULL;
-        }
-
-        if ((uint64_t)len < cap) {
-            new_str->len = (uint64_t)len;
-            new_str->str[new_str->len] = '\0';
-            return new_str;
-        }
-
-        free_alloc(alloc, mark, new_str, free_str_cb_);
-
-        if (cap > 0x3FFFFFFFFFFFFFFF) {
-            return NULL;
-        }
-
-        cap *= 2;
-    }
 }

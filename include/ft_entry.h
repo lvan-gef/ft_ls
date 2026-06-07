@@ -19,18 +19,6 @@
 #define PATH_MAX INT64_C(4096)
 #endif // ifndef PATH_MAX //
 
-#ifndef PERMISSION_SIZE
-#define PERMISSION_SIZE UINT64_C(12)
-#endif // ifndef PERMISSION_SIZE //
-
-#ifndef DT_LEN
-#define DT_LEN UINT64_C(13)
-#endif // ifndef DT_LEN //
-
-#ifndef ROW_ELEMENTS
-#define ROW_ELEMENTS UINT64_C(8)
-#endif // ifndef ROW_ELEMENTS //
-
 typedef struct {
     t_str *perm;
     t_str *links;
@@ -61,6 +49,11 @@ t_entry *new_entry(const t_alloc *alloc, const t_entry *entry,
                    const struct dirent *dp);
 bool get_file_info(const t_alloc *alloc, t_entry *entry);
 void init_entry_display(t_entry *entry);
+bool ensure_entry_path(const t_alloc *alloc, t_entry *entry);
+t_entry *dup_dir_entry(const t_alloc *alloc, const t_entry *src,
+                       bool is_operand);
+t_str *read_symlink_target(const t_alloc *alloc, const t_str *path,
+                           uint64_t target_size, int *read_err);
 void free_entry(free_list *fl, t_entry *entry);
 
 #endif // !FT_ENTRY_H

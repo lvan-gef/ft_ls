@@ -4,8 +4,8 @@
 #include <stdint.h>
 
 #include "./ft_entry.h"
-#include "./ft_parse.h"
 #include "./ft_str.h"
+#include "./ft_array.h"
 
 #ifndef TERM_SIZE
 #define TERM_SIZE 80
@@ -24,7 +24,6 @@ typedef struct {
 } t_list_stats;
 
 typedef struct {
-    t_args *args;
     t_array *array;
     t_entry *dir_entry;
     t_str *buffer;
@@ -35,7 +34,9 @@ typedef struct {
     bool quote_padding;
 } t_ps;
 
-void printer(t_ps *ps);
+void printer(t_ps *ps, bool list_mode);
 void print_list(t_ps *ps);
+bool put_dir_header(t_str *out, const t_entry *dir_entry);
+void update_list_stats(t_list_stats *stats, const t_entry *entry);
 
 #endif // !FT_PRINTER_H

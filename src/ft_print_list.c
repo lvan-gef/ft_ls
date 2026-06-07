@@ -14,6 +14,26 @@ static void printer_(t_str *out, t_array *array, const t_list_stats *sizes);
 static bool left_pad_(t_str *out, uint64_t src_len, uint64_t max_size);
 static bool put_uint_(t_str *out, uint64_t value);
 
+void update_list_stats(t_list_stats *stats, const t_entry *entry) {
+    if (entry->info->links->len > stats->max_len_links) {
+        stats->max_len_links = entry->info->links->len;
+    }
+
+    if (entry->info->size->len > stats->max_len_sizes) {
+        stats->max_len_sizes = entry->info->size->len;
+    }
+
+    if (entry->info->perm->len > stats->max_len_perm) {
+        stats->max_len_perm = entry->info->perm->len;
+    }
+
+    if (!stats->have_quote && entry->quote != '\0') {
+        stats->have_quote = true;
+    }
+
+    stats->total += entry->info->blocks;
+}
+
 void print_list(t_ps *ps) {
     t_list_stats sizes = ps->stats;
 

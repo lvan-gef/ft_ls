@@ -22,10 +22,9 @@ static t_str *entry_name_(const t_entry *entry);
 static int compare_(const t_str *lhs, const t_str *rhs);
 static int compare_time_(const struct timespec *a, const struct timespec *b);
 
-void sort(t_sort_scratch *scratch, t_array *array, bool reverse,
-          bool sort_time) {
+bool sort(t_sort_scratch *scratch, t_array *array, bool reverse, bool sort_time) {
     if (array->len <= 1) {
-        return;
+        return true;
     }
 
     t_cmp_entry cmp;
@@ -37,10 +36,11 @@ void sort(t_sort_scratch *scratch, t_array *array, bool reverse,
     }
 
     if (!ensure_sort_scratch_(scratch, array->len)) {
-        return;
+        return false;
     }
 
     merge_sort_(scratch->data, array, cmp);
+    return true;
 }
 
 static bool ensure_sort_scratch_(t_sort_scratch *scratch, uint64_t need) {
@@ -63,12 +63,12 @@ static bool ensure_sort_scratch_(t_sort_scratch *scratch, uint64_t need) {
         new_cap *= 2;
     }
 
-    void **new_data = malloc((size_t)new_cap * sizeof(*new_data));
+    void **new_data = (void **)malloc((size_t)new_cap * sizeof(*new_data));
     if (!new_data) {
         return false;
     }
 
-    free(scratch->data);
+    free((void *)scratch->data);
     scratch->data = new_data;
     scratch->cap = new_cap;
     return true;

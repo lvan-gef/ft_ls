@@ -19,6 +19,8 @@ typedef struct {
 typedef void (*t_fl_cleanup)(free_list *fl, void *ptr);
 
 uint64_t len_of_nbr(uint64_t nbr);
+
+void *alloc_mem(const t_alloc *alloc, Arena_Mark *mark, uint64_t size);
 void free_alloc(const t_alloc *alloc, Arena_Mark mark, void *ptr,
                 t_fl_cleanup fl_cleanup);
 

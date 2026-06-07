@@ -14,16 +14,8 @@ t_str *init_str(const t_alloc *alloc, uint64_t cap) {
         return NULL;
     }
 
-    t_str *str = NULL;
-    switch (alloc->kind) {
-        case ALLOC_ARENA:
-            str = arena_push(alloc->as.arena, sizeof(*str) + cap + 1);
-            break;
-        case ALLOC_FL:
-            str = fl_alloc(alloc->as.fl, sizeof(*str) + cap + 1, 8);
-            break;
-    }
-
+    Arena_Mark mark = {0};
+    t_str *str = alloc_mem(alloc, &mark, sizeof(*str) + cap + 1);
     if (!str) {
         return NULL;
     }
