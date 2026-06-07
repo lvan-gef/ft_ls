@@ -1,6 +1,5 @@
 #include <stdbool.h>
 #include <stdint.h>
-#include <unistd.h>
 
 #include "../include/ft_array.h"
 #include "../include/ft_entry.h"
@@ -8,31 +7,57 @@
 #include "../include/ft_printer_helper.h"
 #include "../include/ft_shell_escape.h"
 
+#include "../libft/include/libft.h"
+
+#ifndef TERM_SIZE
+#define TERM_SIZE 80
+#endif // !TERM_SIZE
+
+#if TERM_SIZE < 1
+#error "TERM_SIZE must be at least 1"
+#endif
+
 typedef struct {
     uint64_t rows;
     uint64_t cols;
     uint64_t max;
 } t_map;
 
+typedef struct {
+    uint64_t total;
+    uint64_t max_len_links;
+    uint64_t max_len_sizes;
+    uint64_t max_len_perm;
+    bool have_quote;
+} t_list_stats;
+
+static bool put_dir_header_(t_str *out, const t_entry *dir_entry);
 static uint64_t display_len_(const t_entry *entry, bool quoted);
-static void init_print_row_(t_ps *ps);
-static void calc_cols_(t_array *array, t_map *map, bool *quoted,
+static bool init_print_row_(const t_print_request *req);
+static void calc_cols_(const t_array *array, t_map *map, bool *quoted,
                        uint64_t *col_widths);
-static bool calc_width_(t_array *array, bool quoted, uint64_t num_cols,
+static bool calc_width_(const t_array *array, bool quoted, uint64_t num_cols,
                         uint64_t *col_widths);
-static bool create_row_(t_str *out, t_array *array, const t_map *map,
+static bool create_row_(t_str *out, const t_array *array, const t_map *map,
                         const uint64_t *col_widths, bool quoted);
 static bool indent_(t_str *out, uint64_t from, uint64_t to);
+static void update_list_stats_(t_list_stats *stats, const t_entry *entry);
+static bool print_list_(const t_print_request *req);
+static bool left_pad_(t_str *out, uint64_t src_len, uint64_t max_size);
+static bool put_uint_(t_str *out, uint64_t value);
+static void collect_list_stats_(const t_array *entries, t_list_stats *stats);
+static bool print_list_rows_(t_str *out, const t_array *array,
+                             const t_list_stats *sizes);
 
-void printer(t_ps *ps, bool list_mode) {
-    if (list_mode) {
-        print_list(ps);
-    } else {
-        init_print_row_(ps);
+bool printer(const t_print_request *req) {
+    if (req->list_mode) {
+        return print_list_(req);
     }
+
+    return init_print_row_(req);
 }
 
-bool put_dir_header(t_str *out, const t_entry *dir_entry) {
+static bool put_dir_header_(t_str *out, const t_entry *dir_entry) {
     if (!dir_entry) {
         return true;
     }
@@ -41,64 +66,25 @@ bool put_dir_header(t_str *out, const t_entry *dir_entry) {
            put_mem(out, ":\n", 2);
 }
 
-static void init_print_row_(t_ps *ps) {
-    uint64_t max_cols = (TERM_SIZE + SPACE_GAP) / (1 + SPACE_GAP);
+static bool init_print_row_(const t_print_request *req) {
+    const uint64_t max_cols = (TERM_SIZE + SPACE_GAP) / (1 + SPACE_GAP);
     t_map map = {.cols = 1,
-                 .rows = ps->array->len,
-                 .max = ps->array->len < max_cols ? ps->array->len : max_cols};
+                 .rows = req->entries->len,
+                 .max = req->entries->len < max_cols ? req->entries->len
+                                                     : max_cols};
 
-    bool quoted = ps->quote_padding;
+    bool quoted = req->quote_padding;
     uint64_t col_widths[(TERM_SIZE + SPACE_GAP) / (1 + SPACE_GAP)];
-    calc_cols_(ps->array, &map, &quoted, col_widths);
+    calc_cols_(req->entries, &map, &quoted, col_widths);
 
-    if (!put_dir_header(ps->buffer, ps->dir_entry)) {
-        return;
+    if (!put_dir_header_(req->buffer, req->dir_header)) {
+        return false;
     }
 
-    if (!create_row_(ps->buffer, ps->array, &map, col_widths, quoted)) {
-        return;
-    }
+    return create_row_(req->buffer, req->entries, &map, col_widths, quoted);
 }
 
-static bool create_row_(t_str *out, t_array *array, const t_map *map,
-                        const uint64_t *col_widths, bool quoted) {
-    const uint64_t files_len = array->len;
-    for (uint64_t row = 0; row < map->rows; ++row) {
-        uint64_t col = 0;
-        uint64_t filesno = row;
-        uint64_t pos = 0;
-
-        while (true) {
-            const t_entry *entry = array->data[filesno];
-            const uint64_t name_length = display_len_(entry, quoted);
-            const uint64_t max_name_length = col_widths[col++];
-
-            if (!escaped_out(out, entry->name, entry->quote, quoted)) {
-                return false;
-            }
-
-            if (files_len - map->rows <= filesno) {
-                break;
-            }
-
-            filesno += map->rows;
-
-            if (!indent_(out, pos + name_length, pos + max_name_length)) {
-                return false;
-            }
-
-            pos += max_name_length;
-        }
-
-        if (!put_mem(out, "\n", 1)) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-static void calc_cols_(t_array *array, t_map *map, bool *quoted,
+static void calc_cols_(const t_array *array, t_map *map, bool *quoted,
                        uint64_t *col_widths) {
     const uint64_t width_count = map->max ? map->max : 1;
 
@@ -134,7 +120,7 @@ static void calc_cols_(t_array *array, t_map *map, bool *quoted,
     (void)calc_width_(array, *quoted, best, col_widths);
 }
 
-static bool calc_width_(t_array *array, bool quoted, uint64_t num_cols,
+static bool calc_width_(const t_array *array, bool quoted, uint64_t num_cols,
                         uint64_t *col_widths) {
     const uint64_t file_count = array->len;
     const uint64_t num_rows = (file_count + num_cols - 1) / num_cols;
@@ -165,6 +151,45 @@ static bool calc_width_(t_array *array, bool quoted, uint64_t num_cols,
     return true;
 }
 
+static bool create_row_(t_str *out, const t_array *array, const t_map *map,
+                        const uint64_t *col_widths, bool quoted) {
+    const uint64_t files_len = array->len;
+
+    for (uint64_t row = 0; row < map->rows; ++row) {
+        uint64_t col = 0;
+        uint64_t filesno = row;
+        uint64_t pos = 0;
+
+        while (true) {
+            const t_entry *entry = array->data[filesno];
+            const uint64_t name_length = display_len_(entry, quoted);
+            const uint64_t max_name_length = col_widths[col++];
+
+            if (!escaped_out(out, entry->name, entry->quote, quoted)) {
+                return false;
+            }
+
+            if (files_len - map->rows <= filesno) {
+                break;
+            }
+
+            filesno += map->rows;
+
+            if (!indent_(out, pos + name_length, pos + max_name_length)) {
+                return false;
+            }
+
+            pos += max_name_length;
+        }
+
+        if (!put_mem(out, "\n", 1)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 static uint64_t display_len_(const t_entry *entry, bool quoted) {
     if (quoted) {
         return entry->padded_display_len;
@@ -187,6 +212,137 @@ static bool indent_(t_str *out, uint64_t from, uint64_t to) {
             }
 
             ++from;
+        }
+    }
+
+    return true;
+}
+
+static void update_list_stats_(t_list_stats *stats, const t_entry *entry) {
+    if (entry->info->links->len > stats->max_len_links) {
+        stats->max_len_links = entry->info->links->len;
+    }
+
+    if (entry->info->size->len > stats->max_len_sizes) {
+        stats->max_len_sizes = entry->info->size->len;
+    }
+
+    if (entry->info->perm->len > stats->max_len_perm) {
+        stats->max_len_perm = entry->info->perm->len;
+    }
+
+    if (!stats->have_quote && entry->quote != '\0') {
+        stats->have_quote = true;
+    }
+
+    stats->total += entry->info->blocks;
+}
+
+static void collect_list_stats_(const t_array *entries, t_list_stats *stats) {
+    *stats = (t_list_stats){0};
+
+    for (uint64_t index = 0; index < entries->len; ++index) {
+        const t_entry *entry = entries->data[index];
+        update_list_stats_(stats, entry);
+    }
+}
+
+static bool print_list_(const t_print_request *req) {
+    t_list_stats sizes;
+
+    collect_list_stats_(req->entries, &sizes);
+
+    if (sizes.max_len_links < req->min_len_links) {
+        sizes.max_len_links = req->min_len_links;
+    }
+
+    if (sizes.max_len_sizes < req->min_len_sizes) {
+        sizes.max_len_sizes = req->min_len_sizes;
+    }
+
+    sizes.have_quote = sizes.have_quote || req->quote_padding;
+    if (!put_dir_header_(req->buffer, req->dir_header)) {
+        return false;
+    }
+
+    if (req->print_total) {
+        if (!put_mem(req->buffer, "total ", 6) ||
+            !put_uint_(req->buffer, (sizes.total + 1) / 2) ||
+            !put_mem(req->buffer, "\n", 1)) {
+            return false;
+        }
+    }
+
+    return print_list_rows_(req->buffer, req->entries, &sizes);
+}
+
+static bool left_pad_(t_str *out, uint64_t src_len, uint64_t max_size) {
+    uint64_t count = max_size - src_len;
+
+    while (count) {
+        if (out->len == out->cap - 1 && !flush_str(out)) {
+            return false;
+        }
+
+        const uint64_t avail = (out->cap - 1) - out->len;
+        const uint64_t to_fill = count < avail ? count : avail;
+        ft_memset(out->str + out->len, ' ', (size_t)to_fill);
+        out->len += to_fill;
+        out->str[out->len] = '\0';
+        count -= to_fill;
+    }
+
+    return true;
+}
+
+static bool put_uint_(t_str *out, uint64_t value) {
+    char digits[32];
+    size_t index = sizeof(digits);
+
+    do {
+        digits[--index] = (char)('0' + (value % 10));
+        value /= 10;
+    } while (value > 0);
+
+    return put_mem(out, digits + index, (uint64_t)(sizeof(digits) - index));
+}
+
+static bool print_list_rows_(t_str *out, const t_array *array,
+                             const t_list_stats *sizes) {
+    for (uint64_t index = 0; index < array->len; ++index) {
+        const t_entry *entry = array->data[index];
+
+        if (!put_mem(out, entry->info->perm->str, entry->info->perm->len) ||
+            !left_pad_(out, entry->info->perm->len, sizes->max_len_perm) ||
+            !put_mem(out, " ", 1) ||
+            !left_pad_(out, entry->info->links->len, sizes->max_len_links) ||
+            !put_mem(out, entry->info->links->str, entry->info->links->len) ||
+            !put_mem(out, " ", 1) ||
+            !put_mem(out, entry->info->username->str,
+                     entry->info->username->len) ||
+            !put_mem(out, " ", 1) ||
+            !put_mem(out, entry->info->groupname->str,
+                     entry->info->groupname->len) ||
+            !put_mem(out, " ", 1) ||
+            !left_pad_(out, entry->info->size->len, sizes->max_len_sizes) ||
+            !put_mem(out, entry->info->size->str, entry->info->size->len) ||
+            !put_mem(out, " ", 1) ||
+            !put_mem(out, entry->info->dt->str, entry->info->dt->len) ||
+            !put_mem(out, " ", 1) ||
+            !escaped_out(out, entry->name, entry->quote, sizes->have_quote)) {
+            return false;
+        }
+
+        if (entry->info->symlink && entry->info->symlink->len > 0) {
+            if (!put_mem(out, " -> ", 4) ||
+                !put_mem(out, entry->info->symlink->str,
+                         entry->info->symlink->len)) {
+                return false;
+            }
+        }
+
+        if (!put_mem(out, "\n", 1)) {
+            return false;
         }
     }
 

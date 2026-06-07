@@ -31,8 +31,6 @@ typedef struct {
     t_array *files;
     char out_buf[OUTPUT_BUFFER_CAP];
     t_str out;
-    t_list_stats file_stats;
-    t_list_stats dir_stats;
     uint64_t max_len_links;
     uint64_t max_len_sizes;
     bool output_failed;
@@ -101,21 +99,26 @@ static bool run_(t_params *params, const t_array *array, int *exit_code) {
     params->out.str[0] = '\0';
     params->output_failed = false;
 
-    t_ps ps = {.array = params->files,
-               .dir_entry = NULL,
-               .buffer = &params->out,
-               .stats = params->file_stats,
-               .print_total = false,
-               .min_len_links = params->max_len_links,
-               .min_len_sizes = params->max_len_sizes,
-               .quote_padding = has_quoted_operands};
+    t_print_request req = {.entries = params->files,
+                           .dir_header = NULL,
+                           .buffer = &params->out,
+                           .min_len_links = params->max_len_links,
+                           .min_len_sizes = params->max_len_sizes,
+                           .list_mode = params->args->list,
+                           .print_total = false,
+                           .quote_padding = has_quoted_operands};
     if (params->files->len) {
         if (!sort(&params->sort_scratch, params->files, params->args->reverse,
-             params->args->time)) {
+                  params->args->time)) {
             free_entry_array_(params, params->files);
             return false;
         }
-        printer(&ps, params->args->list);
+
+        if (!printer(&req)) {
+            free_entry_array_(params, params->files);
+            return false;
+        }
+
         printed_files = true;
         free_entry_array_(params, params->files);
     }
@@ -123,16 +126,16 @@ static bool run_(t_params *params, const t_array *array, int *exit_code) {
     bool printed_dir = false;
     bool inserted_files_dirs_gap = false;
     const bool print_dir_path = params->args->recursive || array->len > 1;
-    ps.print_total = true;
-    ps.min_len_links = 0;
-    ps.min_len_sizes = 0;
-    ps.quote_padding = false;
+    req.print_total = true;
+    req.min_len_links = 0;
+    req.min_len_sizes = 0;
+    req.quote_padding = false;
     t_entry *dir_path = NULL;
     while (params->dirs->len) {
         dir_path = pop_array(params->dirs);
 
         if (!inserted_files_dirs_gap && printed_files && dir_path->is_operand) {
-            if (!put_mem(ps.buffer, "\n", 1)) {
+            if (!put_mem(req.buffer, "\n", 1)) {
                 goto error;
             }
             inserted_files_dirs_gap = true;
@@ -148,7 +151,7 @@ static bool run_(t_params *params, const t_array *array, int *exit_code) {
         }
 
         if (!sort(&params->sort_scratch, params->files, params->args->reverse,
-             params->args->time)) {
+                  params->args->time)) {
             goto error;
         }
 
@@ -157,7 +160,7 @@ static bool run_(t_params *params, const t_array *array, int *exit_code) {
         }
 
         if (printed_dir) {
-            if (!put_mem(ps.buffer, "\n", 1)) {
+            if (!put_mem(req.buffer, "\n", 1)) {
                 goto error;
             }
         }
@@ -167,11 +170,12 @@ static bool run_(t_params *params, const t_array *array, int *exit_code) {
                          .display_len = dir_path->display_len,
                          .padded_display_len = dir_path->padded_display_len};
 
-        t_entry *ent = print_dir_path ? &entry : NULL;
-        ps.array = params->files;
-        ps.dir_entry = ent;
-        ps.stats = params->dir_stats;
-        printer(&ps, params->args->list);
+        req.dir_header = print_dir_path ? &entry : NULL;
+        req.entries = params->files;
+        if (!printer(&req)) {
+            goto error;
+        }
+
         printed_dir = true;
         clear_temp_dir_(params);
         free_entry(&params->fl, dir_path);
@@ -250,8 +254,6 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
                 free_entry(&params->fl, entry);
                 goto failed;
             }
-
-            update_list_stats(&params->file_stats, entry);
         }
 
         if (!append_array(params->files, entry)) {
@@ -415,8 +417,6 @@ static bool read_dir_(t_params *params, t_entry *path, int *exit_code) {
             if (!get_file_info(&alloc, entry)) {
                 goto cleanup;
             }
-
-            update_list_stats(&params->dir_stats, entry);
         }
 
         if (!append_array(params->files, entry)) {
@@ -440,7 +440,6 @@ cleanup:
 static void clear_temp_dir_(t_params *params) {
     clear_array(params->files);
     arena_clear(params->temp_arena);
-    params->dir_stats = (t_list_stats){0};
 }
 
 static void free_entry_array_(t_params *params, t_array *array) {
