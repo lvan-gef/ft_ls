@@ -92,10 +92,6 @@ void shell_scan_str(const t_str *str, t_shell_scan *scan) {
     scan_shell_(str->str, str->len, scan);
 }
 
-void shell_scan_cstr(const char *src, t_shell_scan *scan) {
-    scan_shell_(src, (uint64_t)ft_strlen(src), scan);
-}
-
 static void escape_str_(t_str *dst, const t_str *str, char quote,
                         bool pad_unquoted) {
     if (!quote) {

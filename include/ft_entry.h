@@ -28,6 +28,7 @@ typedef struct {
     const t_str *parent_path;
     t_file_info *info;
     struct stat st;
+    bool stat_unavailable;
     bool is_operand;
 } t_entry;
 

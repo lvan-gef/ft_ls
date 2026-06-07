@@ -43,7 +43,7 @@ typedef enum {
 
 static bool run_listing_(t_params *params, const t_array *array,
                          int *exit_code);
-static bool print_operand_files_(t_params *params, t_print_request *req,
+static bool print_operand_files_(t_params *params, const t_print_request *req,
                                  bool *printed_files);
 static bool process_queue_(t_params *params, const t_array *array,
                            t_print_request *req, int *exit_code,
@@ -64,7 +64,7 @@ static bool print_path_error_(t_params *params, t_str *str, int e,
                               const char *prefix);
 static bool queue_operand_dir_(t_params *params, t_str *str,
                                const struct stat *st);
-static t_entry *new_file_operand_(t_params *params, t_str *str,
+static t_entry *new_file_operand_(t_params *params, const t_str *str,
                                   const struct stat *st);
 static bool sort_operand_dirs_(t_params *params);
 
@@ -142,7 +142,7 @@ error:
     return false;
 }
 
-static bool print_operand_files_(t_params *params, t_print_request *req,
+static bool print_operand_files_(t_params *params, const t_print_request *req,
                                  bool *printed_files) {
     bool state = false;
     if (!params->files->len) {
@@ -377,17 +377,26 @@ static bool load_directory_entries_(t_params *params, t_entry *path,
             goto cleanup;
         }
 
+        entry->st.st_mode = dtype_to_mode_(dtype);
+
         if (need_lstat) {
             if (!ensure_entry_path(&alloc, entry)) {
                 goto cleanup;
             }
 
             if (lstat(entry->path->str, &entry->st) == -1) {
-                *exit_code = 2;
-                continue;
+                const int e = errno;
+                if (!print_path_error_(params, entry->path, e,
+                                       "cannot access")) {
+                    params->output_failed = true;
+                    goto cleanup;
+                }
+
+                entry->stat_unavailable = true;
+                if (*exit_code != 2) {
+                    *exit_code = 1;
+                }
             }
-        } else {
-            entry->st.st_mode = dtype_to_mode_(dtype);
         }
 
         if (params->args->list) {
@@ -455,7 +464,8 @@ static bool queue_recursive_dirs_(t_params *params) {
             --index;
             const t_entry *entry = params->files->data[index];
             t_entry *dir_entry;
-            if (!entry || !entry->name || !S_ISDIR(entry->st.st_mode)) {
+            if (!entry || !entry->name || entry->stat_unavailable ||
+                !S_ISDIR(entry->st.st_mode)) {
                 continue;
             }
 
@@ -553,7 +563,7 @@ static bool queue_operand_dir_(t_params *params, t_str *str,
     return true;
 }
 
-static t_entry *new_file_operand_(t_params *params, t_str *str,
+static t_entry *new_file_operand_(t_params *params, const t_str *str,
                                   const struct stat *st) {
     const t_alloc alloc = {.kind = ALLOC_FL, .as.fl = &params->fl};
     t_entry *entry = fl_alloc(&params->fl, sizeof(*entry));

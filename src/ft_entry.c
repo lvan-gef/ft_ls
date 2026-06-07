@@ -37,6 +37,10 @@
 #define PATH_MAX INT64_C(4096)
 #endif // ifndef PATH_MAX //
 
+#ifndef LS_RECENT_SECS
+#define LS_RECENT_SECS ((time_t)(31556952 / 2))
+#endif // ifndef LS_RECENT_SECS //
+
 typedef struct {
     char name[LOGIN_NAME_MAX];
     uint64_t id;
@@ -52,6 +56,8 @@ static bool fill_file_info_(const t_alloc *alloc, t_file_info *info,
                             const t_entry *entry);
 static t_str *join_dir_path_(const t_alloc *alloc, const t_str *lhs,
                              const t_str *rhs);
+static t_str *unknown_field_(const t_alloc *alloc);
+static t_str *unknown_dt_field_(const t_alloc *alloc);
 static t_str *get_perm_(const t_alloc *alloc, const t_entry *entry);
 static t_str *get_user_(const t_alloc *alloc, uid_t user_id);
 static t_str *get_group_(const t_alloc *alloc, gid_t group_id);
@@ -64,6 +70,9 @@ static void free_str_cb_(free_list *fl, void *ptr);
 static char *cache_lookup_(t_id_cache_entry *cache, uint64_t id);
 static void cache_store_(t_id_cache_entry *cache, uint64_t *next, uint64_t id,
                          const char *name);
+static char file_type_char_(mode_t mode);
+static char exec_char_(mode_t mode, mode_t exec_bit, mode_t special_bit,
+                       char lower, char upper);
 
 t_entry *new_entry(const t_alloc *alloc, const t_entry *entry,
                    const struct dirent *dp) {
@@ -85,6 +94,7 @@ t_entry *new_entry(const t_alloc *alloc, const t_entry *entry,
     ent->name->str[ent->name->len] = '\0';
     ent->path = NULL;
     ent->parent_path = entry->path;
+    ent->stat_unavailable = false;
     ent->is_operand = false;
     ent->info = NULL;
     ent->st = (struct stat){0};
@@ -153,6 +163,7 @@ t_entry *dup_dir_entry(const t_alloc *alloc, const t_entry *src,
     }
 
     entry->st = src->st;
+    entry->stat_unavailable = src->stat_unavailable;
     entry->is_operand = is_operand;
     return entry;
 failed:
@@ -234,6 +245,46 @@ void free_entry(free_list *fl, t_entry *entry) {
 
 static bool fill_file_info_(const t_alloc *alloc, t_file_info *info,
                             const t_entry *entry) {
+    if (entry->stat_unavailable) {
+        info->perm = get_perm_(alloc, entry);
+        if (!info->perm) {
+            return false;
+        }
+
+        info->links = unknown_field_(alloc);
+        if (!info->links) {
+            return false;
+        }
+
+        info->username = unknown_field_(alloc);
+        if (!info->username) {
+            return false;
+        }
+
+        info->groupname = unknown_field_(alloc);
+        if (!info->groupname) {
+            return false;
+        }
+
+        info->size = unknown_field_(alloc);
+        if (!info->size) {
+            return false;
+        }
+
+        info->dt = unknown_dt_field_(alloc);
+        if (!info->dt) {
+            return false;
+        }
+
+        info->symlink = init_str(alloc, 1);
+        if (!info->symlink) {
+            return false;
+        }
+
+        info->blocks = 0;
+        return true;
+    }
+
     info->perm = get_perm_(alloc, entry);
     if (!info->perm) {
         return false;
@@ -295,6 +346,14 @@ static t_str *join_dir_path_(const t_alloc *alloc, const t_str *lhs,
     return path;
 }
 
+static t_str *unknown_field_(const t_alloc *alloc) {
+    return create_str(alloc, "?");
+}
+
+static t_str *unknown_dt_field_(const t_alloc *alloc) {
+    return create_str(alloc, "           ?");
+}
+
 static t_str *get_perm_(const t_alloc *alloc, const t_entry *entry) {
     t_str *str = init_str(alloc, PERMISSION_SIZE);
     if (!str) {
@@ -302,27 +361,65 @@ static t_str *get_perm_(const t_alloc *alloc, const t_entry *entry) {
     }
 
     uint64_t index = 0;
-    if ((entry->st.st_mode & S_IFMT) == S_IFLNK) {
-        str->str[index++] = 'l';
-    } else if ((entry->st.st_mode & S_IFMT) == S_IFREG) {
-        str->str[index++] = '-';
-    } else if ((entry->st.st_mode & S_IFMT) == S_IFDIR) {
-        str->str[index++] = 'd';
+    str->str[index++] = file_type_char_(entry->st.st_mode);
+    if (entry->stat_unavailable) {
+        while (index < 10) {
+            str->str[index++] = '?';
+        }
+
+        str->len = index;
+        str->str[index] = '\0';
+        return str;
     }
 
     str->str[index++] = entry->st.st_mode & S_IRUSR ? 'r' : '-';
     str->str[index++] = entry->st.st_mode & S_IWUSR ? 'w' : '-';
-    str->str[index++] = entry->st.st_mode & S_IXUSR ? 'x' : '-';
+    str->str[index++] =
+        exec_char_(entry->st.st_mode, S_IXUSR, S_ISUID, 's', 'S');
     str->str[index++] = entry->st.st_mode & S_IRGRP ? 'r' : '-';
     str->str[index++] = entry->st.st_mode & S_IWGRP ? 'w' : '-';
-    str->str[index++] = entry->st.st_mode & S_IXGRP ? 'x' : '-';
+    str->str[index++] =
+        exec_char_(entry->st.st_mode, S_IXGRP, S_ISGID, 's', 'S');
     str->str[index++] = entry->st.st_mode & S_IROTH ? 'r' : '-';
     str->str[index++] = entry->st.st_mode & S_IWOTH ? 'w' : '-';
-    str->str[index++] = entry->st.st_mode & S_IXOTH ? 'x' : '-';
+    str->str[index++] =
+        exec_char_(entry->st.st_mode, S_IXOTH, S_ISVTX, 't', 'T');
 
     str->len = index;
     str->str[index] = '\0';
     return str;
+}
+
+static char file_type_char_(mode_t mode) {
+    if ((mode & S_IFMT) == S_IFREG) {
+        return '-';
+    }
+
+    if ((mode & S_IFMT) == S_IFDIR) {
+        return 'd';
+    }
+
+    if ((mode & S_IFMT) == S_IFLNK) {
+        return 'l';
+    }
+
+    if ((mode & S_IFMT) == S_IFIFO) {
+        return 'p';
+    }
+
+    if ((mode & S_IFMT) == S_IFSOCK) {
+        return 's';
+    }
+
+    if ((mode & S_IFMT) == S_IFCHR) {
+        return 'c';
+    }
+
+    if ((mode & S_IFMT) == S_IFBLK) {
+        return 'b';
+    }
+
+    return '?';
 }
 
 static t_str *get_user_(const t_alloc *alloc, uid_t user_id) {
@@ -391,33 +488,52 @@ static t_str *get_group_(const t_alloc *alloc, gid_t group_id) {
 
 static t_str *get_dt_(const t_alloc *alloc, const struct timespec *ctim) {
     Arena_Mark mark = {0};
-    t_str *new_str;
-
     if (alloc->kind == ALLOC_ARENA) {
         mark = arena_get_mark(alloc->as.arena);
     }
 
-    new_str = init_str(alloc, DT_LEN);
+    t_str *new_str = init_str(alloc, DT_LEN);
     if (!new_str) {
         return NULL;
     }
 
-    const char *dt = ctime(&ctim->tv_sec);
+    time_t stamp = ctim->tv_sec;
+    const char *dt = ctime(&stamp);
     if (!dt) {
         free_alloc(alloc, mark, new_str, free_str_cb_);
         return NULL;
     }
 
-    ft_memcpy(new_str->str, dt + 4, 7);
-    ft_memcpy(new_str->str + 7, dt + 11, 5);
-    new_str->len = 12;
-    new_str->str[new_str->len] = '\0';
+    time_t now = time(NULL);
+    if (now == (time_t)-1) {
+        free_alloc(alloc, mark, new_str, free_str_cb_);
+        return NULL;
+    }
 
+    bool recent = false;
+    if (stamp <= now) {
+        recent = (now - stamp) < LS_RECENT_SECS;
+    }
+
+    if (recent) {
+        ft_memcpy(new_str->str, dt + 4, 12);
+    } else {
+        ft_memcpy(new_str->str, dt + 4, 7);
+        new_str->str[7] = ' ';
+        ft_memcpy(new_str->str + 8, dt + 20, 4);
+    }
+
+    new_str->len = 12;
+    new_str->str[12] = '\0';
     return new_str;
 }
 
 static t_str *get_symlink_(const t_alloc *alloc, const t_entry *entry) {
     if (!S_ISLNK(entry->st.st_mode)) {
+        return init_str(alloc, 1);
+    }
+
+    if (entry->stat_unavailable) {
         return init_str(alloc, 1);
     }
 
@@ -493,4 +609,16 @@ static void cache_store_(t_id_cache_entry *cache, uint64_t *next, uint64_t id,
     cache[index].id = id;
     ft_strlcpy(cache[index].name, name, LOGIN_NAME_MAX);
     ++(*next);
+}
+
+static char exec_char_(mode_t mode, mode_t exec_bit, mode_t special_bit,
+                       char lower, char upper) {
+    const bool has_exec = (mode & exec_bit) != 0;
+    const bool has_special = (mode & special_bit) != 0;
+
+    if (!has_special) {
+        return has_exec ? 'x' : '-';
+    }
+
+    return has_exec ? lower : upper;
 }

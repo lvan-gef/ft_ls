@@ -23,12 +23,19 @@ t_array *parse_args(free_list *fl, uint64_t argc, char **argv, t_args *args) {
     bool is_flag = true;
     for (uint64_t index = 1; index < argc; ++index) {
         const size_t len = ft_strlen(argv[index]);
-        if (!ft_strncmp("--", argv[index], len)) {
+        if (argv[index][0] == '-' && argv[index][1] == '-' &&
+            argv[index][2] == '\0') {
             is_flag = false;
             continue;
         }
 
         if (is_flag && *argv[index] == '-') {
+            if (len == 1) {
+                if (!create_and_append_(&alloc, argv[index], inputs)) {
+                    return NULL;
+                }
+            }
+
             for (uint64_t sub_index = 1; sub_index < len; ++sub_index) {
                 switch (argv[index][sub_index]) {
                     case 'R': args->recursive = true; break;
