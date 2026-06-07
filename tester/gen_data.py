@@ -7,8 +7,12 @@ ALLOWED_FLAGS = ("R", "a", "l", "r", "t")
 
 
 def gen_data(paths: Paths) -> Generator[list[str], None, None]:
-    yield ["-R", "/mnt/bulk2/"]
+    yield ["-"]
+    yield ["--", "-"]
+    yield ["--"]
+    yield ["--", ""]
 
+    yield ["-R", "/mnt/bulk2/"]
     for size in range(1, len(ALLOWED_FLAGS) + 1):
         for combo in combinations(ALLOWED_FLAGS, size):
             flags = "-" + "".join(combo)

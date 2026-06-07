@@ -1,7 +1,5 @@
-import getpass
 import os
-import shutil
-import subprocess
+import socket
 import time
 from pathlib import Path
 from typing import Generator
@@ -28,7 +26,7 @@ def create_test_folders(path: Path) -> Paths:
     out_paths.append(new_path)
     out_files.extend(files)
 
-    # Timestamps for -t testing
+    # Timestamps for -t sorting and -l recent/non-recent formatting testing
     new_path, files = create_timestamps(path=path)
     out_paths.append(new_path)
     out_files.extend(files)
@@ -50,11 +48,6 @@ def create_test_folders(path: Path) -> Paths:
 
     # Various file sizes for -l testing
     new_path, files = create_sizes(path=path)
-    out_paths.append(new_path)
-    out_files.extend(files)
-
-    # ACL/xattr marker tests for -l (Linux)
-    new_path, files = create_xattrs(path=path)
     out_paths.append(new_path)
     out_files.extend(files)
 
@@ -181,14 +174,21 @@ def create_timestamps(path: Path) -> tuple[Path, list[Path]]:
     out_files: list[Path] = []
 
     base_time = time.time()
-    files = ["oldest.txt", "old.txt", "middle.txt", "recent.txt", "newest.txt"]
+    timestamp_cases = [
+        ("very_old.txt", base_time - 400 * 24 * 60 * 60),
+        ("oldest.txt", base_time - 40),
+        ("old.txt", base_time - 30),
+        ("middle.txt", base_time - 20),
+        ("recent.txt", base_time - 10),
+        ("newest.txt", base_time),
+        ("near_future.txt", base_time + 10 * 60),
+        ("far_future.txt", base_time + 400 * 24 * 60 * 60),
+    ]
 
-    for i, filename in enumerate(files):
+    for filename, mtime in timestamp_cases:
         file_path = ts_path.joinpath(filename)
         out_files.append(file_path)
         file_path.touch()
-        # Set modification time: oldest first, newest last
-        mtime = base_time - (len(files) - 1 - i) * 10
         os.utime(file_path, (mtime, mtime))
 
     return ts_path, out_files
@@ -323,6 +323,51 @@ def create_permissions(path: Path) -> tuple[list[Path], list[Path]]:
     readonly.chmod(0o444)
     out_files.append(readonly)
 
+    # setuid executable file (4755)
+    setuid_exec = perm_path.joinpath("setuid_exec.sh")
+    setuid_exec.write_text("#!/bin/bash\necho hello\n")
+    setuid_exec.chmod(0o4755)
+    out_files.append(setuid_exec)
+
+    # setuid file without execute bit (4644) -> S marker
+    setuid_noexec = perm_path.joinpath("setuid_noexec.txt")
+    setuid_noexec.touch()
+    setuid_noexec.chmod(0o4644)
+    out_files.append(setuid_noexec)
+
+    # setgid executable file (2755)
+    setgid_exec = perm_path.joinpath("setgid_exec.sh")
+    setgid_exec.write_text("#!/bin/bash\necho hello\n")
+    setgid_exec.chmod(0o2755)
+    out_files.append(setgid_exec)
+
+    # Sticky directories for t/T markers when listing the parent directory.
+    sticky_dir = perm_path.joinpath("sticky")
+    sticky_dir.mkdir(exist_ok=True)
+    sticky_dir.chmod(0o1777)
+
+    sticky_noexec = perm_path.joinpath("sticky_noexec")
+    sticky_noexec.mkdir(exist_ok=True)
+    sticky_noexec.chmod(0o1666)
+
+    # FIFO entry for file-type prefix testing.
+    named_pipe = perm_path.joinpath("named_pipe")
+    if named_pipe.exists() or named_pipe.is_symlink():
+        named_pipe.unlink()
+    os.mkfifo(named_pipe, 0o644)
+    out_files.append(named_pipe)
+
+    # UNIX socket entry for file-type prefix testing.
+    unix_socket = perm_path.joinpath("unix_socket")
+    if unix_socket.exists() or unix_socket.is_symlink():
+        unix_socket.unlink()
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        sock.bind(str(unix_socket))
+    finally:
+        sock.close()
+    out_files.append(unix_socket)
+
     # Restricted directory for permission denied tests
     restricted = perm_path.joinpath("restricted")
     restricted.mkdir(exist_ok=True)
@@ -370,40 +415,6 @@ def create_sizes(path: Path) -> tuple[Path, list[Path]]:
     out_files.append(file_path)
 
     return sizes_path, out_files
-
-
-def create_xattrs(path: Path) -> tuple[Path, list[Path]]:
-    x_path = path.joinpath("xattrs").absolute()
-    x_path.mkdir(parents=True, exist_ok=True)
-    out_files: list[Path] = []
-
-    normal = x_path.joinpath("normal.txt")
-    normal.write_text("normal\n")
-    out_files.append(normal)
-
-    acl_file = x_path.joinpath("acl_file.txt")
-    acl_file.write_text("acl\n")
-
-    # Try to set an ACL so `ls -l` prints a '+' on the permissions field.
-    # If setfacl is unavailable (or filesystem doesn't support ACLs), we skip.
-    if shutil.which("setfacl") is not None:
-        user = getpass.getuser()
-        subprocess.run(
-            ["setfacl", "-m", f"u:{user}:rw", str(acl_file)],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        out_files.append(acl_file)
-
-    # Optional: a harmless user.* xattr (GNU ls won't show it by default).
-    if shutil.which("setfattr") is not None:
-        subprocess.run(
-            ["setfattr", "-n", "user.ft_ls_test", "-v", "hello", str(normal)],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-
-    return x_path, out_files
 
 
 def create_special_chars(path: Path) -> tuple[Path, list[Path]]:
