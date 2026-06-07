@@ -12,15 +12,15 @@
 #include "../include/ft_arena.h"
 #include "../include/ft_entry.h"
 #include "../include/ft_free_list.h"
+#include "../include/ft_helper.h"
 #include "../include/ft_shell_escape.h"
 #include "../include/ft_str.h"
-#include "../include/ft_helper.h"
 
 #include "../libft/include/libft.h"
 
 #ifndef CACHE_SIZE
 #define CACHE_SIZE UINT64_C(8)
-#endif
+#endif // ifndef CACHE_SIZE //
 
 #ifndef PERMISSION_SIZE
 #define PERMISSION_SIZE UINT64_C(12)
@@ -29,6 +29,14 @@
 #ifndef DT_LEN
 #define DT_LEN UINT64_C(13)
 #endif // ifndef DT_LEN //
+
+#ifndef LOGIN_NAME_MAX
+#define LOGIN_NAME_MAX INT64_C(256)
+#endif // ifndef LOGIN_NAME_MAX //
+
+#ifndef PATH_MAX
+#define PATH_MAX INT64_C(4096)
+#endif // ifndef PATH_MAX //
 
 typedef struct {
     char name[LOGIN_NAME_MAX];
@@ -58,6 +66,7 @@ static void free_str_cb_(free_list *fl, void *ptr);
 static char *cache_lookup_(t_id_cache_entry *cache, uint64_t id);
 static void cache_store_(t_id_cache_entry *cache, uint64_t *next, uint64_t id,
                          const char *name);
+static void apply_shell_scan_(t_entry *entry, const t_shell_scan *scan);
 
 t_entry *new_entry(const t_alloc *alloc, const t_entry *entry,
                    const struct dirent *dp) {
@@ -74,21 +83,19 @@ t_entry *new_entry(const t_alloc *alloc, const t_entry *entry,
         goto failed;
     }
 
+    apply_shell_scan_(ent, &scan);
     ft_memcpy(ent->name->str, dp->d_name, scan.len);
     ent->name->len = scan.len;
     ent->name->str[ent->name->len] = '\0';
     ent->path = NULL;
     ent->symlink = NULL;
     ent->parent_path = entry->path;
-    ent->quote = scan.quote;
     ent->path_has_colon = entry->path_has_colon ||
                           ft_memchr(dp->d_name, ':', (size_t)scan.len) != NULL;
     ent->is_operand = false;
     ent->symlink_ready = false;
     ent->info = NULL;
     ent->st = (struct stat){0};
-    ent->display_len = scan.display_len;
-    ent->padded_display_len = scan.padded_display_len;
     return ent;
 failed:
     free_alloc(alloc, mark, ent, fl_free);
@@ -121,9 +128,7 @@ void init_entry_display(t_entry *entry) {
     t_shell_scan scan;
 
     shell_scan_str(entry->name, &scan);
-    entry->quote = scan.quote;
-    entry->display_len = scan.display_len;
-    entry->padded_display_len = scan.padded_display_len;
+    apply_shell_scan_(entry, &scan);
 }
 
 bool ensure_entry_path(const t_alloc *alloc, t_entry *entry) {
@@ -314,10 +319,8 @@ static void fill_dir_entry_display_(t_entry *entry, const t_entry *src) {
     t_shell_scan scan;
 
     shell_scan_str(entry->path, &scan);
-    entry->quote = scan.quote;
+    apply_shell_scan_(entry, &scan);
     entry->path_has_colon = src->path_has_colon;
-    entry->display_len = scan.display_len;
-    entry->padded_display_len = scan.padded_display_len;
     if (entry->quote == '\0' && entry->path_has_colon) {
         entry->quote = '\'';
         entry->display_len = entry->path->len + 2;
@@ -526,4 +529,10 @@ static void cache_store_(t_id_cache_entry *cache, uint64_t *next, uint64_t id,
     cache[index].id = id;
     ft_strlcpy(cache[index].name, name, LOGIN_NAME_MAX);
     ++(*next);
+}
+
+static void apply_shell_scan_(t_entry *entry, const t_shell_scan *scan) {
+    entry->quote = scan->quote;
+    entry->display_len = scan->display_len;
+    entry->padded_display_len = scan->padded_display_len;
 }

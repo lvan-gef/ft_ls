@@ -5,6 +5,10 @@
 
 #include "../include/ft_free_list.h"
 
+#ifndef FL_ALIGN
+#define FL_ALIGN UINT64_C(8)
+#endif // !FL_ALIGN
+
 static free_list_node *fl_find_best_(free_list *fl, size_t size, size_t align,
                                      size_t *padding_,
                                      free_list_node **prev_node_);
@@ -37,7 +41,7 @@ void fl_init(free_list *fl, void *data, size_t size) {
     fl_free_all(fl);
 }
 
-void *fl_alloc(free_list *fl, size_t size, size_t align) {
+void *fl_alloc(free_list *fl, size_t size) {
     size_t padding = 0;
     free_list_node *prev_node = NULL;
     free_list_node *node = NULL;
@@ -48,17 +52,9 @@ void *fl_alloc(free_list *fl, size_t size, size_t align) {
         size = sizeof(free_list_node);
     }
 
-    if (align < 8) {
-        align = 8;
-    }
-
-    if (!is_power_of_two_(align)) {
-        return NULL;
-    }
-
-    node = fl_find_best_(fl, size, align, &padding, &prev_node);
+    node = fl_find_best_(fl, size, FL_ALIGN, &padding, &prev_node);
     if (node == NULL) {
-        void *extra = alloc_extra_block_(fl, size, align);
+        void *extra = alloc_extra_block_(fl, size, FL_ALIGN);
         if (extra != NULL) {
             return extra;
         }

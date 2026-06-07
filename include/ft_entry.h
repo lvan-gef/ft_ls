@@ -11,14 +11,6 @@
 #include "./ft_free_list.h"
 #include "./ft_str.h"
 
-#ifndef LOGIN_NAME_MAX
-#define LOGIN_NAME_MAX INT64_C(256)
-#endif // ifndef LOGIN_NAME_MAX //
-
-#ifndef PATH_MAX
-#define PATH_MAX INT64_C(4096)
-#endif // ifndef PATH_MAX //
-
 typedef struct {
     t_str *perm;
     t_str *links;

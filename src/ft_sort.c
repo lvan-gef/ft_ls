@@ -22,7 +22,8 @@ static t_str *entry_name_(const t_entry *entry);
 static int compare_(const t_str *lhs, const t_str *rhs);
 static int compare_time_(const struct timespec *a, const struct timespec *b);
 
-bool sort(t_sort_scratch *scratch, t_array *array, bool reverse, bool sort_time) {
+bool sort(t_sort_scratch *scratch, t_array *array, bool reverse,
+          bool sort_time) {
     if (array->len <= 1) {
         return true;
     }

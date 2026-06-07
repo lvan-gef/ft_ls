@@ -49,7 +49,12 @@ static int check_links_(t_params *params, t_str *str, t_array *dir_entries,
 static bool has_quoted_operands_(const t_array *array);
 static void clean_up_(t_params *params);
 static bool print_err_(t_params *params, t_str *str, int e, const char *prefix);
-static void set_entry_(t_entry *entry, t_str *str, const struct stat *st);
+static bool queue_operand_dir_(free_list *fl, t_array *dir_entries, t_str *str,
+                               const struct stat *st);
+static t_entry *new_file_operand_(t_params *params, t_str *str,
+                                  const struct stat *st, t_str *symlink);
+static bool operand_has_colon_(const t_str *str);
+static bool drain_operand_dirs_(t_params *params, t_array *dir_entries);
 
 void process(t_args *args, t_array *array, int *exit_code) {
     unsigned char buffer[FL_DEFAULT_SIZE];
@@ -67,8 +72,6 @@ void process(t_args *args, t_array *array, int *exit_code) {
         *exit_code = 2;
         goto cleanup;
     }
-
-    arena_auto_align(params.temp_arena, 8);
 
     params.dirs = init_array(&params.fl, ARRAY_SIZE);
     params.files = init_array(&params.fl, ARRAY_SIZE);
@@ -199,7 +202,6 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
     }
 
     struct stat st;
-    const t_alloc alloc = {.kind = ALLOC_FL, .as.fl = &params->fl};
     for (uint64_t index = 0; index < array->len; ++index) {
         t_str *str = array->data[index];
         t_str *symlink = NULL;
@@ -216,44 +218,15 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
         }
 
         if (S_ISDIR(st.st_mode)) {
-            t_entry src = {0};
-            set_entry_(&src, str, &st);
-            t_entry *dir_entry = dup_dir_entry(&alloc, &src, true);
-            if (!dir_entry) {
-                goto failed;
-            }
-
-            if (!append_array(dir_entries, dir_entry)) {
+            if (!queue_operand_dir_(&params->fl, dir_entries, str, &st)) {
                 goto failed;
             }
             continue;
         }
 
-        t_entry *entry = fl_alloc(&params->fl, sizeof(*entry), 8);
+        t_entry *entry = new_file_operand_(params, str, &st, symlink);
         if (!entry) {
             goto failed;
-        }
-
-        *entry = (t_entry){0};
-        entry->name = dup_str(&alloc, str);
-        if (!entry->name) {
-            free_entry(&params->fl, entry);
-            goto failed;
-        }
-
-        entry->path = entry->name;
-        entry->path_has_colon =
-            ft_memchr(str->str + str->pos, ':', (size_t)str->len) != NULL;
-        entry->st = st;
-        entry->symlink = symlink;
-        entry->symlink_ready = symlink != NULL;
-        entry->is_operand = false;
-        init_entry_display(entry);
-        if (params->args->list) {
-            if (!get_file_info(&alloc, entry)) {
-                free_entry(&params->fl, entry);
-                goto failed;
-            }
         }
 
         if (!append_array(params->files, entry)) {
@@ -263,17 +236,8 @@ static bool process_args_(t_params *params, t_array *array, int *exit_code) {
     }
 
     if (dir_entries->len) {
-        if (!sort(&params->sort_scratch, dir_entries, params->args->reverse,
-             params->args->time)) {
+        if (!drain_operand_dirs_(params, dir_entries)) {
             goto failed;
-        }
-
-        while (dir_entries->len) {
-            t_entry *entry = pop_array(dir_entries);
-            entry->is_operand = true;
-            if (!append_array(params->dirs, entry)) {
-                goto failed;
-            }
         }
     }
 
@@ -344,14 +308,7 @@ static int check_links_(t_params *params, t_str *str, t_array *dir_entries,
     }
 
     if (is_dir_operand && !params->args->list) {
-        t_entry src = {0};
-        set_entry_(&src, str, st_dir);
-        t_entry *dir_entry = dup_dir_entry(&alloc, &src, true);
-        if (!dir_entry) {
-            return -1;
-        }
-
-        if (!append_array(dir_entries, dir_entry)) {
+        if (!queue_operand_dir_(&params->fl, dir_entries, str, st_dir)) {
             return -1;
         }
         return 0;
@@ -554,10 +511,81 @@ static bool print_err_(t_params *params, t_str *str, int e,
     return true;
 }
 
-static void set_entry_(t_entry *entry, t_str *str, const struct stat *st) {
-    entry->name = str;
-    entry->path = str;
-    entry->path_has_colon =
-        ft_memchr(str->str + str->pos, ':', (size_t)str->len) != NULL,
-    entry->st = *st;
+static bool queue_operand_dir_(free_list *fl, t_array *dir_entries, t_str *str,
+                               const struct stat *st) {
+    const t_alloc alloc = {.kind = ALLOC_FL, .as.fl = fl};
+    t_entry src = {
+        .name = str,
+        .path = str,
+        .path_has_colon = operand_has_colon_(str),
+        .st = *st,
+    };
+
+    t_entry *dir_entry = dup_dir_entry(&alloc, &src, true);
+    if (!dir_entry) {
+        return false;
+    }
+
+    if (!append_array(dir_entries, dir_entry)) {
+        free_entry(fl, dir_entry);
+        return false;
+    }
+
+    return true;
+}
+
+static t_entry *new_file_operand_(t_params *params, t_str *str,
+                                  const struct stat *st, t_str *symlink) {
+    const t_alloc alloc = {.kind = ALLOC_FL, .as.fl = &params->fl};
+
+    t_entry *entry = fl_alloc(&params->fl, sizeof(*entry));
+    if (!entry) {
+        return NULL;
+    }
+
+    *entry = (t_entry){0};
+    entry->name = dup_str(&alloc, str);
+    if (!entry->name) {
+        goto failed;
+    }
+
+    entry->path = entry->name;
+    entry->path_has_colon = operand_has_colon_(str), entry->st = *st;
+    entry->symlink = symlink;
+    entry->symlink_ready = symlink != NULL;
+    entry->is_operand = false;
+    init_entry_display(entry);
+
+    if (params->args->list) {
+        if (!get_file_info(&alloc, entry)) {
+            goto failed;
+        }
+    }
+
+    return entry;
+
+failed:
+    free_entry(&params->fl, entry);
+    return NULL;
+}
+
+static bool operand_has_colon_(const t_str *str) {
+    return ft_memchr(str->str + str->pos, ':', (size_t)str->len) != NULL;
+}
+
+static bool drain_operand_dirs_(t_params *params, t_array *dir_entries) {
+    if (!sort(&params->sort_scratch, dir_entries, params->args->reverse,
+              params->args->time)) {
+        return false;
+    }
+
+    while (dir_entries->len) {
+        t_entry *entry = pop_array(dir_entries);
+        entry->is_operand = true;
+        if (!append_array(params->dirs, entry)) {
+            return false;
+        }
+    }
+
+    return true;
 }

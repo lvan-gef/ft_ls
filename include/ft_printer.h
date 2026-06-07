@@ -3,9 +3,9 @@
 
 #include <stdint.h>
 
+#include "./ft_array.h"
 #include "./ft_entry.h"
 #include "./ft_str.h"
-#include "./ft_array.h"
 
 typedef struct {
     const t_array *entries;

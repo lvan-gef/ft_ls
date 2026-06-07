@@ -40,7 +40,7 @@ enum { FREE_LIST_NODE_ALIGN = offsetof(free_list_node_align_helper, member) };
 
 void fl_free_all(free_list *fl);
 void fl_init(free_list *fl, void *data, size_t size);
-void *fl_alloc(free_list *fl, size_t size, size_t align);
+void *fl_alloc(free_list *fl, size_t size);
 void fl_free(free_list *fl, void *ptr);
 
 #endif // !FT_FREE_LIST

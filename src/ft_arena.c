@@ -3,6 +3,10 @@
 
 #include "../include/ft_arena.h"
 
+#ifndef ARENA_ALIGN
+#define ARENA_ALIGN UINT64_C(8)
+#endif // !ARENA_ALIGN
+
 static Arena_Block *new_block_(uint64_t cap);
 
 Arena *arena_alloc(uint64_t cap) {
@@ -19,7 +23,7 @@ Arena *arena_alloc(uint64_t cap) {
 
     arena->first = block;
     arena->current = block;
-    arena->align = 0;
+    arena->align = ARENA_ALIGN;
     arena->block_size = cap;
 
     return arena;
@@ -37,13 +41,6 @@ void arena_release(Arena *arena) {
     free(arena);
 }
 
-void arena_auto_align(Arena *arena, uint64_t align) {
-    arena->align = align;
-    if (align > arena->block_size) {
-        arena->block_size = align;
-    }
-}
-
 Arena_Mark arena_get_mark(const Arena *arena) {
     Arena_Mark mark = {.block = arena->current, .pos = arena->current->pos};
     return mark;
@@ -52,11 +49,9 @@ Arena_Mark arena_get_mark(const Arena *arena) {
 void *arena_push(Arena *arena, uint64_t size) {
     uint64_t align_pos = arena->current->pos;
 
-    if (arena->align) {
-        uint64_t remainder = align_pos % arena->align;
-        if (remainder) {
-            align_pos += arena->align - remainder;
-        }
+    uint64_t remainder = align_pos % arena->align;
+    if (remainder) {
+        align_pos += arena->align - remainder;
     }
 
     if (align_pos + size > arena->current->cap) {

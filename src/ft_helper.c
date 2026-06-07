@@ -1,8 +1,8 @@
 #include <stdint.h>
 
-#include "../include/ft_helper.h"
 #include "../include/ft_arena.h"
 #include "../include/ft_free_list.h"
+#include "../include/ft_helper.h"
 
 uint64_t len_of_nbr(uint64_t nbr) {
     uint64_t len = 1;
@@ -22,10 +22,8 @@ void *alloc_mem(const t_alloc *alloc, Arena_Mark *mark, uint64_t size) {
                 *mark = arena_get_mark(alloc->as.arena);
             }
             return arena_push(alloc->as.arena, size);
-        case ALLOC_FL:
-            return fl_alloc(alloc->as.fl, size, 8);
-        default:
-            return NULL;
+        case ALLOC_FL: return fl_alloc(alloc->as.fl, size);
+        default: return NULL;
     }
 }
 

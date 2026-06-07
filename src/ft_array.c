@@ -12,12 +12,12 @@
 static bool realloc_arr_(t_array *array);
 
 t_array *init_array(free_list *fl, uint64_t size) {
-    t_array *array = fl_alloc(fl, 1 * sizeof(*array), 8);
+    t_array *array = fl_alloc(fl, 1 * sizeof(*array));
     if (!array) {
         return NULL;
     }
 
-    array->data = (void **)fl_alloc(fl, size * sizeof(*array->data), 8);
+    array->data = (void **)fl_alloc(fl, size * sizeof(*array->data));
     if (!array->data) {
         fl_free(fl, array);
         return NULL;
@@ -64,7 +64,7 @@ static bool realloc_arr_(t_array *array) {
 
     void **old_data = array->data;
     void **new_data =
-        (void **)fl_alloc(array->fl, new_cap * sizeof(*new_data), 8);
+        (void **)fl_alloc(array->fl, new_cap * sizeof(*new_data));
     if (!new_data) {
         return false;
     }
