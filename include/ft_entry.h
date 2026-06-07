@@ -25,22 +25,15 @@ typedef struct {
 typedef struct {
     t_str *name;
     t_str *path;
-    t_str *symlink;
     const t_str *parent_path;
     t_file_info *info;
     struct stat st;
-    uint64_t display_len;
-    uint64_t padded_display_len;
-    char quote;
-    bool path_has_colon;
     bool is_operand;
-    bool symlink_ready;
 } t_entry;
 
 t_entry *new_entry(const t_alloc *alloc, const t_entry *entry,
                    const struct dirent *dp);
 bool get_file_info(const t_alloc *alloc, t_entry *entry);
-void init_entry_display(t_entry *entry);
 bool ensure_entry_path(const t_alloc *alloc, t_entry *entry);
 t_entry *dup_dir_entry(const t_alloc *alloc, const t_entry *src,
                        bool is_operand);

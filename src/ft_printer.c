@@ -31,7 +31,7 @@ typedef struct {
     bool have_quote;
 } t_list_stats;
 
-static bool put_dir_header_(t_str *out, const t_entry *dir_entry);
+static bool put_dir_header_(t_str *out, const t_str *dir_header);
 static uint64_t display_len_(const t_entry *entry, bool quoted);
 static bool init_print_row_(const t_print_request *req);
 static void calc_cols_(const t_array *array, t_map *map, bool *quoted,
@@ -57,12 +57,19 @@ bool printer(const t_print_request *req) {
     return init_print_row_(req);
 }
 
-static bool put_dir_header_(t_str *out, const t_entry *dir_entry) {
-    if (!dir_entry) {
+static bool put_dir_header_(t_str *out, const t_str *dir_header) {
+    if (!dir_header) {
         return true;
     }
 
-    return escaped_out(out, dir_entry->name, dir_entry->quote, false) &&
+    t_shell_scan scan;
+    shell_scan_str(dir_header, &scan);
+    if (scan.quote == '\0' && ft_memchr(dir_header->str + dir_header->pos, ':',
+                                        (size_t)dir_header->len) != NULL) {
+        scan.quote = '\'';
+    }
+
+    return escaped_out(out, dir_header, scan.quote, false) &&
            put_mem(out, ":\n", 2);
 }
 
@@ -91,27 +98,20 @@ static void calc_cols_(const t_array *array, t_map *map, bool *quoted,
     if (!*quoted) {
         for (uint64_t index = 0; index < array->len; ++index) {
             const t_entry *entry = array->data[index];
-            if (entry->quote != '\0') {
+            t_shell_scan scan;
+            shell_scan_str(entry->name, &scan);
+            if (scan.quote != '\0') {
                 *quoted = true;
                 break;
             }
         }
     }
 
-    uint64_t lo = 1;
-    uint64_t hi = width_count;
     uint64_t best = 1;
-    while (lo <= hi) {
-        const uint64_t mid = lo + (hi - lo) / 2;
-
-        if (calc_width_(array, *quoted, mid, col_widths)) {
-            best = mid;
-            lo = mid + 1;
-        } else {
-            if (mid == 1) {
-                break;
-            }
-            hi = mid - 1;
+    for (uint64_t cols = width_count; cols > 0; --cols) {
+        if (calc_width_(array, *quoted, cols, col_widths)) {
+            best = cols;
+            break;
         }
     }
 
@@ -162,10 +162,13 @@ static bool create_row_(t_str *out, const t_array *array, const t_map *map,
 
         while (true) {
             const t_entry *entry = array->data[filesno];
-            const uint64_t name_length = display_len_(entry, quoted);
+            t_shell_scan scan;
+            shell_scan_str(entry->name, &scan);
+            const uint64_t name_length =
+                quoted ? scan.padded_display_len : scan.display_len;
             const uint64_t max_name_length = col_widths[col++];
 
-            if (!escaped_out(out, entry->name, entry->quote, quoted)) {
+            if (!escaped_out(out, entry->name, scan.quote, quoted)) {
                 return false;
             }
 
@@ -191,11 +194,14 @@ static bool create_row_(t_str *out, const t_array *array, const t_map *map,
 }
 
 static uint64_t display_len_(const t_entry *entry, bool quoted) {
+    t_shell_scan scan;
+    shell_scan_str(entry->name, &scan);
+
     if (quoted) {
-        return entry->padded_display_len;
+        return scan.padded_display_len;
     }
 
-    return entry->display_len;
+    return scan.display_len;
 }
 
 static bool indent_(t_str *out, uint64_t from, uint64_t to) {
@@ -231,8 +237,10 @@ static void update_list_stats_(t_list_stats *stats, const t_entry *entry) {
         stats->max_len_perm = entry->info->perm->len;
     }
 
-    if (!stats->have_quote && entry->quote != '\0') {
-        stats->have_quote = true;
+    if (!stats->have_quote) {
+        t_shell_scan scan;
+        shell_scan_str(entry->name, &scan);
+        stats->have_quote = scan.quote != '\0';
     }
 
     stats->total += entry->info->blocks;
@@ -249,7 +257,6 @@ static void collect_list_stats_(const t_array *entries, t_list_stats *stats) {
 
 static bool print_list_(const t_print_request *req) {
     t_list_stats sizes;
-
     collect_list_stats_(req->entries, &sizes);
 
     if (sizes.max_len_links < req->min_len_links) {
@@ -311,6 +318,9 @@ static bool print_list_rows_(t_str *out, const t_array *array,
                              const t_list_stats *sizes) {
     for (uint64_t index = 0; index < array->len; ++index) {
         const t_entry *entry = array->data[index];
+        t_shell_scan scan;
+
+        shell_scan_str(entry->name, &scan);
 
         if (!put_mem(out, entry->info->perm->str, entry->info->perm->len) ||
             !left_pad_(out, entry->info->perm->len, sizes->max_len_perm) ||
@@ -329,7 +339,7 @@ static bool print_list_rows_(t_str *out, const t_array *array,
             !put_mem(out, " ", 1) ||
             !put_mem(out, entry->info->dt->str, entry->info->dt->len) ||
             !put_mem(out, " ", 1) ||
-            !escaped_out(out, entry->name, entry->quote, sizes->have_quote)) {
+            !escaped_out(out, entry->name, scan.quote, sizes->have_quote)) {
             return false;
         }
 

@@ -13,7 +13,6 @@
 #include "../include/ft_entry.h"
 #include "../include/ft_free_list.h"
 #include "../include/ft_helper.h"
-#include "../include/ft_shell_escape.h"
 #include "../include/ft_str.h"
 
 #include "../libft/include/libft.h"
@@ -53,7 +52,6 @@ static bool fill_file_info_(const t_alloc *alloc, t_file_info *info,
                             const t_entry *entry);
 static t_str *join_dir_path_(const t_alloc *alloc, const t_str *lhs,
                              const t_str *rhs);
-static void fill_dir_entry_display_(t_entry *entry, const t_entry *src);
 static t_str *get_perm_(const t_alloc *alloc, const t_entry *entry);
 static t_str *get_user_(const t_alloc *alloc, uid_t user_id);
 static t_str *get_group_(const t_alloc *alloc, gid_t group_id);
@@ -66,7 +64,6 @@ static void free_str_cb_(free_list *fl, void *ptr);
 static char *cache_lookup_(t_id_cache_entry *cache, uint64_t id);
 static void cache_store_(t_id_cache_entry *cache, uint64_t *next, uint64_t id,
                          const char *name);
-static void apply_shell_scan_(t_entry *entry, const t_shell_scan *scan);
 
 t_entry *new_entry(const t_alloc *alloc, const t_entry *entry,
                    const struct dirent *dp) {
@@ -76,24 +73,19 @@ t_entry *new_entry(const t_alloc *alloc, const t_entry *entry,
         return NULL;
     }
 
-    t_shell_scan scan;
-    shell_scan_cstr(dp->d_name, &scan);
-    ent->name = init_str(alloc, scan.len);
+    *ent = (t_entry){0};
+    const size_t name_len = ft_strlen(dp->d_name);
+    ent->name = init_str(alloc, name_len);
     if (!ent->name) {
         goto failed;
     }
 
-    apply_shell_scan_(ent, &scan);
-    ft_memcpy(ent->name->str, dp->d_name, scan.len);
-    ent->name->len = scan.len;
+    ft_memcpy(ent->name->str, dp->d_name, name_len);
+    ent->name->len = name_len;
     ent->name->str[ent->name->len] = '\0';
     ent->path = NULL;
-    ent->symlink = NULL;
     ent->parent_path = entry->path;
-    ent->path_has_colon = entry->path_has_colon ||
-                          ft_memchr(dp->d_name, ':', (size_t)scan.len) != NULL;
     ent->is_operand = false;
-    ent->symlink_ready = false;
     ent->info = NULL;
     ent->st = (struct stat){0};
     return ent;
@@ -122,13 +114,6 @@ failed:
 
     entry->info = NULL;
     return false;
-}
-
-void init_entry_display(t_entry *entry) {
-    t_shell_scan scan;
-
-    shell_scan_str(entry->name, &scan);
-    apply_shell_scan_(entry, &scan);
 }
 
 bool ensure_entry_path(const t_alloc *alloc, t_entry *entry) {
@@ -168,7 +153,6 @@ t_entry *dup_dir_entry(const t_alloc *alloc, const t_entry *src,
     }
 
     entry->st = src->st;
-    fill_dir_entry_display_(entry, src);
     entry->is_operand = is_operand;
     return entry;
 failed:
@@ -241,10 +225,6 @@ void free_entry(free_list *fl, t_entry *entry) {
         free_str(fl, entry->path);
     }
 
-    if (entry->symlink) {
-        free_str(fl, entry->symlink);
-    }
-
     if (entry->info) {
         free_info_(fl, entry->info);
     }
@@ -313,19 +293,6 @@ static t_str *join_dir_path_(const t_alloc *alloc, const t_str *lhs,
     path->len += rhs->len;
     path->str[path->len] = '\0';
     return path;
-}
-
-static void fill_dir_entry_display_(t_entry *entry, const t_entry *src) {
-    t_shell_scan scan;
-
-    shell_scan_str(entry->path, &scan);
-    apply_shell_scan_(entry, &scan);
-    entry->path_has_colon = src->path_has_colon;
-    if (entry->quote == '\0' && entry->path_has_colon) {
-        entry->quote = '\'';
-        entry->display_len = entry->path->len + 2;
-        entry->padded_display_len = entry->display_len;
-    }
 }
 
 static t_str *get_perm_(const t_alloc *alloc, const t_entry *entry) {
@@ -454,15 +421,12 @@ static t_str *get_symlink_(const t_alloc *alloc, const t_entry *entry) {
         return init_str(alloc, 1);
     }
 
-    if (!entry->symlink_ready) {
+    if (!entry->path) {
         return NULL;
     }
 
-    if (entry->symlink) {
-        return dup_str(alloc, entry->symlink);
-    }
-
-    return init_str(alloc, 1);
+    return read_symlink_target(alloc, entry->path, (uint64_t)entry->st.st_size,
+                               NULL);
 }
 
 static void free_info_(free_list *fl, t_file_info *info) {
@@ -529,10 +493,4 @@ static void cache_store_(t_id_cache_entry *cache, uint64_t *next, uint64_t id,
     cache[index].id = id;
     ft_strlcpy(cache[index].name, name, LOGIN_NAME_MAX);
     ++(*next);
-}
-
-static void apply_shell_scan_(t_entry *entry, const t_shell_scan *scan) {
-    entry->quote = scan->quote;
-    entry->display_len = scan->display_len;
-    entry->padded_display_len = scan->padded_display_len;
 }

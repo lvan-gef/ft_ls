@@ -78,9 +78,5 @@ t_str *uint_to_str(const t_alloc *alloc, uint64_t nbr) {
 }
 
 void free_str(free_list *fl, t_str *str) {
-    if (!str) {
-        return;
-    }
-
     fl_free(fl, str);
 }
