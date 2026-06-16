@@ -4,7 +4,6 @@
 
 #include "../include/ft_arena.h"
 #include "../include/ft_free_list.h"
-#include "../include/ft_helper.h"
 #include "../include/ft_str.h"
 
 #include "../libft/include/libft.h"
@@ -97,7 +96,7 @@ t_str *uint_to_str(Arena *arena, uint64_t nbr) {
     return str;
 }
 
-void free_str(free_list *fl, t_str *str) {
+void free_str(free_list *fl, const t_str *str) {
     fl_free(fl, str);
 }
 

@@ -21,5 +21,5 @@ t_str *arena_create_str(Arena *arena, const char *str);
 t_str *fl_create_str(free_list *fl, const char *str);
 t_str *dup_str(free_list *fl, const t_str *str);
 t_str *uint_to_str(Arena *arena, uint64_t nbr);
-void free_str(free_list *fl, t_str *str);
+void free_str(free_list *fl, const t_str *str);
 #endif // !FT_STR_H

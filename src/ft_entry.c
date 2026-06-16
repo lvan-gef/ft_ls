@@ -214,7 +214,7 @@ t_str *read_symlink_target(Arena *arena, const t_str *path,
     }
 }
 
-void free_entry(free_list *fl, t_entry *entry) {
+void free_entry(free_list *fl, const t_entry *entry) {
     if (!entry) {
         return;
     }

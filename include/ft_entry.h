@@ -41,6 +41,6 @@ bool ensure_entry_path(Arena *arena, t_entry *entry);
 t_entry *dup_dir_entry(free_list *fl, const t_entry *src, bool is_operand);
 t_str *read_symlink_target(Arena *arena, const t_str *path,
                            uint64_t target_size, int *read_err);
-void free_entry(free_list *fl, t_entry *entry);
+void free_entry(free_list *fl, const t_entry *entry);
 
 #endif // !FT_ENTRY_H

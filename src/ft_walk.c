@@ -405,7 +405,7 @@ static void clear_directory_entries_(const t_params *params) {
 
 static void free_entry_array_(t_params *params, t_array *array) {
     while (array->len) {
-        t_entry *entry = pop_array(array);
+        const t_entry *entry = pop_array(array);
         free_entry(&params->fl, entry);
     }
 }
