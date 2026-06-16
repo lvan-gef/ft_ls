@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 #include "./ft_free_list.h"
-#include "./ft_helper.h"
+#include "./ft_arena.h"
 
 typedef struct {
     char *str;
@@ -15,9 +15,10 @@ typedef struct {
     uint64_t pos;
 } t_str;
 
-t_str *init_str(const t_alloc *alloc, uint64_t cap);
-t_str *create_str(const t_alloc *alloc, const char *str);
-t_str *dup_str(const t_alloc *alloc, const t_str *str);
-t_str *uint_to_str(const t_alloc *alloc, uint64_t nbr);
+t_str *arena_init_str(Arena *arena, uint64_t cap);
+t_str *fl_init_str(free_list *fl, uint64_t cap);
+t_str *create_str(free_list *fl, const char *str);
+t_str *dup_str(free_list *fl, const t_str *str);
+t_str *uint_to_str(free_list *fl, uint64_t nbr);
 void free_str(free_list *fl, t_str *str);
 #endif // !FT_STR_H

@@ -10,6 +10,7 @@
 
 #include "./ft_free_list.h"
 #include "./ft_str.h"
+#include "./ft_arena.h"
 
 typedef struct {
     t_str *perm;
@@ -32,13 +33,14 @@ typedef struct {
     bool is_operand;
 } t_entry;
 
-t_entry *new_entry(const t_alloc *alloc, const t_entry *entry,
-                   const struct dirent *dp);
-bool get_file_info(const t_alloc *alloc, t_entry *entry);
-bool ensure_entry_path(const t_alloc *alloc, t_entry *entry);
-t_entry *dup_dir_entry(const t_alloc *alloc, const t_entry *src,
-                       bool is_operand);
-t_str *read_symlink_target(const t_alloc *alloc, const t_str *path,
+t_entry *new_scanned_entry(Arena *arena, const t_entry *parent,
+                           const struct dirent *dp);
+bool ensure_entry_path(Arena *arena, t_entry *entry);
+bool arena_fill_file_info(Arena *arena, t_entry *entry);
+
+bool fl_fill_file_info(free_list *fl, t_entry *entry);
+t_entry *dup_dir_entry(free_list *fl, const t_entry *src, bool is_operand);
+t_str *read_symlink_target(free_list *fl, const t_str *path,
                            uint64_t target_size, int *read_err);
 void free_entry(free_list *fl, t_entry *entry);
 

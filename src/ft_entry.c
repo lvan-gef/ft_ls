@@ -12,8 +12,8 @@
 #include "../include/ft_arena.h"
 #include "../include/ft_entry.h"
 #include "../include/ft_free_list.h"
-#include "../include/ft_helper.h"
 #include "../include/ft_str.h"
+#include "../include/ft_arena.h"
 
 #include "../libft/include/libft.h"
 
@@ -46,6 +46,18 @@ typedef struct {
     uint64_t id;
 } t_id_cache_entry;
 
+typedef enum e_alloc_kind { ALLOC_FL, ALLOC_ARENA } t_alloc_kind;
+
+typedef struct {
+    t_alloc_kind kind;
+    union {
+        free_list *fl;
+        Arena *arena;
+    } as;
+} t_alloc;
+
+typedef void (*t_fl_cleanup)(free_list *fl, void *ptr);
+
 static uint64_t user_index = 0;
 static t_id_cache_entry user_cache[CACHE_SIZE] = {0};
 
@@ -73,18 +85,20 @@ static void cache_store_(t_id_cache_entry *cache, uint64_t *next, uint64_t id,
 static char file_type_char_(mode_t mode);
 static char exec_char_(mode_t mode, mode_t exec_bit, mode_t special_bit,
                        char lower, char upper);
+static void *alloc_mem_(const t_alloc *alloc, Arena_Mark *mark, const uint64_t size);
+static void free_alloc_(const t_alloc *alloc, const Arena_Mark mark, void *ptr, const t_fl_cleanup fl_cleanup);
 
-t_entry *new_entry(const t_alloc *alloc, const t_entry *entry,
+t_entry *new_scanned_entry(Arena *arena, const t_entry *parent,
                    const struct dirent *dp) {
     Arena_Mark mark = {0};
-    t_entry *ent = alloc_mem(alloc, &mark, sizeof(*ent));
+    t_entry *ent = arena_push(arena, sizeof(*ent));
     if (!ent) {
         return NULL;
     }
 
     *ent = (t_entry){0};
     const size_t name_len = ft_strlen(dp->d_name);
-    ent->name = init_str(alloc, name_len);
+    ent->name = arena_init_str(arena, name_len);
     if (!ent->name) {
         goto failed;
     }
@@ -93,20 +107,41 @@ t_entry *new_entry(const t_alloc *alloc, const t_entry *entry,
     ent->name->len = name_len;
     ent->name->str[ent->name->len] = '\0';
     ent->path = NULL;
-    ent->parent_path = entry->path;
+    ent->parent_path = parent->path;
     ent->stat_unavailable = false;
     ent->is_operand = false;
     ent->info = NULL;
     ent->st = (struct stat){0};
     return ent;
 failed:
-    free_alloc(alloc, mark, ent, fl_free);
+    arena_pop_to_mark(arena, mark);
     return NULL;
 }
 
-bool get_file_info(const t_alloc *alloc, t_entry *entry) {
+bool arena_fill_file_info(const t_alloc *alloc, t_entry *entry) {
     Arena_Mark mark = {0};
-    t_file_info *info = alloc_mem(alloc, &mark, sizeof(*info));
+    t_file_info *info = alloc_mem_(alloc, &mark, sizeof(*info));
+    if (!info) {
+        goto failed;
+    }
+
+    *info = (t_file_info){0};
+    if (!fill_file_info_(arena, info, entry)) {
+        goto failed;
+    }
+
+    entry->info = info;
+    return true;
+
+failed:
+    arena_pop_to_mark(arena, mark);
+    entry->info = NULL;
+    return false;
+}
+
+bool fill_file_info_fl(const t_alloc *alloc, t_entry *entry) {
+    Arena_Mark mark = {0};
+    t_file_info *info = alloc_mem_(alloc, &mark, sizeof(*info));
     if (!info) {
         goto failed;
     }
@@ -120,7 +155,7 @@ bool get_file_info(const t_alloc *alloc, t_entry *entry) {
     return true;
 
 failed:
-    free_alloc(alloc, mark, info, free_info_cb_);
+    free_alloc_(alloc, mark, info, free_info_cb_);
 
     entry->info = NULL;
     return false;
@@ -142,7 +177,7 @@ bool ensure_entry_path(const t_alloc *alloc, t_entry *entry) {
 t_entry *dup_dir_entry(const t_alloc *alloc, const t_entry *src,
                        const bool is_operand) {
     Arena_Mark mark = {0};
-    t_entry *entry = alloc_mem(alloc, &mark, sizeof(*entry));
+    t_entry *entry = alloc_mem_(alloc, &mark, sizeof(*entry));
     if (!entry) {
         return NULL;
     }
@@ -167,7 +202,7 @@ t_entry *dup_dir_entry(const t_alloc *alloc, const t_entry *src,
     entry->is_operand = is_operand;
     return entry;
 failed:
-    free_alloc(alloc, mark, entry, free_entry_cb_);
+    free_alloc_(alloc, mark, entry, free_entry_cb_);
     return NULL;
 }
 
@@ -194,7 +229,7 @@ t_str *read_symlink_target(const t_alloc *alloc, const t_str *path,
         const ssize_t len = readlink(path->str, new_str->str, read_size);
         if (len < 0) {
             const int err = errno;
-            free_alloc(alloc, mark, new_str, free_str_cb_);
+            free_alloc_(alloc, mark, new_str, free_str_cb_);
 
             if (err == ENOENT || err == EINVAL || err == EACCES ||
                 err == EPERM) {
@@ -213,7 +248,7 @@ t_str *read_symlink_target(const t_alloc *alloc, const t_str *path,
             return new_str;
         }
 
-        free_alloc(alloc, mark, new_str, free_str_cb_);
+        free_alloc_(alloc, mark, new_str, free_str_cb_);
 
         if (cap > 0x3FFFFFFFFFFFFFFF) {
             return NULL;
@@ -500,13 +535,13 @@ static t_str *get_dt_(const t_alloc *alloc, const struct timespec *ctim) {
     const time_t stamp = ctim->tv_sec;
     const char *dt = ctime(&stamp);
     if (!dt) {
-        free_alloc(alloc, mark, new_str, free_str_cb_);
+        free_alloc_(alloc, mark, new_str, free_str_cb_);
         return NULL;
     }
 
     const time_t now = time(NULL);
     if (now == (time_t)-1) {
-        free_alloc(alloc, mark, new_str, free_str_cb_);
+        free_alloc_(alloc, mark, new_str, free_str_cb_);
         return NULL;
     }
 
@@ -618,4 +653,27 @@ static char exec_char_(const mode_t mode, const mode_t exec_bit,
     }
 
     return has_exec ? lower : upper;
+}
+
+static void *alloc_mem_(const t_alloc *alloc, Arena_Mark *mark, const uint64_t size) {
+    switch (alloc->kind) {
+        case ALLOC_ARENA:
+            if (mark) {
+                *mark = arena_get_mark(alloc->as.arena);
+            }
+            return arena_push(alloc->as.arena, size);
+        case ALLOC_FL: return fl_alloc(alloc->as.fl, size);
+        default: return NULL;
+    }
+}
+
+static void free_alloc_(const t_alloc *alloc, const Arena_Mark mark, void *ptr, const t_fl_cleanup fl_cleanup) {
+    if (!ptr) {
+        return;
+    }
+
+    switch (alloc->kind) {
+        case ALLOC_ARENA: arena_pop_to_mark(alloc->as.arena, mark); break;
+        case ALLOC_FL: fl_cleanup(alloc->as.fl, ptr); break;
+    }
 }

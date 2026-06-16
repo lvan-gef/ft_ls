@@ -374,7 +374,7 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
             continue;
         }
 
-        t_entry *entry = new_entry(&alloc, path, dp);
+        t_entry *entry = new_scanned_entry(&alloc, path, dp);
         if (!entry) {
             goto cleanup;
         }
@@ -382,7 +382,7 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
         entry->st.st_mode = dtype_to_mode_(dtype);
 
         if (need_lstat) {
-            if (!ensure_entry_path(&alloc, entry)) {
+            if (!ensure_scanned_entry_path(&alloc, entry)) {
                 goto cleanup;
             }
 
@@ -402,7 +402,7 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
         }
 
         if (params->args->list) {
-            if (!get_file_info(&alloc, entry)) {
+            if (!fill_scanned_file_info(&alloc, entry)) {
                 goto cleanup;
             }
         }
@@ -581,7 +581,7 @@ static t_entry *new_file_operand_(t_params *params, const t_str *str,
     entry->is_operand = false;
 
     if (params->args->list) {
-        if (!get_file_info(&alloc, entry)) {
+        if (!fill_scanned_file_info(&alloc, entry)) {
             goto failed;
         }
     }
