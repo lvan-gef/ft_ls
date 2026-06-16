@@ -118,7 +118,7 @@ failed:
     return NULL;
 }
 
-bool arena_fill_file_info(const t_alloc *alloc, t_entry *entry) {
+bool arena_fill_file_info(, t_entry *entry) {
     Arena_Mark mark = {0};
     t_file_info *info = alloc_mem_(alloc, &mark, sizeof(*info));
     if (!info) {
@@ -139,7 +139,7 @@ failed:
     return false;
 }
 
-bool fill_file_info_fl(const t_alloc *alloc, t_entry *entry) {
+bool fl_fill_file_info(const t_alloc *alloc, t_entry *entry) {
     Arena_Mark mark = {0};
     t_file_info *info = alloc_mem_(alloc, &mark, sizeof(*info));
     if (!info) {
