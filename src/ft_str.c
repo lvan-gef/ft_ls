@@ -44,7 +44,7 @@ t_str *arena_create_str(Arena *arena, const char *str) {
     const size_t len = ft_strlen(str);
 
     t_str *new_str = arena_init_str(arena, len);
-    if (!str) {
+    if (!new_str) {
         return NULL;
     }
 
@@ -56,7 +56,7 @@ t_str *fl_create_str(free_list *fl, const char *str) {
     const size_t len = ft_strlen(str);
 
     t_str *new_str = fl_init_str(fl, len);
-    if (!str) {
+    if (!new_str) {
         return NULL;
     }
 
@@ -64,7 +64,7 @@ t_str *fl_create_str(free_list *fl, const char *str) {
     return new_str;
 }
 
-t_str *dup_str(free_list *fl, const t_str *str) {
+t_str *fl_dup_str(free_list *fl, const t_str *str) {
     t_str *new_str = fl_init_str(fl, str->cap - 1);
     if (!new_str) {
         return NULL;
@@ -77,7 +77,7 @@ t_str *dup_str(free_list *fl, const t_str *str) {
     return new_str;
 }
 
-t_str *uint_to_str(Arena *arena, uint64_t nbr) {
+t_str *arena_uint_to_str(Arena *arena, uint64_t nbr) {
     const uint64_t len = len_of_nbr_(nbr);
     t_str *str = arena_init_str(arena, len);
     if (!str) {
@@ -96,7 +96,7 @@ t_str *uint_to_str(Arena *arena, uint64_t nbr) {
     return str;
 }
 
-void free_str(free_list *fl, const t_str *str) {
+void fl_free_str(free_list *fl, const t_str *str) {
     fl_free(fl, str);
 }
 

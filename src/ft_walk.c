@@ -268,7 +268,7 @@ static t_operand_state classify_operand_(t_params *params, t_str *str,
                                          struct stat *st, int *exit_code) {
     int e = 0;
     const t_str *symlink = NULL;
-    Arena_Mark mark = {0};
+    Arena_Mark mark = arena_get_mark(params->temp_arena);
     t_operand_state state = OPERAND_FILE;
 
     if (lstat(str->str, st) == -1) {
@@ -291,10 +291,11 @@ static t_operand_state classify_operand_(t_params *params, t_str *str,
             st_dir = &st_target;
         }
 
-        symlink =
-            read_symlink(params->temp_arena, str, (uint64_t)st->st_size, &e);
+        symlink = arena_read_symlink(params->temp_arena, str,
+                                     (uint64_t)st->st_size, &e);
         if (!symlink) {
-            return OPERAND_FATAL;
+            state = OPERAND_FATAL;
+            goto cleanup;
         }
 
         if (e != 0) {
@@ -354,14 +355,14 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
             continue;
         }
 
-        t_entry *entry = new_entry(params->temp_arena, path, dp);
+        t_entry *entry = arena_new_entry(params->temp_arena, path, dp);
         if (!entry) {
             goto cleanup;
         }
 
         entry->st.st_mode = dtype_to_mode_(dtype);
         if (need_lstat) {
-            if (!entry_path(params->temp_arena, entry)) {
+            if (!arena_entry_path(params->temp_arena, entry)) {
                 goto cleanup;
             }
 
@@ -445,7 +446,7 @@ static bool queue_recursive_dirs_(t_params *params) {
                 continue;
             }
 
-            t_entry *dir_entry = dup_entry(&params->fl, entry, false);
+            t_entry *dir_entry = fl_dup_entry(&params->fl, entry, false);
             if (!dir_entry) {
                 return false;
             }
@@ -486,7 +487,7 @@ static bool print_path_error_(t_params *params, const t_str *str, const int e,
         if (new_str) {
             ft_fprintf(STDERR_FILENO, "ft_ls: %s %s: %s\n", prefix,
                        new_str->str, msg);
-            free_str(fl, new_str);
+            fl_free_str(fl, new_str);
             return true;
         }
     }
@@ -503,7 +504,7 @@ static bool queue_operand_dir_(t_params *params, t_str *str,
         .st = *st,
     };
 
-    t_entry *dir_entry = dup_entry(&params->fl, &src, true);
+    t_entry *dir_entry = fl_dup_entry(&params->fl, &src, true);
     if (!dir_entry) {
         return false;
     }
@@ -524,7 +525,7 @@ static t_entry *new_file_operand_(t_params *params, const t_str *str,
     }
 
     *entry = (t_entry){0};
-    entry->name = dup_str(&params->fl, str);
+    entry->name = fl_dup_str(&params->fl, str);
     if (!entry->name) {
         goto failed;
     }

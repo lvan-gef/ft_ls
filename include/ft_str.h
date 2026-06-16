@@ -19,7 +19,7 @@ t_str *arena_init_str(Arena *arena, uint64_t cap);
 t_str *fl_init_str(free_list *fl, uint64_t cap);
 t_str *arena_create_str(Arena *arena, const char *str);
 t_str *fl_create_str(free_list *fl, const char *str);
-t_str *uint_to_str(Arena *arena, uint64_t nbr);
-t_str *dup_str(free_list *fl, const t_str *str);
-void free_str(free_list *fl, const t_str *str);
+t_str *arena_uint_to_str(Arena *arena, uint64_t nbr);
+t_str *fl_dup_str(free_list *fl, const t_str *str);
+void fl_free_str(free_list *fl, const t_str *str);
 #endif // !FT_STR_H
