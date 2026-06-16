@@ -40,6 +40,7 @@ bool flush_str(t_str *out) {
             written_total += (uint64_t)written;
             continue;
         }
+
         if (written < 0 && errno == EINTR) {
             continue;
         }
