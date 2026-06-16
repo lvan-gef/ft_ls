@@ -14,7 +14,7 @@ int main(const int argc, char *argv[]) {
     free_list fl;
     fl_init(&fl, buffer, sizeof(buffer));
 
-    t_array *inputs = parse_args(&fl, (uint64_t)argc, argv, &args);
+    const t_array *inputs = parse_args(&fl, (uint64_t)argc, argv, &args);
     if (!inputs) {
         clean_program_(&fl);
         return 1;

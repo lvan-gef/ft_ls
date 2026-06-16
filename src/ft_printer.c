@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "../include/ft_arena.h"
 #include "../include/ft_array.h"
 #include "../include/ft_entry.h"
 #include "../include/ft_printer.h"
@@ -31,6 +32,11 @@ typedef struct {
     bool have_quote;
 } t_list_stats;
 
+static bool prepare_list_infos_(Arena *arena, const t_array *entries);
+static void clear_list_infos_(const t_array *entries);
+static bool context_needs_padding_(const t_array *context);
+static void apply_list_width_context_(const t_array *context,
+                                      t_list_stats *sizes);
 static bool put_dir_header_(t_str *out, const t_str *dir_header);
 static uint64_t display_len_(const t_entry *entry, bool quoted);
 static bool init_print_row_(const t_print_request *req);
@@ -50,11 +56,96 @@ static bool print_list_rows_(t_str *out, const t_array *array,
                              const t_list_stats *sizes);
 
 bool printer(const t_print_request *req) {
-    if (req->list_mode) {
-        return print_list_(req);
+    if (!req->list_mode) {
+        return init_print_row_(req);
     }
 
-    return init_print_row_(req);
+    const Arena_Mark mark = arena_get_mark(req->arena);
+    bool ok = true;
+    if (!prepare_list_infos_(req->arena, req->entries) ||
+        !prepare_list_infos_(req->arena, req->list_width_context)) {
+        ok = false;
+        goto cleanup;
+    }
+
+    ok = print_list_(req);
+
+cleanup:
+    clear_list_infos_(req->entries);
+    clear_list_infos_(req->list_width_context);
+    arena_pop_to_mark(req->arena, mark);
+    return ok;
+}
+
+static bool prepare_list_infos_(Arena *arena, const t_array *entries) {
+    if (!entries) {
+        return true;
+    }
+
+    for (uint64_t index = 0; index < entries->len; ++index) {
+        t_entry *entry = entries->data[index];
+
+        entry->info = NULL;
+        if (!fill_file_info(arena, entry)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static void clear_list_infos_(const t_array *entries) {
+    if (!entries) {
+        return;
+    }
+
+    for (uint64_t index = 0; index < entries->len; ++index) {
+        t_entry *entry = entries->data[index];
+        entry->info = NULL;
+    }
+}
+
+static bool context_needs_padding_(const t_array *context) {
+    if (!context) {
+        return false;
+    }
+
+    for (uint64_t index = 0; index < context->len; ++index) {
+        const t_str *str = context->data[index];
+        if (!str) {
+            continue;
+        }
+
+        t_shell_scan scan;
+        shell_scan_str(str, &scan);
+        if (scan.quote != '\0') {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static void apply_list_width_context_(const t_array *context,
+                                      t_list_stats *sizes) {
+    if (!context) {
+        return;
+    }
+
+    for (uint64_t index = 0; index < context->len; ++index) {
+        const t_entry *entry = context->data[index];
+        if (!entry || !entry->info) {
+            continue;
+        }
+
+        if (entry->info->links->len > sizes->max_len_links) {
+            sizes->max_len_links = entry->info->links->len;
+        }
+
+        if (entry->info->size->len > sizes->max_len_sizes) {
+            sizes->max_len_sizes = entry->info->size->len;
+        }
+    }
 }
 
 static bool put_dir_header_(t_str *out, const t_str *dir_header) {
@@ -80,7 +171,7 @@ static bool init_print_row_(const t_print_request *req) {
                  .max = req->entries->len < max_cols ? req->entries->len
                                                      : max_cols};
 
-    bool quoted = req->quote_padding;
+    bool quoted = context_needs_padding_(req->quote_padding_context);
     uint64_t col_widths[(TERM_SIZE + SPACE_GAP) / (1 + SPACE_GAP)];
     calc_cols_(req->entries, &map, &quoted, col_widths);
 
@@ -177,7 +268,6 @@ static bool create_row_(t_str *out, const t_array *array, const t_map *map,
             }
 
             filesno += map->rows;
-
             if (!indent_(out, pos + name_length, pos + max_name_length)) {
                 return false;
             }
@@ -258,16 +348,11 @@ static void collect_list_stats_(const t_array *entries, t_list_stats *stats) {
 static bool print_list_(const t_print_request *req) {
     t_list_stats sizes;
     collect_list_stats_(req->entries, &sizes);
+    apply_list_width_context_(req->list_width_context, &sizes);
 
-    if (sizes.max_len_links < req->min_len_links) {
-        sizes.max_len_links = req->min_len_links;
-    }
+    sizes.have_quote =
+        sizes.have_quote || context_needs_padding_(req->quote_padding_context);
 
-    if (sizes.max_len_sizes < req->min_len_sizes) {
-        sizes.max_len_sizes = req->min_len_sizes;
-    }
-
-    sizes.have_quote = sizes.have_quote || req->quote_padding;
     if (!put_dir_header_(req->buffer, req->dir_header)) {
         return false;
     }

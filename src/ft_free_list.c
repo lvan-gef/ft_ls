@@ -78,7 +78,7 @@ void *fl_alloc(free_list *fl, size_t size) {
     return (void *)((char *)header_ptr + sizeof(free_list_header));
 }
 
-void fl_free(free_list *fl, void *ptr) {
+void fl_free(free_list *fl, const void *ptr) {
     free_list_node *prev_node = NULL;
     if (ptr == NULL) {
         return;

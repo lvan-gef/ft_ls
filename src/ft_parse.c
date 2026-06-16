@@ -9,7 +9,7 @@
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
 
-static t_str *create_and_append_(const t_alloc *alloc, const char *arg,
+static t_str *create_and_append_(free_list *fl, const char *arg,
                                  t_array *inputs);
 static void print_error_(const char *flag);
 
@@ -20,7 +20,7 @@ t_array *parse_args(free_list *fl, const uint64_t argc, char **argv,
         return NULL;
     }
 
-    const t_alloc alloc = {.kind = ALLOC_FL, .as.fl = fl};
+    // const t_alloc alloc = {.kind = ALLOC_FL, .as.fl = fl};
     bool is_flag = true;
     for (uint64_t index = 1; index < argc; ++index) {
         const size_t len = ft_strlen(argv[index]);
@@ -32,7 +32,7 @@ t_array *parse_args(free_list *fl, const uint64_t argc, char **argv,
 
         if (is_flag && *argv[index] == '-') {
             if (len == 1) {
-                if (!create_and_append_(&alloc, argv[index], inputs)) {
+                if (!create_and_append_(fl, argv[index], inputs)) {
                     return NULL;
                 }
             }
@@ -50,13 +50,13 @@ t_array *parse_args(free_list *fl, const uint64_t argc, char **argv,
             continue;
         }
 
-        if (!create_and_append_(&alloc, argv[index], inputs)) {
+        if (!create_and_append_(fl, argv[index], inputs)) {
             return NULL;
         }
     }
 
     if (!inputs->len) {
-        if (!create_and_append_(&alloc, ".", inputs)) {
+        if (!create_and_append_(fl, ".", inputs)) {
             return NULL;
         }
     }
@@ -64,15 +64,15 @@ t_array *parse_args(free_list *fl, const uint64_t argc, char **argv,
     return inputs;
 }
 
-static t_str *create_and_append_(const t_alloc *alloc, const char *arg,
+static t_str *create_and_append_(free_list *fl, const char *arg,
                                  t_array *inputs) {
-    t_str *str = create_str(alloc, arg);
+    t_str *str = fl_create_str(fl, arg);
     if (!str) {
         return NULL;
     }
 
     if (!append_array(inputs, (void *)str)) {
-        fl_free(alloc->as.fl, str);
+        fl_free(fl, str);
         return NULL;
     }
 

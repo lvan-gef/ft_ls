@@ -10,6 +10,7 @@
 #include "../libft/include/libft.h"
 
 static void fill_init_str_(t_str *str, uint64_t cap);
+static void fill_str_(t_str *new_str, const char *str, const uint64_t len);
 
 t_str *arena_init_str(Arena *arena, const uint64_t cap) {
     if (cap > UINT64_MAX - 1 - sizeof(t_str)) {
@@ -39,25 +40,32 @@ t_str *fl_init_str(free_list *fl, const uint64_t cap) {
     return str;
 }
 
-t_str *create_str(free_list *fl, const char *str) {
+t_str *arena_create_str(Arena *arena, const char *str) {
     const size_t len = ft_strlen(str);
-    if (len + 1 < len) {
-        return NULL;
-    }
 
-    t_str *new_str = fl_alloc(fl, len);
+    t_str *new_str = arena_init_str(arena, len);
     if (!str) {
         return NULL;
     }
 
-    ft_memcpy(new_str->str, str, len);
-    new_str->len = len;
-    new_str->str[new_str->len] = '\0';
+    fill_str_(new_str, str, len);
+    return new_str;
+}
+
+t_str *fl_create_str(free_list *fl, const char *str) {
+    const size_t len = ft_strlen(str);
+
+    t_str *new_str = fl_init_str(fl, len);
+    if (!str) {
+        return NULL;
+    }
+
+    fill_str_(new_str, str, len);
     return new_str;
 }
 
 t_str *dup_str(free_list *fl, const t_str *str) {
-    t_str *new_str = fl_alloc(fl, str->cap - 1);
+    t_str *new_str = fl_init_str(fl, str->cap - 1);
     if (!new_str) {
         return NULL;
     }
@@ -69,9 +77,9 @@ t_str *dup_str(free_list *fl, const t_str *str) {
     return new_str;
 }
 
-t_str *uint_to_str(free_list *fl, uint64_t nbr) {
+t_str *uint_to_str(Arena *arena, uint64_t nbr) {
     const uint64_t len = len_of_nbr(nbr);
-    t_str *str = fl_init_str(fl, len);
+    t_str *str = arena_init_str(arena, len);
     if (!str) {
         return NULL;
     }
@@ -98,4 +106,10 @@ static void fill_init_str_(t_str *str, const uint64_t cap) {
     str->len = 0;
     str->pos = 0;
     str->str[0] = '\0';
+}
+
+static void fill_str_(t_str *new_str, const char *str, const uint64_t len) {
+    ft_memcpy(new_str->str, str, len);
+    new_str->len = len;
+    new_str->str[new_str->len] = '\0';
 }

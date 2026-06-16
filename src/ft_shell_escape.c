@@ -78,8 +78,7 @@ t_str *shell_escape_str(free_list *fl, const t_str *str, const char quote) {
     const uint64_t escaped_len =
         shell_display_len_(str->str, str->len, quote, false);
 
-    const t_alloc alloc = {.kind = ALLOC_FL, .as.fl = fl};
-    t_str *new_str = init_str(&alloc, escaped_len);
+    t_str *new_str = fl_init_str(fl, escaped_len);
 
     if (!new_str) {
         return NULL;

@@ -11,8 +11,9 @@ typedef struct {
     const t_array *entries;
     const t_str *dir_header;
     t_str *buffer;
-    uint64_t min_len_links;
-    uint64_t min_len_sizes;
+    Arena *arena;
+    const t_array *quote_padding_context;
+    const t_array *list_width_context;
     bool list_mode;
     bool print_total;
     bool quote_padding;
