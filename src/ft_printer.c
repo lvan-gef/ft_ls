@@ -120,8 +120,8 @@ static void calc_cols_(const t_array *array, t_map *map, bool *quoted,
     (void)calc_width_(array, *quoted, best, col_widths);
 }
 
-static bool calc_width_(const t_array *array, bool quoted, uint64_t num_cols,
-                        uint64_t *col_widths) {
+static bool calc_width_(const t_array *array, const bool quoted,
+                        const uint64_t num_cols, uint64_t *col_widths) {
     const uint64_t file_count = array->len;
     const uint64_t num_rows = (file_count + num_cols - 1) / num_cols;
     uint64_t line_len = num_cols * MIN_COLUMN_WIDTH;
@@ -152,7 +152,7 @@ static bool calc_width_(const t_array *array, bool quoted, uint64_t num_cols,
 }
 
 static bool create_row_(t_str *out, const t_array *array, const t_map *map,
-                        const uint64_t *col_widths, bool quoted) {
+                        const uint64_t *col_widths, const bool quoted) {
     const uint64_t files_len = array->len;
 
     for (uint64_t row = 0; row < map->rows; ++row) {
@@ -193,7 +193,7 @@ static bool create_row_(t_str *out, const t_array *array, const t_map *map,
     return true;
 }
 
-static uint64_t display_len_(const t_entry *entry, bool quoted) {
+static uint64_t display_len_(const t_entry *entry, const bool quoted) {
     t_shell_scan scan;
     shell_scan_str(entry->name, &scan);
 
@@ -204,7 +204,7 @@ static uint64_t display_len_(const t_entry *entry, bool quoted) {
     return scan.display_len;
 }
 
-static bool indent_(t_str *out, uint64_t from, uint64_t to) {
+static bool indent_(t_str *out, uint64_t from, const uint64_t to) {
     while (from < to) {
         if (TABSIZE != 0 && to / TABSIZE > (from + 1) / TABSIZE) {
             if (!put_mem(out, "\t", 1)) {
@@ -283,7 +283,8 @@ static bool print_list_(const t_print_request *req) {
     return print_list_rows_(req->buffer, req->entries, &sizes);
 }
 
-static bool left_pad_(t_str *out, uint64_t src_len, uint64_t max_size) {
+static bool left_pad_(t_str *out, const uint64_t src_len,
+                      const uint64_t max_size) {
     uint64_t count = max_size - src_len;
 
     while (count) {

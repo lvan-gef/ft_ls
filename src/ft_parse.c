@@ -13,7 +13,8 @@ static t_str *create_and_append_(const t_alloc *alloc, const char *arg,
                                  t_array *inputs);
 static void print_error_(const char *flag);
 
-t_array *parse_args(free_list *fl, uint64_t argc, char **argv, t_args *args) {
+t_array *parse_args(free_list *fl, const uint64_t argc, char **argv,
+                    t_args *args) {
     t_array *inputs = init_array(fl, ARRAY_SIZE);
     if (!inputs) {
         return NULL;

@@ -15,7 +15,7 @@ uint64_t len_of_nbr(uint64_t nbr) {
     return len;
 }
 
-void *alloc_mem(const t_alloc *alloc, Arena_Mark *mark, uint64_t size) {
+void *alloc_mem(const t_alloc *alloc, Arena_Mark *mark, const uint64_t size) {
     switch (alloc->kind) {
         case ALLOC_ARENA:
             if (mark) {
@@ -27,8 +27,8 @@ void *alloc_mem(const t_alloc *alloc, Arena_Mark *mark, uint64_t size) {
     }
 }
 
-void free_alloc(const t_alloc *alloc, Arena_Mark mark, void *ptr,
-                t_fl_cleanup fl_cleanup) {
+void free_alloc(const t_alloc *alloc, const Arena_Mark mark, void *ptr,
+                const t_fl_cleanup fl_cleanup) {
     if (!ptr) {
         return;
     }

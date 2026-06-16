@@ -9,7 +9,7 @@
 
 static Arena_Block *new_block_(uint64_t cap);
 
-Arena *arena_alloc(uint64_t cap) {
+Arena *arena_alloc(const uint64_t cap) {
     Arena_Block *block = new_block_(cap);
     if (!block) {
         return NULL;
@@ -42,14 +42,15 @@ void arena_release(Arena *arena) {
 }
 
 Arena_Mark arena_get_mark(const Arena *arena) {
-    Arena_Mark mark = {.block = arena->current, .pos = arena->current->pos};
+    const Arena_Mark mark = {.block = arena->current,
+                             .pos = arena->current->pos};
     return mark;
 }
 
-void *arena_push(Arena *arena, uint64_t size) {
+void *arena_push(Arena *arena, const uint64_t size) {
     uint64_t align_pos = arena->current->pos;
 
-    uint64_t remainder = align_pos % arena->align;
+    const uint64_t remainder = align_pos % arena->align;
     if (remainder) {
         align_pos += arena->align - remainder;
     }
@@ -78,7 +79,7 @@ void *arena_push(Arena *arena, uint64_t size) {
     return ptr;
 }
 
-void arena_pop_to_mark(Arena *arena, Arena_Mark mark) {
+void arena_pop_to_mark(Arena *arena, const Arena_Mark mark) {
     const Arena_Block *cursor = arena->current;
     while (cursor && cursor != mark.block) {
         cursor = cursor->prev;
@@ -89,7 +90,7 @@ void arena_pop_to_mark(Arena *arena, Arena_Mark mark) {
     }
 
     Arena_Block *block = arena->current;
-    while (block != mark.block) {
+    while (block && block != mark.block) {
         Arena_Block *prev = block->prev;
         if (prev) {
             prev->next = NULL;
@@ -97,6 +98,10 @@ void arena_pop_to_mark(Arena *arena, Arena_Mark mark) {
 
         free(block);
         block = prev;
+    }
+
+    if (!block) {
+        return;
     }
 
     block->pos = mark.pos;
@@ -118,7 +123,7 @@ void arena_clear(Arena *arena) {
     arena->current = arena->first;
 }
 
-static Arena_Block *new_block_(uint64_t cap) {
+static Arena_Block *new_block_(const uint64_t cap) {
     Arena_Block *block = malloc(sizeof(*block) + cap);
     if (!block) {
         return NULL;

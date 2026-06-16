@@ -58,7 +58,8 @@ static void analyze_shell_byte_(t_shell_analysis *analysis, unsigned char c,
 static void init_analysis_(t_shell_analysis *analysis);
 static char quote_from_analysis_(const t_shell_analysis *analysis);
 
-bool escaped_out(t_str *dst, const t_str *str, char quote, bool pad_unquoted) {
+bool escaped_out(t_str *dst, const t_str *str, const char quote,
+                 const bool pad_unquoted) {
     const uint64_t need =
         shell_display_len_(str->str, str->len, quote, pad_unquoted);
     if (need > dst->cap - 1) {
@@ -73,7 +74,7 @@ bool escaped_out(t_str *dst, const t_str *str, char quote, bool pad_unquoted) {
     return true;
 }
 
-t_str *shell_escape_str(free_list *fl, const t_str *str, char quote) {
+t_str *shell_escape_str(free_list *fl, const t_str *str, const char quote) {
     const uint64_t escaped_len =
         shell_display_len_(str->str, str->len, quote, false);
 
@@ -92,8 +93,8 @@ void shell_scan_str(const t_str *str, t_shell_scan *scan) {
     scan_shell_(str->str, str->len, scan);
 }
 
-static void escape_str_(t_str *dst, const t_str *str, char quote,
-                        bool pad_unquoted) {
+static void escape_str_(t_str *dst, const t_str *str, const char quote,
+                        const bool pad_unquoted) {
     if (!quote) {
         if (pad_unquoted) {
             append_bytes_(dst, " ", 1);
@@ -114,13 +115,13 @@ static void escape_str_(t_str *dst, const t_str *str, char quote,
                         str->len);
 }
 
-static void append_bytes_(t_str *dst, const char *src, uint64_t len) {
+static void append_bytes_(t_str *dst, const char *src, const uint64_t len) {
     ft_memcpy(dst->str + dst->len, src, (size_t)len);
     dst->len += len;
     dst->str[dst->len] = '\0';
 }
 
-static void emit_bytes_(t_shell_out *out, const char *src, uint64_t len) {
+static void emit_bytes_(t_shell_out *out, const char *src, const uint64_t len) {
     if (!out->dst) {
         out->len += len;
         return;
@@ -130,7 +131,7 @@ static void emit_bytes_(t_shell_out *out, const char *src, uint64_t len) {
     out->len += len;
 }
 
-static void emit_ansi_byte_(t_shell_out *out, unsigned char byte) {
+static void emit_ansi_byte_(t_shell_out *out, const unsigned char byte) {
     char repr[4];
     uint64_t len = 2;
 
@@ -214,7 +215,7 @@ static void leave_ansi_(t_shell_out *out, t_escape_state *state) {
 }
 
 static void shell_escape_bytes_(t_shell_out *out, const char *src,
-                                uint64_t len) {
+                                const uint64_t len) {
     t_escape_state state = {.in_single = true, .in_ansi = false};
 
     emit_bytes_(out, "'", 1);
@@ -225,16 +226,14 @@ static void shell_escape_bytes_(t_shell_out *out, const char *src,
     if (state.in_single || state.in_ansi) {
         emit_bytes_(out, "'", 1);
     }
-
-    return;
 }
 
 static void escape_byte_(t_shell_out *out, t_escape_state *state,
-                         unsigned char c) {
+                         const unsigned char c) {
     if (ft_isprint(c) && c != '\'') {
         leave_ansi_(out, state);
         enter_single_(out, state);
-        char ch = (char)c;
+        const char ch = (char)c;
         emit_bytes_(out, &ch, 1);
         return;
     }
@@ -251,8 +250,8 @@ static void escape_byte_(t_shell_out *out, t_escape_state *state,
     emit_ansi_byte_(out, c);
 }
 
-static uint64_t shell_display_len_(const char *src, uint64_t len, char quote,
-                                   bool pad_unquoted) {
+static uint64_t shell_display_len_(const char *src, const uint64_t len,
+                                   const char quote, const bool pad_unquoted) {
     if (quote == '\0') {
         return len + (pad_unquoted ? 1 : 0);
     }
@@ -264,14 +263,15 @@ static uint64_t shell_display_len_(const char *src, uint64_t len, char quote,
     return shell_escaped_len_(src, len);
 }
 
-static uint64_t shell_escaped_len_(const char *src, uint64_t len) {
+static uint64_t shell_escaped_len_(const char *src, const uint64_t len) {
     t_shell_out out = {.dst = NULL, .len = 0};
 
     shell_escape_bytes_(&out, src, len);
     return out.len;
 }
 
-static void scan_shell_(const char *src, uint64_t len, t_shell_scan *scan) {
+static void scan_shell_(const char *src, const uint64_t len,
+                        t_shell_scan *scan) {
     t_shell_analysis analysis;
 
     analyze_shell_span_(src, len, &analysis);
@@ -290,7 +290,7 @@ static void fill_scan_(t_shell_scan *scan, const char *src,
         analysis->quote == '\0' ? display_len + 1 : display_len;
 }
 
-static bool needs_raw_quote_(unsigned char c, uint64_t index) {
+static bool needs_raw_quote_(const unsigned char c, const uint64_t index) {
     bool needs_quote = false;
 
     switch (c) {
@@ -323,7 +323,7 @@ static bool needs_raw_quote_(unsigned char c, uint64_t index) {
     return needs_quote;
 }
 
-static bool is_safe_punct_(unsigned char c, uint64_t index) {
+static bool is_safe_punct_(const unsigned char c, const uint64_t index) {
     switch (c) {
         case '_':
         case '-':
@@ -342,7 +342,7 @@ static bool is_safe_punct_(unsigned char c, uint64_t index) {
     }
 }
 
-static void analyze_shell_span_(const char *src, uint64_t len,
+static void analyze_shell_span_(const char *src, const uint64_t len,
                                 t_shell_analysis *analysis) {
     init_analysis_(analysis);
     analysis->len = len;
@@ -353,8 +353,8 @@ static void analyze_shell_span_(const char *src, uint64_t len,
     analysis->quote = quote_from_analysis_(analysis);
 }
 
-static void analyze_shell_byte_(t_shell_analysis *analysis, unsigned char c,
-                                uint64_t index) {
+static void analyze_shell_byte_(t_shell_analysis *analysis,
+                                const unsigned char c, const uint64_t index) {
     if (!ft_isprint(c)) {
         analysis->has_non_print = true;
     }

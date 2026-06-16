@@ -36,7 +36,7 @@ typedef struct free_list_node_align_helper {
     free_list_node member;
 } free_list_node_align_helper;
 
-enum { FREE_LIST_NODE_ALIGN = offsetof(free_list_node_align_helper, member) };
+enum { FL_ALIGN = offsetof(free_list_node_align_helper, member) };
 
 void fl_free_all(free_list *fl);
 void fl_init(free_list *fl, void *data, size_t size);

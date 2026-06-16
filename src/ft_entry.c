@@ -140,7 +140,7 @@ bool ensure_entry_path(const t_alloc *alloc, t_entry *entry) {
 }
 
 t_entry *dup_dir_entry(const t_alloc *alloc, const t_entry *src,
-                       bool is_operand) {
+                       const bool is_operand) {
     Arena_Mark mark = {0};
     t_entry *entry = alloc_mem(alloc, &mark, sizeof(*entry));
     if (!entry) {
@@ -172,7 +172,7 @@ failed:
 }
 
 t_str *read_symlink_target(const t_alloc *alloc, const t_str *path,
-                           uint64_t target_size, int *read_err) {
+                           const uint64_t target_size, int *read_err) {
     Arena_Mark mark = {0};
 
     if (read_err) {
@@ -191,7 +191,7 @@ t_str *read_symlink_target(const t_alloc *alloc, const t_str *path,
         }
 
         const size_t read_size = (cap > (size_t)-1) ? (size_t)-1 : (size_t)cap;
-        ssize_t len = readlink(path->str, new_str->str, read_size);
+        const ssize_t len = readlink(path->str, new_str->str, read_size);
         if (len < 0) {
             const int err = errno;
             free_alloc(alloc, mark, new_str, free_str_cb_);
@@ -390,7 +390,7 @@ static t_str *get_perm_(const t_alloc *alloc, const t_entry *entry) {
     return str;
 }
 
-static char file_type_char_(mode_t mode) {
+static char file_type_char_(const mode_t mode) {
     if ((mode & S_IFMT) == S_IFREG) {
         return '-';
     }
@@ -422,7 +422,7 @@ static char file_type_char_(mode_t mode) {
     return '?';
 }
 
-static t_str *get_user_(const t_alloc *alloc, uid_t user_id) {
+static t_str *get_user_(const t_alloc *alloc, const uid_t user_id) {
     const char *name = cache_lookup_(user_cache, (uint64_t)user_id);
     if (name) {
         return create_str(alloc, name);
@@ -453,7 +453,7 @@ static t_str *get_user_(const t_alloc *alloc, uid_t user_id) {
     return new_str;
 }
 
-static t_str *get_group_(const t_alloc *alloc, gid_t group_id) {
+static t_str *get_group_(const t_alloc *alloc, const gid_t group_id) {
     const char *name = cache_lookup_(group_cache, (uint64_t)group_id);
     if (name) {
         return create_str(alloc, name);
@@ -497,14 +497,14 @@ static t_str *get_dt_(const t_alloc *alloc, const struct timespec *ctim) {
         return NULL;
     }
 
-    time_t stamp = ctim->tv_sec;
+    const time_t stamp = ctim->tv_sec;
     const char *dt = ctime(&stamp);
     if (!dt) {
         free_alloc(alloc, mark, new_str, free_str_cb_);
         return NULL;
     }
 
-    time_t now = time(NULL);
+    const time_t now = time(NULL);
     if (now == (time_t)-1) {
         free_alloc(alloc, mark, new_str, free_str_cb_);
         return NULL;
@@ -530,10 +530,6 @@ static t_str *get_dt_(const t_alloc *alloc, const struct timespec *ctim) {
 
 static t_str *get_symlink_(const t_alloc *alloc, const t_entry *entry) {
     if (!S_ISLNK(entry->st.st_mode)) {
-        return init_str(alloc, 1);
-    }
-
-    if (entry->stat_unavailable) {
         return init_str(alloc, 1);
     }
 
@@ -589,7 +585,7 @@ static void free_str_cb_(free_list *fl, void *ptr) {
     free_str(fl, ptr);
 }
 
-static char *cache_lookup_(t_id_cache_entry *cache, uint64_t id) {
+static char *cache_lookup_(t_id_cache_entry *cache, const uint64_t id) {
     for (uint64_t index = 0; index < CACHE_SIZE; ++index) {
         if (!*cache[index].name) {
             continue;
@@ -603,16 +599,17 @@ static char *cache_lookup_(t_id_cache_entry *cache, uint64_t id) {
     return NULL;
 }
 
-static void cache_store_(t_id_cache_entry *cache, uint64_t *next, uint64_t id,
-                         const char *name) {
+static void cache_store_(t_id_cache_entry *cache, uint64_t *next,
+                         const uint64_t id, const char *name) {
     const uint64_t index = *next % CACHE_SIZE;
     cache[index].id = id;
     ft_strlcpy(cache[index].name, name, LOGIN_NAME_MAX);
     ++(*next);
 }
 
-static char exec_char_(mode_t mode, mode_t exec_bit, mode_t special_bit,
-                       char lower, char upper) {
+static char exec_char_(const mode_t mode, const mode_t exec_bit,
+                       const mode_t special_bit, const char lower,
+                       const char upper) {
     const bool has_exec = (mode & exec_bit) != 0;
     const bool has_special = (mode & special_bit) != 0;
 

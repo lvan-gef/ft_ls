@@ -48,23 +48,9 @@ def print_stats(name: str, durations: list[float]) -> float:
 
 
 def run():
-    p = "/"
+    p = "/mnt/bulk2"
 
-    flags = [
-        "-Rl",
-        "-al",
-        "-Ral",
-        "-Rlr",
-        "-Rlt",
-        "-alr",
-        "-alt",
-        "-Ralr",
-        "-Ralt",
-        "-Rlrt",
-        "-alrt",
-        "-Ralrt",
-    ]
-    # flags = ["R", "a", "l", "r", "t"]
+    flags = ["R", "a", "l", "r", "t"]
     runs = 21
     batch_size = 5
     ls_bin = which("ls")
@@ -73,25 +59,28 @@ def run():
     if ls_bin is None:
         raise RuntimeError("could not find ls in PATH")
 
-    # for size in range(1, len(flags) + 1):
-    #     for combo in combinations(flags, size):
-    for flag in flags:
-        # flag = f"-{''.join(combo)}"
-        print("cache warmup")
-        bench(ls_cmd=[ls_bin, flag, p], ft_cmd=[ft_bin, flag, p], runs=1, batch_size=1)
+    for size in range(1, len(flags) + 1):
+        for combo in combinations(flags, size):
+            flag = f"-{''.join(combo)}"
+            print("cache warmup")
+            bench(
+                ls_cmd=[ls_bin, flag, p], ft_cmd=[ft_bin, flag, p], runs=1, batch_size=1
+            )
 
-        ls_results, ft_results = bench(
-            ls_cmd=[ls_bin, flag, p],
-            ft_cmd=[ft_bin, flag, p],
-            runs=runs,
-            batch_size=batch_size,
-        )
+            ls_results, ft_results = bench(
+                ls_cmd=[ls_bin, flag, p],
+                ft_cmd=[ft_bin, flag, p],
+                runs=runs,
+                batch_size=batch_size,
+            )
 
-        # - above 1.000x means ft_ls is slower
-        # - below 1.000x means ft_ls is faster
-        ls_median = print_stats("ls   ", ls_results)
-        own_median = print_stats("ft_ls", ft_results)
-        print(f"ratio: ft_ls / ls {flag} = {own_median / ls_median:.3f}x (median)\n")
+            # - above 1.000x means ft_ls is slower
+            # - below 1.000x means ft_ls is faster
+            ls_median = print_stats("ls   ", ls_results)
+            own_median = print_stats("ft_ls", ft_results)
+            print(
+                f"ratio: ft_ls / ls {flag} = {own_median / ls_median:.3f}x (median)\n"
+            )
 
 
 run()

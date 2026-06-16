@@ -9,7 +9,7 @@
 
 #include "../libft/include/libft.h"
 
-t_str *init_str(const t_alloc *alloc, uint64_t cap) {
+t_str *init_str(const t_alloc *alloc, const uint64_t cap) {
     if (cap > UINT64_MAX - 1 - sizeof(t_str)) {
         return NULL;
     }
@@ -59,7 +59,7 @@ t_str *dup_str(const t_alloc *alloc, const t_str *str) {
 }
 
 t_str *uint_to_str(const t_alloc *alloc, uint64_t nbr) {
-    uint64_t len = len_of_nbr(nbr);
+    const uint64_t len = len_of_nbr(nbr);
     t_str *str = init_str(alloc, len);
     if (!str) {
         return NULL;

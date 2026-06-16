@@ -48,11 +48,12 @@ static bool print_operand_files_(t_params *params, const t_print_request *req,
 static bool process_queue_(t_params *params, const t_array *array,
                            t_print_request *req, int *exit_code,
                            bool printed_files);
-static bool load_directory_entries_(t_params *params, t_entry *path,
+static bool load_directory_entries_(t_params *params, const t_entry *path,
                                     int *exit_code);
 static bool queue_recursive_dirs_(t_params *params);
-static bool collect_operands_(t_params *params, t_array *array, int *exit_code);
-static void clear_directory_entries_(t_params *params);
+static bool collect_operands_(t_params *params, const t_array *array,
+                              int *exit_code);
+static void clear_directory_entries_(const t_params *params);
 static void free_entry_array_(t_params *params, t_array *array);
 static mode_t dtype_to_mode_(unsigned char dtype);
 static bool needs_lstat_(const t_args *args, unsigned char dtype);
@@ -60,7 +61,7 @@ static t_operand_state classify_operand_(t_params *params, t_str *str,
                                          struct stat *st, int *exit_code);
 static bool operands_need_quote_padding_(const t_array *array);
 static void cleanup_process_(t_params *params);
-static bool print_path_error_(t_params *params, t_str *str, int e,
+static bool print_path_error_(t_params *params, const t_str *str, int e,
                               const char *prefix);
 static bool queue_operand_dir_(t_params *params, t_str *str,
                                const struct stat *st);
@@ -68,7 +69,7 @@ static t_entry *new_file_operand_(t_params *params, const t_str *str,
                                   const struct stat *st);
 static bool sort_operand_dirs_(t_params *params);
 
-void process(t_args *args, t_array *array, int *exit_code) {
+void process(t_args *args, const t_array *array, int *exit_code) {
     unsigned char buffer[FL_DEFAULT_SIZE];
     t_params params = {0};
 
@@ -100,7 +101,6 @@ void process(t_args *args, t_array *array, int *exit_code) {
 
     if (!run_listing_(&params, array, exit_code)) {
         *exit_code = 2;
-        goto cleanup;
     }
 
 cleanup:
@@ -168,7 +168,7 @@ cleanup:
 
 static bool process_queue_(t_params *params, const t_array *array,
                            t_print_request *req, int *exit_code,
-                           bool printed_files) {
+                           const bool printed_files) {
     bool printed_dir = false;
     bool inserted_files_dirs_gap = false;
     const bool print_dir_path = params->args->recursive || array->len > 1;
@@ -227,16 +227,19 @@ error:
     return false;
 }
 
-static bool collect_operands_(t_params *params, t_array *array,
+static bool collect_operands_(t_params *params, const t_array *array,
                               int *exit_code) {
     struct stat st;
     for (uint64_t index = 0; index < array->len; ++index) {
         t_str *str = array->data[index];
 
-        t_operand_state state = classify_operand_(params, str, &st, exit_code);
+        const t_operand_state state =
+            classify_operand_(params, str, &st, exit_code);
         if (state == OPERAND_SKIP) {
             continue;
-        } else if (state == OPERAND_FATAL) {
+        }
+
+        if (state == OPERAND_FATAL) {
             goto failed;
         }
 
@@ -298,7 +301,7 @@ static t_operand_state classify_operand_(t_params *params, t_str *str,
     }
 
     bool is_dir_operand = S_ISDIR(st->st_mode);
-    struct stat *st_dir = st;
+    const struct stat *st_dir = st;
     struct stat st_target;
     const t_alloc alloc = {.kind = ALLOC_FL, .as.fl = &params->fl};
     if (S_ISLNK(st->st_mode)) {
@@ -338,7 +341,6 @@ static t_operand_state classify_operand_(t_params *params, t_str *str,
         }
 
         state = OPERAND_SKIP;
-        goto cleanup;
     }
 
 cleanup:
@@ -346,13 +348,13 @@ cleanup:
     return state;
 }
 
-static bool load_directory_entries_(t_params *params, t_entry *path,
+static bool load_directory_entries_(t_params *params, const t_entry *path,
                                     int *exit_code) {
     errno = 0;
     bool ok = false;
     DIR *d = opendir(path->path->str);
     if (!d) {
-        int e = errno;
+        const int e = errno;
         if (!print_path_error_(params, path->path, e,
                                "cannot open directory")) {
             params->output_failed = true;
@@ -412,9 +414,7 @@ static bool load_directory_entries_(t_params *params, t_entry *path,
 
     ok = true;
 cleanup:
-    if (d) {
-        closedir(d);
-    }
+    closedir(d);
 
     if (!ok) {
         *exit_code = 2;
@@ -423,7 +423,7 @@ cleanup:
     return ok;
 }
 
-static void clear_directory_entries_(t_params *params) {
+static void clear_directory_entries_(const t_params *params) {
     clear_array(params->files);
     arena_clear(params->temp_arena);
 }
@@ -435,7 +435,7 @@ static void free_entry_array_(t_params *params, t_array *array) {
     }
 }
 
-static mode_t dtype_to_mode_(unsigned char dtype) {
+static mode_t dtype_to_mode_(const unsigned char dtype) {
     switch (dtype) {
         case DT_BLK: return S_IFBLK;
         case DT_CHR: return S_IFCHR;
@@ -448,7 +448,7 @@ static mode_t dtype_to_mode_(unsigned char dtype) {
     }
 }
 
-static bool needs_lstat_(const t_args *args, unsigned char dtype) {
+static bool needs_lstat_(const t_args *args, const unsigned char dtype) {
     if (args->list || args->time) {
         return true;
     }
@@ -463,7 +463,6 @@ static bool queue_recursive_dirs_(t_params *params) {
         while (index > 0) {
             --index;
             const t_entry *entry = params->files->data[index];
-            t_entry *dir_entry;
             if (!entry || !entry->name || entry->stat_unavailable ||
                 !S_ISDIR(entry->st.st_mode)) {
                 continue;
@@ -474,7 +473,7 @@ static bool queue_recursive_dirs_(t_params *params) {
                 continue;
             }
 
-            dir_entry = dup_dir_entry(&alloc, entry, false);
+            t_entry *dir_entry = dup_dir_entry(&alloc, entry, false);
             if (!dir_entry) {
                 return false;
             }
@@ -515,7 +514,7 @@ static void cleanup_process_(t_params *params) {
     fl_free_all(&params->fl);
 }
 
-static bool print_path_error_(t_params *params, t_str *str, int e,
+static bool print_path_error_(t_params *params, const t_str *str, const int e,
                               const char *prefix) {
     const char *msg = strerror(e);
     t_shell_scan scan;
@@ -544,7 +543,7 @@ static bool print_path_error_(t_params *params, t_str *str, int e,
 static bool queue_operand_dir_(t_params *params, t_str *str,
                                const struct stat *st) {
     const t_alloc alloc = {.kind = ALLOC_FL, .as.fl = &params->fl};
-    t_entry src = {
+    const t_entry src = {
         .name = str,
         .path = str,
         .st = *st,

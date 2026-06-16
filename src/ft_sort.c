@@ -10,7 +10,7 @@
 typedef int (*t_cmp_entry)(const t_entry *a, const t_entry *b);
 
 static bool ensure_sort_scratch_(t_sort_scratch *scratch, uint64_t need);
-static void merge_sort_(void **tmp, t_array *array, t_cmp_entry cmp);
+static void merge_sort_(void **tmp, const t_array *array, t_cmp_entry cmp);
 static uint64_t add_capped_(uint64_t lhs, uint64_t rhs, uint64_t cap);
 static void merge_(void **data, void **tmp, uint64_t left, uint64_t mid,
                    uint64_t right, t_cmp_entry cmp);
@@ -22,8 +22,8 @@ static t_str *entry_name_(const t_entry *entry);
 static int compare_(const t_str *lhs, const t_str *rhs);
 static int compare_time_(const struct timespec *a, const struct timespec *b);
 
-bool sort(t_sort_scratch *scratch, t_array *array, bool reverse,
-          bool sort_time) {
+bool sort(t_sort_scratch *scratch, const t_array *array, const bool reverse,
+          const bool sort_time) {
     if (array->len <= 1) {
         return true;
     }
@@ -44,7 +44,7 @@ bool sort(t_sort_scratch *scratch, t_array *array, bool reverse,
     return true;
 }
 
-static bool ensure_sort_scratch_(t_sort_scratch *scratch, uint64_t need) {
+static bool ensure_sort_scratch_(t_sort_scratch *scratch, const uint64_t need) {
     const uint64_t max_len = (uint64_t)(SIZE_MAX / sizeof(void *));
     if (need > max_len) {
         return false;
@@ -75,7 +75,8 @@ static bool ensure_sort_scratch_(t_sort_scratch *scratch, uint64_t need) {
     return true;
 }
 
-static void merge_sort_(void **tmp, t_array *array, t_cmp_entry cmp) {
+static void merge_sort_(void **tmp, const t_array *array,
+                        const t_cmp_entry cmp) {
     for (uint64_t width = 1; width < array->len;) {
         uint64_t left = 0;
         while (left < array->len) {
@@ -97,7 +98,8 @@ static void merge_sort_(void **tmp, t_array *array, t_cmp_entry cmp) {
     }
 }
 
-static uint64_t add_capped_(uint64_t lhs, uint64_t rhs, uint64_t cap) {
+static uint64_t add_capped_(const uint64_t lhs, const uint64_t rhs,
+                            const uint64_t cap) {
     if (lhs >= cap || rhs >= cap - lhs) {
         return cap;
     }
@@ -105,8 +107,9 @@ static uint64_t add_capped_(uint64_t lhs, uint64_t rhs, uint64_t cap) {
     return lhs + rhs;
 }
 
-static void merge_(void **data, void **tmp, uint64_t left, uint64_t mid,
-                   uint64_t right, t_cmp_entry cmp) {
+static void merge_(void **data, void **tmp, const uint64_t left,
+                   const uint64_t mid, const uint64_t right,
+                   const t_cmp_entry cmp) {
     uint64_t i = left;
     uint64_t j = mid;
     uint64_t out = left;

@@ -5,11 +5,7 @@
 
 #include "../include/ft_free_list.h"
 
-#ifndef FL_ALIGN
-#define FL_ALIGN UINT64_C(8)
-#endif // !FL_ALIGN
-
-static free_list_node *fl_find_best_(free_list *fl, size_t size, size_t align,
+static free_list_node *fl_find_best_(const free_list *fl, size_t size,
                                      size_t *padding_,
                                      free_list_node **prev_node_);
 static void fl_coalescence_(free_list_node *prev_node,
@@ -17,13 +13,12 @@ static void fl_coalescence_(free_list_node *prev_node,
 static void fl_node_insert_(free_list_node **phead, free_list_node *prev_node,
                             free_list_node *new_node);
 static void fl_node_remove_(free_list_node **phead, free_list_node *prev_node,
-                            free_list_node *del_node);
-static size_t calc_padding_(uintptr_t ptr, uintptr_t align, size_t header_size);
-static bool is_power_of_two_(uintptr_t x);
-static size_t align_up_(size_t x, size_t a);
+                            const free_list_node *del_node);
+static size_t calc_padding_(uintptr_t ptr);
+static size_t align_up_(size_t x);
 static void free_extra_allocs_(free_list *fl);
-static void *alloc_extra_block_(free_list *fl, size_t size, size_t align);
-static void free_extra_block_(free_list *fl, free_list_header *header);
+static void *alloc_extra_block_(free_list *fl, size_t size);
+static void free_extra_block_(free_list *fl, const free_list_header *header);
 
 void fl_free_all(free_list *fl) {
     free_extra_allocs_(fl);
@@ -34,7 +29,7 @@ void fl_free_all(free_list *fl) {
     fl->head = first_node;
 }
 
-void fl_init(free_list *fl, void *data, size_t size) {
+void fl_init(free_list *fl, void *data, const size_t size) {
     fl->data = data;
     fl->size = size;
     fl->extra_allocs = NULL;
@@ -44,29 +39,26 @@ void fl_init(free_list *fl, void *data, size_t size) {
 void *fl_alloc(free_list *fl, size_t size) {
     size_t padding = 0;
     free_list_node *prev_node = NULL;
-    free_list_node *node = NULL;
-    size_t align_padding, required_space, remaining;
-    free_list_header *header_ptr;
 
     if (size < sizeof(free_list_node)) {
         size = sizeof(free_list_node);
     }
 
-    node = fl_find_best_(fl, size, FL_ALIGN, &padding, &prev_node);
+    free_list_node *node = fl_find_best_(fl, size, &padding, &prev_node);
     if (node == NULL) {
-        void *extra = alloc_extra_block_(fl, size, FL_ALIGN);
+        void *extra = alloc_extra_block_(fl, size);
         if (extra != NULL) {
             return extra;
         }
         return NULL;
     }
 
-    align_padding = padding - sizeof(free_list_header);
-    required_space = size + padding;
-    required_space = align_up_(required_space, FREE_LIST_NODE_ALIGN);
-    remaining = node->block_size - required_space;
+    const size_t align_padding = padding - sizeof(free_list_header);
+    size_t required_space = size + padding;
+    required_space = align_up_(required_space);
+    const size_t remaining = node->block_size - required_space;
     if (remaining >= sizeof(free_list_node)) {
-        uintptr_t new_addr = (uintptr_t)node + required_space;
+        const uintptr_t new_addr = (uintptr_t)node + required_space;
         free_list_node *new_node = (free_list_node *)new_addr;
         new_node->block_size = remaining;
         fl_node_insert_(&fl->head, node, new_node);
@@ -75,7 +67,8 @@ void *fl_alloc(free_list *fl, size_t size) {
     }
 
     fl_node_remove_(&fl->head, prev_node, node);
-    header_ptr = (free_list_header *)((uintptr_t)node + align_padding);
+    free_list_header *header_ptr =
+        (free_list_header *)((uintptr_t)node + align_padding);
     header_ptr->block_size = required_space;
     header_ptr->padding = align_padding;
     header_ptr->allocation_base = NULL;
@@ -86,24 +79,23 @@ void *fl_alloc(free_list *fl, size_t size) {
 }
 
 void fl_free(free_list *fl, void *ptr) {
-    free_list_header *header;
-    free_list_node *free_node;
-    free_list_node *node;
     free_list_node *prev_node = NULL;
     if (ptr == NULL) {
         return;
     }
 
-    header = (free_list_header *)((uintptr_t)ptr - sizeof(free_list_header));
+    free_list_header *header =
+        (free_list_header *)((uintptr_t)ptr - sizeof(free_list_header));
     if (header->allocation_base != NULL) {
         free_extra_block_(fl, header);
         return;
     }
 
-    free_node = (free_list_node *)((uintptr_t)header - header->padding);
+    free_list_node *free_node =
+        (free_list_node *)((uintptr_t)header - header->padding);
     free_node->block_size = header->block_size;
     free_node->next = NULL;
-    node = fl->head;
+    free_list_node *node = fl->head;
     while (node != NULL) {
         if ((void *)free_node < (void *)node) {
             fl_node_insert_(&fl->head, prev_node, free_node);
@@ -121,7 +113,7 @@ void fl_free(free_list *fl, void *ptr) {
     fl_coalescence_(prev_node, free_node);
 }
 
-static free_list_node *fl_find_best_(free_list *fl, size_t size, size_t align,
+static free_list_node *fl_find_best_(const free_list *fl, const size_t size,
                                      size_t *padding_,
                                      free_list_node **prev_node_) {
     size_t smallest_diff = ~(size_t)0;
@@ -131,11 +123,10 @@ static free_list_node *fl_find_best_(free_list *fl, size_t size, size_t align,
     free_list_node *best_prev_node = NULL;
     size_t best_padding = 0;
     while (node != NULL) {
-        size_t padding =
-            calc_padding_((uintptr_t)node, align, sizeof(free_list_header));
-        size_t required_space = size + padding;
+        const size_t padding = calc_padding_((uintptr_t)node);
+        const size_t required_space = size + padding;
         if (node->block_size >= required_space) {
-            size_t diff = node->block_size - required_space;
+            const size_t diff = node->block_size - required_space;
             if (diff < smallest_diff) {
                 smallest_diff = diff;
                 best_node = node;
@@ -147,14 +138,8 @@ static free_list_node *fl_find_best_(free_list *fl, size_t size, size_t align,
         node = node->next;
     }
 
-    if (padding_) {
-        *padding_ = best_padding;
-    }
-
-    if (prev_node_) {
-        *prev_node_ = best_prev_node;
-    }
-
+    *padding_ = best_padding;
+    *prev_node_ = best_prev_node;
     return best_node;
 }
 
@@ -185,7 +170,7 @@ static void fl_node_insert_(free_list_node **phead, free_list_node *prev_node,
 }
 
 static void fl_node_remove_(free_list_node **phead, free_list_node *prev_node,
-                            free_list_node *del_node) {
+                            const free_list_node *del_node) {
     if (prev_node == NULL) {
         *phead = del_node->next;
     } else {
@@ -193,21 +178,16 @@ static void fl_node_remove_(free_list_node **phead, free_list_node *prev_node,
     }
 }
 
-static size_t calc_padding_(uintptr_t ptr, uintptr_t align,
-                            size_t header_size) {
-    if (!is_power_of_two_(align)) {
-        return 0;
-    }
-
-    uintptr_t p = ptr;
-    uintptr_t a = align;
-    uintptr_t modulo = p & (a - 1);
+static size_t calc_padding_(const uintptr_t ptr) {
+    const uintptr_t p = ptr;
+    const uintptr_t a = FL_ALIGN;
+    const uintptr_t modulo = p & (a - 1);
     uintptr_t padding = 0;
     if (modulo != 0) {
         padding = a - modulo;
     }
 
-    uintptr_t needed_space = (uintptr_t)header_size;
+    uintptr_t needed_space = (uintptr_t)sizeof(free_list_header);
     if (padding < needed_space) {
         needed_space -= padding;
         if ((needed_space & (a - 1)) != 0) {
@@ -219,18 +199,14 @@ static size_t calc_padding_(uintptr_t ptr, uintptr_t align,
     return (size_t)padding;
 }
 
-static bool is_power_of_two_(uintptr_t x) {
-    return (x & (x - 1)) == 0;
-}
-
-static size_t align_up_(size_t x, size_t a) {
-    return (x + (a - 1)) & ~(a - 1);
+static size_t align_up_(const size_t x) {
+    return (x + (FL_ALIGN - 1)) & ~((size_t)FL_ALIGN - 1);
 }
 
 static void free_extra_allocs_(free_list *fl) {
-    free_list_header *header = fl->extra_allocs;
+    const free_list_header *header = fl->extra_allocs;
     while (header != NULL) {
-        free_list_header *next = header->next_extra;
+        const free_list_header *next = header->next_extra;
         free(header->allocation_base);
         header = next;
     }
@@ -238,19 +214,19 @@ static void free_extra_allocs_(free_list *fl) {
     fl->extra_allocs = NULL;
 }
 
-static void *alloc_extra_block_(free_list *fl, size_t size, size_t align) {
-    if (size > SIZE_MAX - sizeof(free_list_header) - (align - 1)) {
+static void *alloc_extra_block_(free_list *fl, const size_t size) {
+    if (size > SIZE_MAX - sizeof(free_list_header) - (FL_ALIGN - 1)) {
         return NULL;
     }
 
-    const size_t total_size = size + sizeof(free_list_header) + (align - 1);
+    const size_t total_size = size + sizeof(free_list_header) + (FL_ALIGN - 1);
     void *base = malloc(total_size);
     if (!base) {
         return NULL;
     }
 
     const uintptr_t payload_addr =
-        align_up_((size_t)((uintptr_t)base + sizeof(free_list_header)), align);
+        align_up_((size_t)((uintptr_t)base + sizeof(free_list_header)));
     free_list_header *header =
         (free_list_header *)(payload_addr - sizeof(free_list_header));
     header->block_size = total_size;
@@ -262,7 +238,7 @@ static void *alloc_extra_block_(free_list *fl, size_t size, size_t align) {
     return (void *)payload_addr;
 }
 
-static void free_extra_block_(free_list *fl, free_list_header *header) {
+static void free_extra_block_(free_list *fl, const free_list_header *header) {
     free_list_header **slot = &fl->extra_allocs;
     while (*slot && *slot != header) {
         slot = &(*slot)->next_extra;
