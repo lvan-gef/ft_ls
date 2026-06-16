@@ -4,10 +4,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "./ft_arena.h"
 #include "./ft_array.h"
 #include "./ft_str.h"
 
-typedef struct {
+typedef struct s_print_request {
     const t_array *entries;
     const t_str *dir_header;
     t_str *buffer;

@@ -1,12 +1,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "../include/ft_arena.h"
 #include "../include/ft_array.h"
 #include "../include/ft_entry.h"
 #include "../include/ft_printer.h"
 #include "../include/ft_printer_helper.h"
 #include "../include/ft_shell_escape.h"
+#include "../include/ft_printer_list.h"
 
 #include "../libft/include/libft.h"
 
@@ -24,19 +24,7 @@ typedef struct {
     uint64_t max;
 } t_map;
 
-typedef struct {
-    uint64_t total;
-    uint64_t max_len_links;
-    uint64_t max_len_sizes;
-    uint64_t max_len_perm;
-    bool have_quote;
-} t_list_stats;
-
-static bool prepare_list_infos_(Arena *arena, const t_array *entries);
-static void clear_list_infos_(const t_array *entries);
 static bool context_needs_padding_(const t_array *context);
-static void apply_list_width_context_(const t_array *context,
-                                      t_list_stats *sizes);
 static bool put_dir_header_(t_str *out, const t_str *dir_header);
 static uint64_t display_len_(const t_entry *entry, bool quoted);
 static bool init_print_row_(const t_print_request *req);
@@ -47,61 +35,13 @@ static bool calc_width_(const t_array *array, bool quoted, uint64_t num_cols,
 static bool create_row_(t_str *out, const t_array *array, const t_map *map,
                         const uint64_t *col_widths, bool quoted);
 static bool indent_(t_str *out, uint64_t from, uint64_t to);
-static void update_list_stats_(t_list_stats *stats, const t_entry *entry);
-static bool print_list_(const t_print_request *req);
-static bool left_pad_(t_str *out, uint64_t src_len, uint64_t max_size);
-static bool put_uint_(t_str *out, uint64_t value);
-static void collect_list_stats_(const t_array *entries, t_list_stats *stats);
-static bool print_list_rows_(t_str *out, const t_array *array,
-                             const t_list_stats *sizes);
 
 bool printer(const t_print_request *req) {
     if (!req->list_mode) {
         return init_print_row_(req);
     }
 
-    const Arena_Mark mark = arena_get_mark(req->arena);
-    bool ok = true;
-    if (!prepare_list_infos_(req->arena, req->entries) ||
-        !prepare_list_infos_(req->arena, req->list_width_context)) {
-        ok = false;
-        goto cleanup;
-    }
-
-    ok = print_list_(req);
-cleanup:
-    clear_list_infos_(req->entries);
-    clear_list_infos_(req->list_width_context);
-    arena_pop_to_mark(req->arena, mark);
-    return ok;
-}
-
-static bool prepare_list_infos_(Arena *arena, const t_array *entries) {
-    if (!entries) {
-        return true;
-    }
-
-    for (uint64_t index = 0; index < entries->len; ++index) {
-        t_entry *entry = entries->data[index];
-
-        entry->info = NULL;
-        if (!fill_file_info(arena, entry)) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-static void clear_list_infos_(const t_array *entries) {
-    if (!entries) {
-        return;
-    }
-
-    for (uint64_t index = 0; index < entries->len; ++index) {
-        t_entry *entry = entries->data[index];
-        entry->info = NULL;
-    }
+    return printer_list(req);
 }
 
 static bool context_needs_padding_(const t_array *context) {
@@ -123,28 +63,6 @@ static bool context_needs_padding_(const t_array *context) {
     }
 
     return false;
-}
-
-static void apply_list_width_context_(const t_array *context,
-                                      t_list_stats *sizes) {
-    if (!context) {
-        return;
-    }
-
-    for (uint64_t index = 0; index < context->len; ++index) {
-        const t_entry *entry = context->data[index];
-        if (!entry || !entry->info) {
-            continue;
-        }
-
-        if (entry->info->links->len > sizes->max_len_links) {
-            sizes->max_len_links = entry->info->links->len;
-        }
-
-        if (entry->info->size->len > sizes->max_len_sizes) {
-            sizes->max_len_sizes = entry->info->size->len;
-        }
-    }
 }
 
 static bool put_dir_header_(t_str *out, const t_str *dir_header) {
@@ -307,137 +225,6 @@ static bool indent_(t_str *out, uint64_t from, const uint64_t to) {
             }
 
             ++from;
-        }
-    }
-
-    return true;
-}
-
-static void update_list_stats_(t_list_stats *stats, const t_entry *entry) {
-    if (entry->info->links->len > stats->max_len_links) {
-        stats->max_len_links = entry->info->links->len;
-    }
-
-    if (entry->info->size->len > stats->max_len_sizes) {
-        stats->max_len_sizes = entry->info->size->len;
-    }
-
-    if (entry->info->perm->len > stats->max_len_perm) {
-        stats->max_len_perm = entry->info->perm->len;
-    }
-
-    if (!stats->have_quote) {
-        t_shell_scan scan;
-        shell_scan_str(entry->name, &scan);
-        stats->have_quote = scan.quote != '\0';
-    }
-
-    stats->total += entry->info->blocks;
-}
-
-static void collect_list_stats_(const t_array *entries, t_list_stats *stats) {
-    *stats = (t_list_stats){0};
-
-    for (uint64_t index = 0; index < entries->len; ++index) {
-        const t_entry *entry = entries->data[index];
-        update_list_stats_(stats, entry);
-    }
-}
-
-static bool print_list_(const t_print_request *req) {
-    t_list_stats sizes;
-    collect_list_stats_(req->entries, &sizes);
-    apply_list_width_context_(req->list_width_context, &sizes);
-
-    sizes.have_quote =
-        sizes.have_quote || context_needs_padding_(req->quote_padding_context);
-
-    if (!put_dir_header_(req->buffer, req->dir_header)) {
-        return false;
-    }
-
-    if (req->print_total) {
-        if (!put_mem(req->buffer, "total ", 6) ||
-            !put_uint_(req->buffer, (sizes.total + 1) / 2) ||
-            !put_mem(req->buffer, "\n", 1)) {
-            return false;
-        }
-    }
-
-    return print_list_rows_(req->buffer, req->entries, &sizes);
-}
-
-static bool left_pad_(t_str *out, const uint64_t src_len,
-                      const uint64_t max_size) {
-    uint64_t count = max_size - src_len;
-
-    while (count) {
-        if (out->len == out->cap - 1 && !flush_str(out)) {
-            return false;
-        }
-
-        const uint64_t avail = (out->cap - 1) - out->len;
-        const uint64_t to_fill = count < avail ? count : avail;
-        ft_memset(out->str + out->len, ' ', (size_t)to_fill);
-        out->len += to_fill;
-        out->str[out->len] = '\0';
-        count -= to_fill;
-    }
-
-    return true;
-}
-
-static bool put_uint_(t_str *out, uint64_t value) {
-    char digits[32];
-    size_t index = sizeof(digits);
-
-    do {
-        digits[--index] = (char)('0' + (value % 10));
-        value /= 10;
-    } while (value > 0);
-
-    return put_mem(out, digits + index, (uint64_t)(sizeof(digits) - index));
-}
-
-static bool print_list_rows_(t_str *out, const t_array *array,
-                             const t_list_stats *sizes) {
-    for (uint64_t index = 0; index < array->len; ++index) {
-        const t_entry *entry = array->data[index];
-        t_shell_scan scan;
-
-        shell_scan_str(entry->name, &scan);
-
-        if (!put_mem(out, entry->info->perm->str, entry->info->perm->len) ||
-            !left_pad_(out, entry->info->perm->len, sizes->max_len_perm) ||
-            !put_mem(out, " ", 1) ||
-            !left_pad_(out, entry->info->links->len, sizes->max_len_links) ||
-            !put_mem(out, entry->info->links->str, entry->info->links->len) ||
-            !put_mem(out, " ", 1) ||
-            !put_mem(out, entry->info->username->str,
-                     entry->info->username->len) ||
-            !put_mem(out, " ", 1) ||
-            !put_mem(out, entry->info->groupname->str,
-                     entry->info->groupname->len) ||
-            !put_mem(out, " ", 1) ||
-            !left_pad_(out, entry->info->size->len, sizes->max_len_sizes) ||
-            !put_mem(out, entry->info->size->str, entry->info->size->len) ||
-            !put_mem(out, " ", 1) ||
-            !put_mem(out, entry->info->dt->str, entry->info->dt->len) ||
-            !put_mem(out, " ", 1) ||
-            !escaped_out(out, entry->name, scan.quote, sizes->have_quote)) {
-            return false;
-        }
-
-        if (entry->info->symlink && entry->info->symlink->len > 0) {
-            if (!put_mem(out, " -> ", 4) ||
-                !put_mem(out, entry->info->symlink->str,
-                         entry->info->symlink->len)) {
-                return false;
-            }
-        }
-
-        if (!put_mem(out, "\n", 1)) {
-            return false;
         }
     }
 
