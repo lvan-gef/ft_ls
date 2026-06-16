@@ -5,7 +5,7 @@
 
 #ifndef ARENA_ALIGN
 #define ARENA_ALIGN UINT64_C(8)
-#endif // !ARENA_ALIGN
+#endif // ifndef !ARENA_ALIGN
 
 static Arena_Block *new_block_(uint64_t cap);
 

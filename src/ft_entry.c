@@ -73,8 +73,8 @@ static char file_type_char_(mode_t mode);
 static char exec_char_(mode_t mode, mode_t exec_bit, mode_t special_bit,
                        char lower, char upper);
 
-t_entry *new_scanned_entry(Arena *arena, const t_entry *parent,
-                           const struct dirent *dp) {
+t_entry *new_entry(Arena *arena, const t_entry *parent,
+                   const struct dirent *dp) {
     Arena_Mark mark = {0};
     t_entry *ent = arena_push(arena, sizeof(*ent));
     if (!ent) {
@@ -124,7 +124,7 @@ failed:
     return false;
 }
 
-bool ensure_entry_path(Arena *arena, t_entry *entry) {
+bool entry_path(Arena *arena, t_entry *entry) {
     if (entry->path) {
         return true;
     }
@@ -137,8 +137,7 @@ bool ensure_entry_path(Arena *arena, t_entry *entry) {
     return entry->path != NULL;
 }
 
-t_entry *dup_dir_entry(free_list *fl, const t_entry *src,
-                       const bool is_operand) {
+t_entry *dup_entry(free_list *fl, const t_entry *src, const bool is_operand) {
     t_entry *entry = fl_alloc(fl, sizeof(*entry));
     if (!entry) {
         return NULL;
@@ -168,8 +167,8 @@ failed:
     return NULL;
 }
 
-t_str *read_symlink_target(Arena *arena, const t_str *path,
-                           const uint64_t target_size, int *read_err) {
+t_str *read_symlink(Arena *arena, const t_str *path, const uint64_t target_size,
+                    int *read_err) {
     if (read_err) {
         *read_err = 0;
     }
@@ -540,8 +539,7 @@ static t_str *get_symlink_(Arena *arena, const t_entry *entry) {
         return NULL;
     }
 
-    return read_symlink_target(arena, entry->path, (uint64_t)entry->st.st_size,
-                               NULL);
+    return read_symlink(arena, entry->path, (uint64_t)entry->st.st_size, NULL);
 }
 
 static char *cache_lookup_(t_id_cache_entry *cache, const uint64_t id) {

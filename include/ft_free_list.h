@@ -5,7 +5,7 @@
 
 #ifndef FL_DEFAULT_SIZE
 #define FL_DEFAULT_SIZE UINT64_C(4096)
-#endif // !FL_DEFAULT_SIZE
+#endif // ifndef !FL_DEFAULT_SIZE
 
 typedef struct free_list_header free_list_header;
 struct free_list_header {

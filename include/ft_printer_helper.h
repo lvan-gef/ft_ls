@@ -16,11 +16,11 @@
 
 #ifndef MIN_COLUMN_WIDTH
 #define MIN_COLUMN_WIDTH UINT64_C(3)
-#endif // !MIN_COLUMN_WIDTH
+#endif // ifndef !MIN_COLUMN_WIDTH
 
 #ifndef OUTPUT_BUFFER_CAP
-#define OUTPUT_BUFFER_CAP UINT64_C(16384) // 32768
-#endif                                    // !OUTPUT_BUFFER_CAP
+#define OUTPUT_BUFFER_CAP UINT64_C(16384)
+#endif // ifndef !OUTPUT_BUFFER_CAP
 
 bool put_mem(t_str *out, const char *src, uint64_t len);
 bool flush_str(t_str *out);

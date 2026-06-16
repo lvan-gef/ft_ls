@@ -154,7 +154,6 @@ static bool print_operand_files_(t_params *params, const t_print_request *req,
 
     *printed_files = true;
     state = true;
-
 cleanup:
     free_entry_array_(params, params->files);
     return state;
@@ -292,8 +291,8 @@ static t_operand_state classify_operand_(t_params *params, t_str *str,
             st_dir = &st_target;
         }
 
-        symlink = read_symlink_target(params->temp_arena, str,
-                                      (uint64_t)st->st_size, &e);
+        symlink =
+            read_symlink(params->temp_arena, str, (uint64_t)st->st_size, &e);
         if (!symlink) {
             return OPERAND_FATAL;
         }
@@ -325,7 +324,6 @@ static t_operand_state classify_operand_(t_params *params, t_str *str,
 
         state = OPERAND_SKIP;
     }
-
 cleanup:
     arena_pop_to_mark(params->temp_arena, mark);
     return state;
@@ -356,14 +354,14 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
             continue;
         }
 
-        t_entry *entry = new_scanned_entry(params->temp_arena, path, dp);
+        t_entry *entry = new_entry(params->temp_arena, path, dp);
         if (!entry) {
             goto cleanup;
         }
 
         entry->st.st_mode = dtype_to_mode_(dtype);
         if (need_lstat) {
-            if (!ensure_entry_path(params->temp_arena, entry)) {
+            if (!entry_path(params->temp_arena, entry)) {
                 goto cleanup;
             }
 
@@ -447,7 +445,7 @@ static bool queue_recursive_dirs_(t_params *params) {
                 continue;
             }
 
-            t_entry *dir_entry = dup_dir_entry(&params->fl, entry, false);
+            t_entry *dir_entry = dup_entry(&params->fl, entry, false);
             if (!dir_entry) {
                 return false;
             }
@@ -505,7 +503,7 @@ static bool queue_operand_dir_(t_params *params, t_str *str,
         .st = *st,
     };
 
-    t_entry *dir_entry = dup_dir_entry(&params->fl, &src, true);
+    t_entry *dir_entry = dup_entry(&params->fl, &src, true);
     if (!dir_entry) {
         return false;
     }

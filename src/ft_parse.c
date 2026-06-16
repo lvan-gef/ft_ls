@@ -20,7 +20,6 @@ t_array *parse_args(free_list *fl, const uint64_t argc, char **argv,
         return NULL;
     }
 
-    // const t_alloc alloc = {.kind = ALLOC_FL, .as.fl = fl};
     bool is_flag = true;
     for (uint64_t index = 1; index < argc; ++index) {
         const size_t len = ft_strlen(argv[index]);

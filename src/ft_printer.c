@@ -12,7 +12,7 @@
 
 #ifndef TERM_SIZE
 #define TERM_SIZE 80
-#endif // !TERM_SIZE
+#endif // ifndef !TERM_SIZE
 
 #if TERM_SIZE < 1
 #error "TERM_SIZE must be at least 1"
@@ -69,7 +69,6 @@ bool printer(const t_print_request *req) {
     }
 
     ok = print_list_(req);
-
 cleanup:
     clear_list_infos_(req->entries);
     clear_list_infos_(req->list_width_context);
