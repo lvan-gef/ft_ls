@@ -181,7 +181,7 @@ def create_timestamps(path: Path) -> tuple[Path, list[Path]]:
         ("middle.txt", base_time - 20),
         ("recent.txt", base_time - 10),
         ("newest.txt", base_time),
-        ("near_future.txt", base_time + 10 * 60),
+        ("near_future.txt", base_time + 24 * 60 * 60),
         ("far_future.txt", base_time + 400 * 24 * 60 * 60),
     ]
 
