@@ -82,17 +82,11 @@ static bool print_list_(const t_print_request *req, const t_file_info *infos,
                         const t_file_info *context_infos);
 static bool left_pad_(t_str *out, uint64_t src_len, uint64_t max_size);
 static bool put_uint_(t_str *out, uint64_t value);
-static void collect_list_stats_(const t_array *entries,
-                                const t_file_info *infos, t_list_stats *stats);
 static bool print_list_rows_(t_str *out, const t_array *array,
                              const t_file_info *infos,
                              const t_list_stats *sizes);
-static bool arena_fill_file_info_(Arena *arena, t_file_info *info,
-                                  const t_entry *entry);
 static bool fill_file_info_(Arena *arena, t_file_info *info,
                             const t_entry *entry);
-static t_str *unknown_field_(Arena *arena);
-static t_str *unknown_dt_field_(Arena *arena);
 static t_str *get_perm_(Arena *arena, const t_entry *entry);
 static t_str *get_user_(Arena *arena, uid_t user_id);
 static t_str *get_group_(Arena *arena, gid_t group_id);
@@ -134,7 +128,7 @@ static bool prepare_list_infos_(Arena *arena, const t_array *entries,
     for (uint64_t index = 0; index < entries->len; ++index) {
         const t_entry *entry = entries->data[index];
 
-        if (!arena_fill_file_info_(arena, &(*infos)[index], entry)) {
+        if (!fill_file_info_(arena, &(*infos)[index], entry)) {
             return false;
         }
     }
@@ -214,20 +208,13 @@ static void update_list_stats_(t_list_stats *stats, const t_entry *entry,
     stats->total += info->blocks;
 }
 
-static void collect_list_stats_(const t_array *entries,
-                                const t_file_info *infos, t_list_stats *stats) {
-    *stats = (t_list_stats){0};
-
-    for (uint64_t index = 0; index < entries->len; ++index) {
-        const t_entry *entry = entries->data[index];
-        update_list_stats_(stats, entry, &infos[index]);
-    }
-}
-
 static bool print_list_(const t_print_request *req, const t_file_info *infos,
                         const t_file_info *context_infos) {
-    t_list_stats sizes;
-    collect_list_stats_(req->entries, infos, &sizes);
+    t_list_stats sizes = {0};
+    for (uint64_t index = 0; index < req->entries->len; ++index) {
+        const t_entry *entry = req->entries->data[index];
+        update_list_stats_(&sizes, entry, &infos[index]);
+    }
     apply_list_width_context_(req->list_width_context, context_infos, &sizes);
 
     sizes.have_quote =
@@ -324,12 +311,6 @@ static bool print_list_rows_(t_str *out, const t_array *array,
     return true;
 }
 
-static bool arena_fill_file_info_(Arena *arena, t_file_info *info,
-                                  const t_entry *entry) {
-    *info = (t_file_info){0};
-    return fill_file_info_(arena, info, entry);
-}
-
 static bool fill_file_info_(Arena *arena, t_file_info *info,
                             const t_entry *entry) {
     if (entry->stat_unavailable) {
@@ -338,27 +319,27 @@ static bool fill_file_info_(Arena *arena, t_file_info *info,
             return false;
         }
 
-        info->links = unknown_field_(arena);
+        info->links = arena_create_str(arena, "?");
         if (!info->links) {
             return false;
         }
 
-        info->username = unknown_field_(arena);
+        info->username = arena_create_str(arena, "?");
         if (!info->username) {
             return false;
         }
 
-        info->groupname = unknown_field_(arena);
+        info->groupname = arena_create_str(arena, "?");
         if (!info->groupname) {
             return false;
         }
 
-        info->size = unknown_field_(arena);
+        info->size = arena_create_str(arena, "?");
         if (!info->size) {
             return false;
         }
 
-        info->dt = unknown_dt_field_(arena);
+        info->dt = arena_create_str(arena, "           ?");
         if (!info->dt) {
             return false;
         }
@@ -409,14 +390,6 @@ static bool fill_file_info_(Arena *arena, t_file_info *info,
 
     info->blocks = (uint64_t)entry->st.st_blocks;
     return true;
-}
-
-static t_str *unknown_field_(Arena *arena) {
-    return arena_create_str(arena, "?");
-}
-
-static t_str *unknown_dt_field_(Arena *arena) {
-    return arena_create_str(arena, "           ?");
 }
 
 static t_str *get_perm_(Arena *arena, const t_entry *entry) {
