@@ -2,15 +2,16 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "../include/ft_arena.h"
 #include "../include/ft_free_list.h"
 #include "../include/ft_helper.h"
 #include "../include/ft_str.h"
-#include "../include/ft_arena.h"
 
 #include "../libft/include/libft.h"
 
 static void fill_init_str_(t_str *str, uint64_t cap);
 static void fill_str_(t_str *new_str, const char *str, const uint64_t len);
+static uint64_t len_of_nbr_(uint64_t nbr);
 
 t_str *arena_init_str(Arena *arena, const uint64_t cap) {
     if (cap > UINT64_MAX - 1 - sizeof(t_str)) {
@@ -78,7 +79,7 @@ t_str *dup_str(free_list *fl, const t_str *str) {
 }
 
 t_str *uint_to_str(Arena *arena, uint64_t nbr) {
-    const uint64_t len = len_of_nbr(nbr);
+    const uint64_t len = len_of_nbr_(nbr);
     t_str *str = arena_init_str(arena, len);
     if (!str) {
         return NULL;
@@ -112,4 +113,15 @@ static void fill_str_(t_str *new_str, const char *str, const uint64_t len) {
     ft_memcpy(new_str->str, str, len);
     new_str->len = len;
     new_str->str[new_str->len] = '\0';
+}
+
+static uint64_t len_of_nbr_(uint64_t nbr) {
+    uint64_t len = 1;
+
+    while (nbr >= 10) {
+        nbr /= 10;
+        ++len;
+    }
+
+    return len;
 }

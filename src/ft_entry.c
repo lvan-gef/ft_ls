@@ -13,7 +13,6 @@
 #include "../include/ft_entry.h"
 #include "../include/ft_free_list.h"
 #include "../include/ft_str.h"
-#include "../include/ft_arena.h"
 
 #include "../libft/include/libft.h"
 
@@ -52,10 +51,14 @@ static t_id_cache_entry user_cache[CACHE_SIZE] = {0};
 static uint64_t group_index = 0;
 static t_id_cache_entry group_cache[CACHE_SIZE] = {0};
 
-static bool fill_file_info_(Arena *arena, t_file_info *info, const t_entry *entry);
-static t_str *arena_join_dir_path_(Arena *arena, const t_str *lhs, const t_str *rhs);
-static t_str *fl_join_dir_path_(free_list *fl, const t_str *lhs, const t_str *rhs);
-static void fill_join_dir(t_str *path, const t_str *lhs, const t_str *rhs, bool need_slash);
+static bool fill_file_info_(Arena *arena, t_file_info *info,
+                            const t_entry *entry);
+static t_str *arena_join_dir_path_(Arena *arena, const t_str *lhs,
+                                   const t_str *rhs);
+static t_str *fl_join_dir_path_(free_list *fl, const t_str *lhs,
+                                const t_str *rhs);
+static void fill_join_dir(t_str *path, const t_str *lhs, const t_str *rhs,
+                          bool need_slash);
 static t_str *unknown_field_(Arena *arena);
 static t_str *unknown_dt_field_(Arena *arena);
 static t_str *get_perm_(Arena *arena, const t_entry *entry);
@@ -71,7 +74,7 @@ static char exec_char_(mode_t mode, mode_t exec_bit, mode_t special_bit,
                        char lower, char upper);
 
 t_entry *new_scanned_entry(Arena *arena, const t_entry *parent,
-                   const struct dirent *dp) {
+                           const struct dirent *dp) {
     Arena_Mark mark = {0};
     t_entry *ent = arena_push(arena, sizeof(*ent));
     if (!ent) {
@@ -170,7 +173,6 @@ t_str *read_symlink_target(Arena *arena, const t_str *path,
     if (read_err) {
         *read_err = 0;
     }
-
 
     uint64_t cap = (target_size > 0) ? target_size + 1 : (uint64_t)PATH_MAX;
     while (true) {
@@ -309,7 +311,8 @@ static bool fill_file_info_(Arena *arena, t_file_info *info,
     return true;
 }
 
-static t_str *arena_join_dir_path_(Arena *arena, const t_str *lhs, const t_str *rhs) {
+static t_str *arena_join_dir_path_(Arena *arena, const t_str *lhs,
+                                   const t_str *rhs) {
     const bool need_slash = lhs->len == 0 || lhs->str[lhs->len - 1] != '/';
     const uint64_t total_len = lhs->len + rhs->len + (need_slash ? 1U : 0U);
     t_str *path = arena_init_str(arena, total_len);
@@ -322,7 +325,8 @@ static t_str *arena_join_dir_path_(Arena *arena, const t_str *lhs, const t_str *
     return path;
 }
 
-static t_str *fl_join_dir_path_(free_list *fl, const t_str *lhs, const t_str *rhs) {
+static t_str *fl_join_dir_path_(free_list *fl, const t_str *lhs,
+                                const t_str *rhs) {
     const bool need_slash = lhs->len == 0 || lhs->str[lhs->len - 1] != '/';
     const uint64_t total_len = lhs->len + rhs->len + (need_slash ? 1U : 0U);
     t_str *path = fl_init_str(fl, total_len);
@@ -335,7 +339,8 @@ static t_str *fl_join_dir_path_(free_list *fl, const t_str *lhs, const t_str *rh
     return path;
 }
 
-static void fill_join_dir(t_str *path, const t_str *lhs, const t_str *rhs, bool need_slash) {
+static void fill_join_dir(t_str *path, const t_str *lhs, const t_str *rhs,
+                          bool need_slash) {
     ft_memcpy(path->str, lhs->str + lhs->pos, (size_t)lhs->len);
     path->len = lhs->len;
     if (need_slash) {
@@ -349,7 +354,6 @@ static void fill_join_dir(t_str *path, const t_str *lhs, const t_str *rhs, bool 
 
 static t_str *unknown_field_(Arena *arena) {
     return arena_create_str(arena, "?");
-
 }
 
 static t_str *unknown_dt_field_(Arena *arena) {

@@ -292,7 +292,8 @@ static t_operand_state classify_operand_(t_params *params, t_str *str,
             st_dir = &st_target;
         }
 
-        symlink = read_symlink_target(params->temp_arena, str, (uint64_t)st->st_size, &e);
+        symlink = read_symlink_target(params->temp_arena, str,
+                                      (uint64_t)st->st_size, &e);
         if (!symlink) {
             return OPERAND_FATAL;
         }
