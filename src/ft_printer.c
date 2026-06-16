@@ -5,8 +5,8 @@
 #include "../include/ft_entry.h"
 #include "../include/ft_printer.h"
 #include "../include/ft_printer_helper.h"
-#include "../include/ft_shell_escape.h"
 #include "../include/ft_printer_list.h"
+#include "../include/ft_shell_escape.h"
 
 #include "../libft/include/libft.h"
 

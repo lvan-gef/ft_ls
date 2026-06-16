@@ -158,7 +158,6 @@ void free_entry(free_list *fl, const t_entry *entry) {
     fl_free(fl, entry);
 }
 
-
 static t_str *arena_join_dir_path_(Arena *arena, const t_str *lhs,
                                    const t_str *rhs) {
     const bool need_slash = lhs->len == 0 || lhs->str[lhs->len - 1] != '/';

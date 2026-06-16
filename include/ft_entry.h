@@ -22,7 +22,7 @@ typedef struct {
 } t_entry;
 
 t_entry *arena_new_entry(Arena *arena, const t_entry *parent,
-                          const struct dirent *dp);
+                         const struct dirent *dp);
 bool arena_entry_path(Arena *arena, t_entry *entry);
 t_entry *fl_dup_entry(free_list *fl, const t_entry *src, bool is_operand);
 t_str *arena_read_symlink(Arena *arena, const t_str *path, uint64_t target_size,
