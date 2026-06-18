@@ -5,15 +5,18 @@
 #include <stdint.h>
 #include <time.h>
 
-#include "../include/ft_arena.h"
 #include "../include/ft_array.h"
 #include "../include/ft_entry.h"
 #include "../include/ft_printer.h"
-#include "../include/ft_printer_helper.h"
-#include "../include/ft_printer_list.h"
-#include "../include/ft_shell_escape.h"
 
 #include "../libft/include/libft.h"
+
+#include "ft_arena.h"
+#include "ft_path_scratch.h"
+#include "ft_printer_helper.h"
+#include "ft_printer_list.h"
+#include "ft_printer_list_scratch.h"
+#include "ft_shell_escape.h"
 
 #ifndef CACHE_SIZE
 #define CACHE_SIZE UINT64_C(8)
@@ -71,11 +74,11 @@ static t_id_cache_entry group_cache[CACHE_SIZE] = {0};
 
 static bool prepare_list_infos_(Arena *arena, const t_array *entries,
                                 t_file_info **infos);
-static bool context_needs_padding_(const t_array *context);
+static bool printer_list_with_scratch_(const t_print_request *req,
+                                       Arena *scratch);
 static void apply_list_width_context_(const t_array *context,
                                       const t_file_info *context_infos,
                                       t_list_stats *sizes);
-static bool put_dir_header_(t_str *out, const t_str *dir_header);
 static void update_list_stats_(t_list_stats *stats, const t_entry *entry,
                                const t_file_info *info);
 static bool print_list_(const t_print_request *req, const t_file_info *infos,
@@ -100,26 +103,37 @@ static char exec_char_(mode_t mode, mode_t exec_bit, mode_t special_bit,
                        char lower, char upper);
 
 bool printer_list(const t_print_request *req) {
-    const Arena_Mark mark = arena_get_mark(req->arena);
-    t_file_info *infos = NULL;
-    t_file_info *context_infos = NULL;
-    bool ok = true;
-
-    if (!prepare_list_infos_(req->arena, req->entries, &infos) ||
-        !prepare_list_infos_(req->arena, req->list_width_context,
-                             &context_infos)) {
-        ok = false;
-        goto cleanup;
+    Arena *scratch = arena_alloc(ARENA_SIZE);
+    if (!scratch) {
+        return false;
     }
 
-    ok = print_list_(req, infos, context_infos);
-cleanup:
-    arena_pop_to_mark(req->arena, mark);
+    const bool ok = printer_list_with_scratch_(req, scratch);
+    arena_release(scratch);
     return ok;
+}
+
+static bool printer_list_with_scratch_(const t_print_request *req,
+                                       Arena *scratch) {
+    t_file_info *infos = NULL;
+    t_file_info *context_infos = NULL;
+
+    if (!prepare_list_infos_(scratch, req->entries, &infos) ||
+        !prepare_list_infos_(scratch, req->list_width_context,
+                             &context_infos)) {
+        return false;
+    }
+
+    return print_list_(req, infos, context_infos);
 }
 
 static bool prepare_list_infos_(Arena *arena, const t_array *entries,
                                 t_file_info **infos) {
+    if (!entries) {
+        *infos = NULL;
+        return true;
+    }
+
     *infos = arena_push(arena, sizeof(**infos) * entries->len);
     if (!*infos) {
         return false;
@@ -136,26 +150,13 @@ static bool prepare_list_infos_(Arena *arena, const t_array *entries,
     return true;
 }
 
-static bool context_needs_padding_(const t_array *context) {
-    for (uint64_t index = 0; index < context->len; ++index) {
-        const t_str *str = context->data[index];
-        if (!str) {
-            continue;
-        }
-
-        t_shell_scan scan;
-        shell_scan_str(str, &scan);
-        if (scan.quote != '\0') {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 static void apply_list_width_context_(const t_array *context,
                                       const t_file_info *context_infos,
                                       t_list_stats *sizes) {
+    if (!context || !context_infos) {
+        return;
+    }
+
     for (uint64_t index = 0; index < context->len; ++index) {
         const t_entry *entry = context->data[index];
         const t_file_info *info = &context_infos[index];
@@ -171,18 +172,6 @@ static void apply_list_width_context_(const t_array *context,
             sizes->max_len_sizes = info->size->len;
         }
     }
-}
-
-static bool put_dir_header_(t_str *out, const t_str *dir_header) {
-    t_shell_scan scan;
-    shell_scan_str(dir_header, &scan);
-    if (scan.quote == '\0' && ft_memchr(dir_header->str + dir_header->pos, ':',
-                                        (size_t)dir_header->len) != NULL) {
-        scan.quote = '\'';
-    }
-
-    return escaped_out(out, dir_header, scan.quote, false) &&
-           put_mem(out, ":\n", 2);
 }
 
 static void update_list_stats_(t_list_stats *stats, const t_entry *entry,
@@ -218,9 +207,9 @@ static bool print_list_(const t_print_request *req, const t_file_info *infos,
     apply_list_width_context_(req->list_width_context, context_infos, &sizes);
 
     sizes.have_quote =
-        sizes.have_quote || context_needs_padding_(req->quote_padding_context);
+        sizes.have_quote || context_needs_padding(req->quote_padding_context);
 
-    if (!put_dir_header_(req->buffer, req->dir_header)) {
+    if (!put_dir_header(req->buffer, req->dir_header)) {
         return false;
     }
 
@@ -292,7 +281,8 @@ static bool print_list_rows_(t_str *out, const t_array *array,
             !put_mem(out, " ", 1) ||
             !put_mem(out, info->dt->str, info->dt->len) ||
             !put_mem(out, " ", 1) ||
-            !escaped_out(out, entry->name, scan.quote, sizes->have_quote)) {
+            !put_shell_escaped(out, entry->name, scan.quote,
+                               sizes->have_quote)) {
             return false;
         }
 
@@ -319,32 +309,32 @@ static bool fill_file_info_(Arena *arena, t_file_info *info,
             return false;
         }
 
-        info->links = arena_create_str(arena, "?");
+        info->links = printer_scratch_str_from_cstr(arena, "?");
         if (!info->links) {
             return false;
         }
 
-        info->username = arena_create_str(arena, "?");
+        info->username = printer_scratch_str_from_cstr(arena, "?");
         if (!info->username) {
             return false;
         }
 
-        info->groupname = arena_create_str(arena, "?");
+        info->groupname = printer_scratch_str_from_cstr(arena, "?");
         if (!info->groupname) {
             return false;
         }
 
-        info->size = arena_create_str(arena, "?");
+        info->size = printer_scratch_str_from_cstr(arena, "?");
         if (!info->size) {
             return false;
         }
 
-        info->dt = arena_create_str(arena, "           ?");
+        info->dt = printer_scratch_str_from_cstr(arena, "           ?");
         if (!info->dt) {
             return false;
         }
 
-        info->symlink = arena_init_str(arena, 1);
+        info->symlink = printer_scratch_str_new(arena, 1);
         if (!info->symlink) {
             return false;
         }
@@ -358,7 +348,7 @@ static bool fill_file_info_(Arena *arena, t_file_info *info,
         return false;
     }
 
-    info->links = arena_uint_to_str(arena, entry->st.st_nlink);
+    info->links = printer_scratch_str_from_uint(arena, entry->st.st_nlink);
     if (!info->links) {
         return false;
     }
@@ -373,7 +363,8 @@ static bool fill_file_info_(Arena *arena, t_file_info *info,
         return false;
     }
 
-    info->size = arena_uint_to_str(arena, (uint64_t)entry->st.st_size);
+    info->size =
+        printer_scratch_str_from_uint(arena, (uint64_t)entry->st.st_size);
     if (!info->size) {
         return false;
     }
@@ -393,7 +384,7 @@ static bool fill_file_info_(Arena *arena, t_file_info *info,
 }
 
 static t_str *get_perm_(Arena *arena, const t_entry *entry) {
-    t_str *str = arena_init_str(arena, PERMISSION_SIZE);
+    t_str *str = printer_scratch_str_new(arena, PERMISSION_SIZE);
 
     if (!str) {
         return NULL;
@@ -464,13 +455,13 @@ static char file_type_char_(const mode_t mode) {
 static t_str *get_user_(Arena *arena, const uid_t user_id) {
     const char *name = cache_lookup_(user_cache, (uint64_t)user_id);
     if (name) {
-        return arena_create_str(arena, name);
+        return printer_scratch_str_from_cstr(arena, name);
     }
 
     const struct passwd *pwd = getpwuid(user_id);
     t_str *new_str = NULL;
     if (pwd) {
-        new_str = arena_create_str(arena, pwd->pw_name);
+        new_str = printer_scratch_str_from_cstr(arena, pwd->pw_name);
         if (!new_str) {
             return NULL;
         }
@@ -478,7 +469,7 @@ static t_str *get_user_(Arena *arena, const uid_t user_id) {
     } else {
         const int err = errno;
 
-        new_str = arena_uint_to_str(arena, (uint64_t)user_id);
+        new_str = printer_scratch_str_from_uint(arena, (uint64_t)user_id);
         if (!new_str) {
             return NULL;
         }
@@ -495,13 +486,13 @@ static t_str *get_user_(Arena *arena, const uid_t user_id) {
 static t_str *get_group_(Arena *arena, const gid_t group_id) {
     const char *name = cache_lookup_(group_cache, (uint64_t)group_id);
     if (name) {
-        return arena_create_str(arena, name);
+        return printer_scratch_str_from_cstr(arena, name);
     }
 
     const struct group *grp = getgrgid(group_id);
     t_str *new_str = NULL;
     if (grp) {
-        new_str = arena_create_str(arena, grp->gr_name);
+        new_str = printer_scratch_str_from_cstr(arena, grp->gr_name);
         if (!new_str) {
             return NULL;
         }
@@ -511,7 +502,7 @@ static t_str *get_group_(Arena *arena, const gid_t group_id) {
     } else {
         const int err = errno;
 
-        new_str = arena_uint_to_str(arena, (uint64_t)group_id);
+        new_str = printer_scratch_str_from_uint(arena, (uint64_t)group_id);
         if (!new_str) {
             return NULL;
         }
@@ -527,7 +518,7 @@ static t_str *get_group_(Arena *arena, const gid_t group_id) {
 
 static t_str *get_dt_(Arena *arena, const struct timespec *ctim) {
     Arena_Mark mark = arena_get_mark(arena);
-    t_str *new_str = arena_init_str(arena, DT_LEN);
+    t_str *new_str = printer_scratch_str_new(arena, DT_LEN);
     if (!new_str) {
         return NULL;
     }
@@ -565,15 +556,15 @@ static t_str *get_dt_(Arena *arena, const struct timespec *ctim) {
 
 static t_str *get_symlink_(Arena *arena, const t_entry *entry) {
     if (!S_ISLNK(entry->st.st_mode)) {
-        return arena_init_str(arena, 1);
+        return printer_scratch_str_new(arena, 1);
     }
 
     if (!entry->path) {
         return NULL;
     }
 
-    return arena_read_symlink(arena, entry->path, (uint64_t)entry->st.st_size,
-                              NULL);
+    return path_read_symlink_scratch(arena, entry->path,
+                                     (uint64_t)entry->st.st_size, NULL);
 }
 
 static char *cache_lookup_(t_id_cache_entry *cache, const uint64_t id) {

@@ -1,11 +1,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "../include/ft_printer_helper.h"
-#include "../include/ft_shell_escape.h"
 #include "../include/ft_str.h"
 
 #include "../libft/include/libft.h"
+
+#include "ft_shell_escape.h"
 
 #define OCTAL_DIGIT_MASK 0x7
 #define BYTE_OCTAL_HIGH_SHIFT 6
@@ -43,9 +43,9 @@ static void shell_escape_bytes_(t_shell_out *out, const char *src,
                                 uint64_t len);
 static void escape_byte_(t_shell_out *out, t_escape_state *state,
                          unsigned char c);
-static uint64_t shell_display_len_(const char *src, uint64_t len, char quote,
-                                   bool pad_unquoted);
-static uint64_t shell_escaped_len_(const char *src, uint64_t len);
+static uint64_t escaped_len_(const char *src, uint64_t len, char quote,
+                             bool pad_unquoted);
+static uint64_t single_quoted_len_(const char *src, uint64_t len);
 static void scan_shell_(const char *src, uint64_t len, t_shell_scan *scan);
 static void fill_scan_(t_shell_scan *scan, const char *src,
                        const t_shell_analysis *analysis);
@@ -58,15 +58,18 @@ static void analyze_shell_byte_(t_shell_analysis *analysis, unsigned char c,
 static void init_analysis_(t_shell_analysis *analysis);
 static char quote_from_analysis_(const t_shell_analysis *analysis);
 
-bool escaped_out(t_str *dst, const t_str *str, const char quote,
-                 const bool pad_unquoted) {
-    const uint64_t need =
-        shell_display_len_(str->str, str->len, quote, pad_unquoted);
-    if (need > dst->cap - 1) {
-        return false;
-    }
+void shell_scan_str(const t_str *str, t_shell_scan *scan) {
+    scan_shell_(str->str + str->pos, str->len, scan);
+}
 
-    if (dst->cap - 1 - dst->len < need && !flush_str(dst)) {
+uint64_t shell_escaped_len(const t_str *str, const char quote,
+                           const bool pad_unquoted) {
+    return escaped_len_(str->str + str->pos, str->len, quote, pad_unquoted);
+}
+
+bool shell_escape_append(t_str *dst, const t_str *str, const char quote,
+                         const bool pad_unquoted) {
+    if (dst->cap - 1 - dst->len < shell_escaped_len(str, quote, pad_unquoted)) {
         return false;
     }
 
@@ -74,11 +77,9 @@ bool escaped_out(t_str *dst, const t_str *str, const char quote,
     return true;
 }
 
-t_str *shell_escape_str(free_list *fl, const t_str *str, const char quote) {
-    const uint64_t escaped_len =
-        shell_display_len_(str->str, str->len, quote, false);
-
-    t_str *new_str = fl_init_str(fl, escaped_len);
+t_str *shell_escape_str(const t_str *str, const char quote) {
+    const uint64_t escaped_len = shell_escaped_len(str, quote, false);
+    t_str *new_str = str_new(escaped_len);
 
     if (!new_str) {
         return NULL;
@@ -88,10 +89,6 @@ t_str *shell_escape_str(free_list *fl, const t_str *str, const char quote) {
     return new_str;
 }
 
-void shell_scan_str(const t_str *str, t_shell_scan *scan) {
-    scan_shell_(str->str, str->len, scan);
-}
-
 static void escape_str_(t_str *dst, const t_str *str, const char quote,
                         const bool pad_unquoted) {
     if (!quote) {
@@ -99,19 +96,19 @@ static void escape_str_(t_str *dst, const t_str *str, const char quote,
             append_bytes_(dst, " ", 1);
         }
 
-        append_bytes_(dst, str->str, str->len);
+        append_bytes_(dst, str->str + str->pos, str->len);
         return;
     }
 
     if (quote == '"') {
         append_bytes_(dst, "\"", 1);
-        append_bytes_(dst, str->str, str->len);
+        append_bytes_(dst, str->str + str->pos, str->len);
         append_bytes_(dst, "\"", 1);
         return;
     }
 
-    shell_escape_bytes_(&(t_shell_out){.dst = dst, .len = 0}, str->str,
-                        str->len);
+    shell_escape_bytes_(&(t_shell_out){.dst = dst, .len = 0},
+                        str->str + str->pos, str->len);
 }
 
 static void append_bytes_(t_str *dst, const char *src, const uint64_t len) {
@@ -249,8 +246,8 @@ static void escape_byte_(t_shell_out *out, t_escape_state *state,
     emit_ansi_byte_(out, c);
 }
 
-static uint64_t shell_display_len_(const char *src, const uint64_t len,
-                                   const char quote, const bool pad_unquoted) {
+static uint64_t escaped_len_(const char *src, const uint64_t len,
+                             const char quote, const bool pad_unquoted) {
     if (quote == '\0') {
         return len + (pad_unquoted ? 1 : 0);
     }
@@ -259,10 +256,10 @@ static uint64_t shell_display_len_(const char *src, const uint64_t len,
         return len + 2;
     }
 
-    return shell_escaped_len_(src, len);
+    return single_quoted_len_(src, len);
 }
 
-static uint64_t shell_escaped_len_(const char *src, const uint64_t len) {
+static uint64_t single_quoted_len_(const char *src, const uint64_t len) {
     t_shell_out out = {.dst = NULL, .len = 0};
 
     shell_escape_bytes_(&out, src, len);
@@ -280,7 +277,7 @@ static void scan_shell_(const char *src, const uint64_t len,
 static void fill_scan_(t_shell_scan *scan, const char *src,
                        const t_shell_analysis *analysis) {
     const uint64_t display_len =
-        shell_display_len_(src, analysis->len, analysis->quote, false);
+        escaped_len_(src, analysis->len, analysis->quote, false);
 
     scan->len = analysis->len;
     scan->quote = analysis->quote;

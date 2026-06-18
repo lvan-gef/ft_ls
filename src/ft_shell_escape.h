@@ -2,9 +2,9 @@
 #define FT_SHELL_ESCAPE_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
-#include "./ft_free_list.h"
-#include "./ft_str.h"
+#include "../include/ft_str.h"
 
 typedef struct s_shell_scan {
     uint64_t len;
@@ -13,8 +13,10 @@ typedef struct s_shell_scan {
     char quote;
 } t_shell_scan;
 
-bool escaped_out(t_str *dst, const t_str *str, char quote, bool pad_unquoted);
-t_str *shell_escape_str(free_list *fl, const t_str *str, char quote);
 void shell_scan_str(const t_str *str, t_shell_scan *scan);
+uint64_t shell_escaped_len(const t_str *str, char quote, bool pad_unquoted);
+bool shell_escape_append(t_str *dst, const t_str *str, char quote,
+                         bool pad_unquoted);
+t_str *shell_escape_str(const t_str *str, char quote);
 
 #endif // !FT_SHELL_ESCAPE_H

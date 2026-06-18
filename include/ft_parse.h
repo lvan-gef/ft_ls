@@ -4,8 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "../include/ft_array.h"
-#include "../include/ft_free_list.h"
+#include "./ft_array.h"
 
 typedef struct {
     bool list;
@@ -15,6 +14,6 @@ typedef struct {
     bool time;
 } t_args;
 
-t_array *parse_args(free_list *fl, uint64_t argc, char **argv, t_args *args);
+bool parse_args(uint64_t argc, char **argv, t_args *args, t_array *inputs);
 
 #endif // !FT_PARSE_H

@@ -4,7 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "./ft_str.h"
+#include "../include/ft_array.h"
+#include "../include/ft_str.h"
 
 #ifndef TABSIZE
 #define TABSIZE UINT64_C(8)
@@ -23,6 +24,10 @@
 #endif // ifndef !OUTPUT_BUFFER_CAP
 
 bool put_mem(t_str *out, const char *src, uint64_t len);
+bool put_shell_escaped(t_str *out, const t_str *str, char quote,
+                       bool pad_unquoted);
 bool flush_str(t_str *out);
+bool put_dir_header(t_str *out, const t_str *dir_header);
+bool context_needs_padding(const t_array *context);
 
 #endif // !FT_PRINTER_HELPER_H

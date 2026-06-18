@@ -4,11 +4,10 @@
 #include "../include/ft_array.h"
 #include "../include/ft_entry.h"
 #include "../include/ft_printer.h"
-#include "../include/ft_printer_helper.h"
-#include "../include/ft_printer_list.h"
-#include "../include/ft_shell_escape.h"
 
-#include "../libft/include/libft.h"
+#include "ft_printer_helper.h"
+#include "ft_printer_list.h"
+#include "ft_shell_escape.h"
 
 #ifndef TERM_SIZE
 #define TERM_SIZE 80
@@ -24,8 +23,6 @@ typedef struct {
     uint64_t max;
 } t_map;
 
-static bool context_needs_padding_(const t_array *context);
-static bool put_dir_header_(t_str *out, const t_str *dir_header);
 static uint64_t display_len_(const t_entry *entry, bool quoted);
 static bool init_print_row_(const t_print_request *req);
 static void calc_cols_(const t_array *array, t_map *map, bool *quoted,
@@ -44,43 +41,6 @@ bool printer(const t_print_request *req) {
     return printer_list(req);
 }
 
-static bool context_needs_padding_(const t_array *context) {
-    if (!context) {
-        return false;
-    }
-
-    for (uint64_t index = 0; index < context->len; ++index) {
-        const t_str *str = context->data[index];
-        if (!str) {
-            continue;
-        }
-
-        t_shell_scan scan;
-        shell_scan_str(str, &scan);
-        if (scan.quote != '\0') {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-static bool put_dir_header_(t_str *out, const t_str *dir_header) {
-    if (!dir_header) {
-        return true;
-    }
-
-    t_shell_scan scan;
-    shell_scan_str(dir_header, &scan);
-    if (scan.quote == '\0' && ft_memchr(dir_header->str + dir_header->pos, ':',
-                                        (size_t)dir_header->len) != NULL) {
-        scan.quote = '\'';
-    }
-
-    return escaped_out(out, dir_header, scan.quote, false) &&
-           put_mem(out, ":\n", 2);
-}
-
 static bool init_print_row_(const t_print_request *req) {
     const uint64_t max_cols = (TERM_SIZE + SPACE_GAP) / (1 + SPACE_GAP);
     t_map map = {.cols = 1,
@@ -88,11 +48,11 @@ static bool init_print_row_(const t_print_request *req) {
                  .max = req->entries->len < max_cols ? req->entries->len
                                                      : max_cols};
 
-    bool quoted = context_needs_padding_(req->quote_padding_context);
+    bool quoted = context_needs_padding(req->quote_padding_context);
     uint64_t col_widths[(TERM_SIZE + SPACE_GAP) / (1 + SPACE_GAP)];
     calc_cols_(req->entries, &map, &quoted, col_widths);
 
-    if (!put_dir_header_(req->buffer, req->dir_header)) {
+    if (!put_dir_header(req->buffer, req->dir_header)) {
         return false;
     }
 
@@ -176,7 +136,7 @@ static bool create_row_(t_str *out, const t_array *array, const t_map *map,
                 quoted ? scan.padded_display_len : scan.display_len;
             const uint64_t max_name_length = col_widths[col++];
 
-            if (!escaped_out(out, entry->name, scan.quote, quoted)) {
+            if (!put_shell_escaped(out, entry->name, scan.quote, quoted)) {
                 return false;
             }
 

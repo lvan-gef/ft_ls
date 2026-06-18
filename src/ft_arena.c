@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "../include/ft_arena.h"
+#include "./ft_arena.h"
 
 #ifndef ARENA_ALIGN
 #define ARENA_ALIGN UINT64_C(8)

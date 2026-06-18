@@ -1,0 +1,162 @@
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
+
+#include "./ft_walk_internal.h"
+
+#include "../libft/include/libft.h"
+
+typedef struct {
+    t_entry entry;
+    t_str name;
+    char name_buf[];
+} t_scratch_dir_entry;
+
+typedef struct {
+    t_entry entry;
+    t_str name;
+    char buf[];
+} t_owned_operand_entry;
+
+static t_str *join_dir_path_scratch_(Arena *scratch, const t_str *lhs,
+                                      const t_str *rhs);
+static bool is_packed_operand_entry_(const t_entry *entry);
+
+t_entry *walk_entry_new_file_operand(const t_str *path, const struct stat *st) {
+    if (path->len > (uint64_t)(PTRDIFF_MAX -
+                               (ptrdiff_t)sizeof(t_owned_operand_entry) - 1)) {
+        return NULL;
+    }
+
+    t_owned_operand_entry *owned =
+        malloc(sizeof(*owned) + (size_t)path->len + 1);
+    if (!owned) {
+        return NULL;
+    }
+
+    str_init(&owned->name, owned->buf, path->len);
+    str_copy_cstr(&owned->name, path->str + path->pos, path->len);
+    owned->entry = (t_entry){.name = &owned->name,
+                             .path = &owned->name,
+                             .st = *st,
+                             .stat_unavailable = false,
+                             .is_operand = true};
+
+    return &owned->entry;
+}
+
+t_entry *walk_entry_new_owned_path(const t_str *path, const struct stat *st,
+                                   const bool is_operand) {
+    t_entry *entry = malloc(sizeof(*entry));
+    if (!entry) {
+        return NULL;
+    }
+
+    *entry = (t_entry){0};
+    entry->path = str_dup(path);
+    entry->st = *st;
+    entry->is_operand = is_operand;
+
+    if (!entry->path) {
+        walk_entry_free(entry);
+        return NULL;
+    }
+
+    return entry;
+}
+
+t_entry *walk_entry_new_scratch_dirent(Arena *scratch,
+                                       const struct dirent *dp) {
+    const uint64_t name_len = (uint64_t)ft_strlen(dp->d_name);
+    if (name_len > UINT64_MAX - (uint64_t)sizeof(t_scratch_dir_entry) - 1) {
+        return NULL;
+    }
+
+    t_scratch_dir_entry *ent = arena_push(scratch, sizeof(*ent) + name_len + 1);
+    if (!ent) {
+        return NULL;
+    }
+
+    str_init(&ent->name, ent->name_buf, name_len);
+    str_copy_cstr(&ent->name, dp->d_name, name_len);
+    ent->entry = (t_entry){.name = &ent->name,
+                           .path = NULL,
+                           .st = (struct stat){0},
+                           .stat_unavailable = false,
+                           .is_operand = false};
+    return &ent->entry;
+}
+
+bool walk_entry_build_path(Arena *scratch, t_entry *entry,
+                           const t_str *parent_path) {
+    if (entry->path) {
+        return true;
+    }
+    if (!parent_path || !entry->name) {
+        return false;
+    }
+
+    entry->path = join_dir_path_scratch_(scratch, parent_path, entry->name);
+    return entry->path != NULL;
+}
+
+void walk_entry_free(t_entry *entry) {
+    if (!entry) {
+        return;
+    }
+
+    const bool packed = is_packed_operand_entry_(entry);
+    if (!packed && entry->path && entry->path != entry->name) {
+        str_free(entry->path);
+    }
+
+    if (!packed && entry->name) {
+        str_free(entry->name);
+    }
+
+    free(entry);
+}
+
+void walk_entry_del(void *ptr) {
+    walk_entry_free((t_entry *)ptr);
+}
+
+static t_str *join_dir_path_scratch_(Arena *scratch, const t_str *lhs,
+                                     const t_str *rhs) {
+    const bool need_slash =
+        lhs->len != 0 && lhs->str[lhs->pos + lhs->len - 1] != '/';
+    const uint64_t slash_len = need_slash ? 1U : 0U;
+    if (lhs->len > UINT64_MAX - rhs->len - slash_len) {
+        return NULL;
+    }
+
+    const uint64_t total_len = lhs->len + rhs->len + slash_len;
+    if (total_len > UINT64_MAX - (uint64_t)sizeof(t_str) - 1) {
+        return NULL;
+    }
+
+    t_str *path = arena_push(scratch, sizeof(*path) + total_len + 1);
+    if (!path) {
+        return NULL;
+    }
+
+    str_init(path, (char *)(path + 1), total_len);
+
+    ft_memcpy(path->str, lhs->str + lhs->pos, (size_t)lhs->len);
+    path->len = lhs->len;
+    if (need_slash) {
+        path->str[path->len++] = '/';
+    }
+
+    ft_memcpy(path->str + path->len, rhs->str + rhs->pos, (size_t)rhs->len);
+    path->len += rhs->len;
+    path->str[path->len] = '\0';
+
+    return path;
+}
+
+static bool is_packed_operand_entry_(const t_entry *entry) {
+    return entry->path == entry->name &&
+           (uintptr_t)entry->name ==
+               (uintptr_t)entry + offsetof(t_owned_operand_entry, name);
+}

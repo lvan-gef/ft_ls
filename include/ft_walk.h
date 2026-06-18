@@ -4,6 +4,6 @@
 #include "./ft_array.h"
 #include "./ft_parse.h"
 
-void process(t_args *args, const t_array *array, int *exit_code);
+void process(const t_args *args, const t_array *array, int *exit_code);
 
 #endif // !FT_WALK_H

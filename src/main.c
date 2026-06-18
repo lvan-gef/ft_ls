@@ -2,31 +2,32 @@
 #include <unistd.h>
 
 #include "../include/ft_array.h"
-#include "../include/ft_free_list.h"
 #include "../include/ft_parse.h"
+#include "../include/ft_str.h"
 #include "../include/ft_walk.h"
 
-static void clean_program_(free_list *fl);
+static void del_str_(void *ptr);
 
 int main(const int argc, char *argv[]) {
     t_args args = {0};
-    unsigned char buffer[FL_DEFAULT_SIZE];
-    free_list fl;
-    fl_init(&fl, buffer, sizeof(buffer));
 
-    const t_array *inputs = parse_args(&fl, (uint64_t)argc, argv, &args);
-    if (!inputs) {
-        clean_program_(&fl);
+    t_array inputs = {0};
+    if (!array_init(&inputs, (uint64_t)(argc))) {
+        return 1;
+    }
+
+    if (!parse_args((uint64_t)argc, argv, &args, &inputs)) {
+        array_destroy_with(&inputs, del_str_);
         return 1;
     }
 
     int exit_code = 0;
-    process(&args, inputs, &exit_code);
+    process(&args, &inputs, &exit_code);
 
-    clean_program_(&fl);
+    array_destroy_with(&inputs, del_str_);
     return exit_code;
 }
 
-static void clean_program_(free_list *fl) {
-    fl_free_all(fl);
+static void del_str_(void *ptr) {
+    str_free((t_str *)ptr);
 }

@@ -5,9 +5,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "./ft_arena.h"
-#include "./ft_free_list.h"
-
 typedef struct {
     char *str;
     uint64_t cap;
@@ -15,11 +12,13 @@ typedef struct {
     uint64_t pos;
 } t_str;
 
-t_str *arena_init_str(Arena *arena, uint64_t cap);
-t_str *fl_init_str(free_list *fl, uint64_t cap);
-t_str *arena_create_str(Arena *arena, const char *str);
-t_str *fl_create_str(free_list *fl, const char *str);
-t_str *arena_uint_to_str(Arena *arena, uint64_t nbr);
-t_str *fl_dup_str(free_list *fl, const t_str *str);
-void fl_free_str(free_list *fl, const t_str *str);
+void str_init(t_str *str, char *buf, uint64_t cap);
+void str_copy_cstr(t_str *str, const char *src, uint64_t len);
+void str_copy_uint(t_str *str, uint64_t value);
+uint64_t str_uint_len(uint64_t value);
+t_str *str_new(uint64_t cap);
+t_str *str_from_cstr(const char *src);
+t_str *str_dup(const t_str *src);
+t_str *str_from_uint(uint64_t value);
+void str_free(t_str *str);
 #endif // !FT_STR_H

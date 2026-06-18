@@ -2,24 +2,19 @@
 #include <stdint.h>
 
 #include "../include/ft_array.h"
-#include "../include/ft_free_list.h"
 #include "../include/ft_parse.h"
 #include "../include/ft_str.h"
 
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
 
-static t_str *create_and_append_(free_list *fl, const char *arg,
-                                 t_array *inputs);
+static bool append_input_(const char *arg, t_array *inputs);
+static bool fail_inputs_(t_array *inputs);
+static void del_str_(void *ptr);
 static void print_error_(const char *flag);
 
-t_array *parse_args(free_list *fl, const uint64_t argc, char **argv,
-                    t_args *args) {
-    t_array *inputs = init_array(fl, ARRAY_SIZE);
-    if (!inputs) {
-        return NULL;
-    }
-
+bool parse_args(const uint64_t argc, char **argv, t_args *args,
+                t_array *inputs) {
     bool is_flag = true;
     for (uint64_t index = 1; index < argc; ++index) {
         const size_t len = ft_strlen(argv[index]);
@@ -31,8 +26,8 @@ t_array *parse_args(free_list *fl, const uint64_t argc, char **argv,
 
         if (is_flag && *argv[index] == '-') {
             if (len == 1) {
-                if (!create_and_append_(fl, argv[index], inputs)) {
-                    return NULL;
+                if (!append_input_(argv[index], inputs)) {
+                    return fail_inputs_(inputs);
                 }
             }
 
@@ -43,39 +38,49 @@ t_array *parse_args(free_list *fl, const uint64_t argc, char **argv,
                     case 'l': args->list = true; break;
                     case 'r': args->reverse = true; break;
                     case 't': args->time = true; break;
-                    default: print_error_(argv[index]); return NULL;
+                    default:
+                        print_error_(argv[index]);
+                        return fail_inputs_(inputs);
                 }
             }
             continue;
         }
 
-        if (!create_and_append_(fl, argv[index], inputs)) {
-            return NULL;
+        if (!append_input_(argv[index], inputs)) {
+            return fail_inputs_(inputs);
         }
     }
 
     if (!inputs->len) {
-        if (!create_and_append_(fl, ".", inputs)) {
-            return NULL;
+        if (!append_input_(".", inputs)) {
+            return fail_inputs_(inputs);
         }
     }
 
-    return inputs;
+    return true;
 }
 
-static t_str *create_and_append_(free_list *fl, const char *arg,
-                                 t_array *inputs) {
-    t_str *str = fl_create_str(fl, arg);
+static bool append_input_(const char *arg, t_array *inputs) {
+    t_str *str = str_from_cstr(arg);
     if (!str) {
-        return NULL;
+        return false;
     }
 
-    if (!append_array(inputs, (void *)str)) {
-        fl_free(fl, str);
-        return NULL;
+    if (!array_append(inputs, (void *)str)) {
+        str_free(str);
+        return false;
     }
 
-    return str;
+    return true;
+}
+
+static bool fail_inputs_(t_array *inputs) {
+    array_clear_with(inputs, del_str_);
+    return false;
+}
+
+static void del_str_(void *ptr) {
+    str_free((t_str *)ptr);
 }
 
 static void print_error_(const char *flag) {
