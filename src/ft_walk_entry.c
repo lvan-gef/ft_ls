@@ -6,6 +6,8 @@
 
 #include "../libft/include/libft.h"
 
+#include "./ft_shell_escape.h"
+
 typedef struct {
     t_entry entry;
     t_str name;
@@ -41,6 +43,7 @@ t_entry *walk_entry_new_file_operand(const t_str *path, const struct stat *st) {
                              .st = *st,
                              .stat_unavailable = false,
                              .is_operand = true};
+    shell_scan_str(owned->entry.name, &owned->entry.name_scan);
 
     return &owned->entry;
 }
@@ -61,6 +64,8 @@ t_entry *walk_entry_new_owned_path(const t_str *path, const struct stat *st,
         walk_entry_free(entry);
         return NULL;
     }
+
+    shell_scan_str(entry->path, &entry->name_scan);
 
     return entry;
 }
@@ -84,6 +89,7 @@ t_entry *walk_entry_new_scratch_dirent(Arena *scratch,
                            .st = (struct stat){0},
                            .stat_unavailable = false,
                            .is_operand = false};
+    shell_scan_str(ent->entry.name, &ent->entry.name_scan);
     return &ent->entry;
 }
 

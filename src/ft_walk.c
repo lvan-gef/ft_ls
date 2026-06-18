@@ -12,11 +12,12 @@
 
 #include "../libft/include/libft.h"
 
-#include "ft_arena.h"
-#include "ft_path_scratch.h"
-#include "ft_printer_helper.h"
-#include "ft_sort.h"
-#include "ft_walk_internal.h"
+#include "./ft_arena.h"
+#include "./ft_path_scratch.h"
+#include "./ft_printer_helper.h"
+#include "./ft_shell_escape.h"
+#include "./ft_sort.h"
+#include "./ft_walk_internal.h"
 
 typedef struct {
     const t_args *args;
@@ -28,6 +29,7 @@ typedef struct {
     char out_buf[OUTPUT_BUFFER_CAP];
     t_str out;
     bool output_failed;
+    bool quote_padding;
 } t_params;
 
 typedef enum {
@@ -96,10 +98,10 @@ static bool run_listing_(t_params *params, const t_array *array,
     params->output_failed = false;
 
     t_print_request req = {.entries = &params->operand_files,
-                           .quote_padding_context = array,
                            .list_width_context = &params->dir_queue,
                            .dir_header = NULL,
                            .buffer = &params->out,
+                           .quote_padding = params->quote_padding,
                            .list_mode = params->args->list,
                            .print_total = false};
     if (!print_operand_files_(params, &req, &printed_files)) {
@@ -107,7 +109,7 @@ static bool run_listing_(t_params *params, const t_array *array,
     }
 
     req.print_total = true;
-    req.quote_padding_context = NULL;
+    req.quote_padding = false;
     req.list_width_context = NULL;
     if (!process_queue_(params, array, &req, exit_code, printed_files)) {
         goto error;
@@ -206,6 +208,10 @@ static bool collect_operands_(t_params *params, const t_array *array,
         const t_operand_state state =
             classify_operand_(params, str, &st, exit_code);
         if (state == OPERAND_SKIP) {
+            t_shell_scan scan;
+
+            shell_scan_str(str, &scan);
+            params->quote_padding = params->quote_padding || scan.quote != '\0';
             continue;
         }
 
@@ -224,6 +230,9 @@ static bool collect_operands_(t_params *params, const t_array *array,
         if (!entry) {
             goto failed;
         }
+
+        params->quote_padding =
+            params->quote_padding || entry->name_scan.quote != '\0';
 
         if (!array_append(&params->operand_files, entry)) {
             walk_entry_free(entry);
@@ -450,6 +459,9 @@ static bool queue_operand_dir_(t_params *params, const t_str *str,
     if (!dir_entry) {
         return false;
     }
+
+    params->quote_padding =
+        params->quote_padding || dir_entry->name_scan.quote != '\0';
 
     if (!array_append(&params->dir_queue, dir_entry)) {
         walk_entry_free(dir_entry);

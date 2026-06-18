@@ -7,7 +7,6 @@
 
 #include "./ft_printer_helper.h"
 #include "./ft_printer_list.h"
-#include "./ft_shell_escape.h"
 
 #ifndef TERM_SIZE
 #define TERM_SIZE 80
@@ -27,9 +26,9 @@ typedef struct {
     uint64_t max;
 } t_map;
 
-static uint64_t display_len_(const t_entry *entry, bool quoted);
 static bool init_print_row_(const t_print_request *req);
-static void calc_cols_(const t_array *array, t_map *map, bool *quoted,
+static bool entries_have_quote_(const t_array *array);
+static void calc_cols_(const t_array *array, t_map *map, const bool *quoted,
                        uint64_t *col_widths);
 static bool calc_width_(const t_array *array, bool quoted, uint64_t num_cols,
                         uint64_t *col_widths);
@@ -51,7 +50,7 @@ static bool init_print_row_(const t_print_request *req) {
                  .max = req->entries->len < MAX_COLS ? req->entries->len
                                                      : MAX_COLS};
 
-    bool quoted = needs_padding(req->quote_padding_context);
+    bool quoted = req->quote_padding || entries_have_quote_(req->entries);
     uint64_t col_widths[MAX_COLS];
     calc_cols_(req->entries, &map, &quoted, col_widths);
 
@@ -62,21 +61,20 @@ static bool init_print_row_(const t_print_request *req) {
     return create_row_(req->buffer, req->entries, &map, col_widths, quoted);
 }
 
-static void calc_cols_(const t_array *array, t_map *map, bool *quoted,
-                       uint64_t *col_widths) {
-    const uint64_t width_count = map->max ? map->max : 1;
-
-    if (!*quoted) {
-        for (uint64_t index = 0; index < array->len; ++index) {
-            const t_entry *entry = array->data[index];
-            t_shell_scan scan;
-            shell_scan_str(entry->name, &scan);
-            if (scan.quote != '\0') {
-                *quoted = true;
-                break;
-            }
+static bool entries_have_quote_(const t_array *array) {
+    for (uint64_t index = 0; index < array->len; ++index) {
+        const t_entry *entry = array->data[index];
+        if (entry->name_scan.quote != '\0') {
+            return true;
         }
     }
+
+    return false;
+}
+
+static void calc_cols_(const t_array *array, t_map *map, const bool *quoted,
+                       uint64_t *col_widths) {
+    const uint64_t width_count = map->max ? map->max : 1;
 
     uint64_t best = 1;
     for (uint64_t cols = width_count; cols > 0; --cols) {
@@ -104,7 +102,8 @@ static bool calc_width_(const t_array *array, const bool quoted,
     for (uint64_t filesno = 0; filesno < file_count; ++filesno) {
         const uint64_t index = filesno / num_rows;
         const t_entry *entry = array->data[filesno];
-        uint64_t real_length = display_len_(entry, quoted);
+        uint64_t real_length = quoted ? entry->name_scan.padded_display_len
+                                      : entry->name_scan.display_len;
 
         if (index != num_cols - 1) {
             real_length += SPACE_GAP;
@@ -133,13 +132,13 @@ static bool create_row_(t_str *out, const t_array *array, const t_map *map,
 
         while (true) {
             const t_entry *entry = array->data[filesno];
-            t_shell_scan scan;
-            shell_scan_str(entry->name, &scan);
             const uint64_t name_length =
-                quoted ? scan.padded_display_len : scan.display_len;
+                quoted ? entry->name_scan.padded_display_len
+                       : entry->name_scan.display_len;
             const uint64_t max_name_length = col_widths[col++];
 
-            if (!put_shell_escaped(out, entry->name, scan.quote, quoted)) {
+            if (!put_shell_escaped_scan(out, entry->name, &entry->name_scan,
+                                        quoted)) {
                 return false;
             }
 
@@ -161,17 +160,6 @@ static bool create_row_(t_str *out, const t_array *array, const t_map *map,
     }
 
     return true;
-}
-
-static uint64_t display_len_(const t_entry *entry, const bool quoted) {
-    t_shell_scan scan;
-    shell_scan_str(entry->name, &scan);
-
-    if (quoted) {
-        return scan.padded_display_len;
-    }
-
-    return scan.display_len;
 }
 
 static bool indent_(t_str *out, uint64_t from, const uint64_t to) {

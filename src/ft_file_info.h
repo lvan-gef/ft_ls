@@ -1,10 +1,13 @@
 #ifndef FT_FILE_INFO_H
 #define FT_FILE_INFO_H
 
-#include "ft_arena.h"
-#include "ft_array.h"
-#include "ft_str.h"
 #include <stdint.h>
+
+#include "../include/ft_array.h"
+#include "../include/ft_str.h"
+
+#include "./ft_arena.h"
+
 typedef struct s_file_info {
     t_str *perm;
     t_str *links;

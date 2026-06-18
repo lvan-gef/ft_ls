@@ -5,14 +5,13 @@
 #include <unistd.h>
 
 #include "./ft_path_scratch.h"
+#include "./ft_str_arena.h"
 
 #ifndef PATH_MAX
 #define PATH_MAX UINT64_C(4096)
 #endif // ifndef PATH_MAX //
 
 #define SYMLINK_CAP_MAX (UINT64_MAX / UINT64_C(2))
-
-static t_str *scratch_str_(Arena *scratch, uint64_t cap);
 
 t_str *path_read_symlink(Arena *scratch, const t_str *path,
                          const uint64_t target_size, int *read_err) {
@@ -27,7 +26,7 @@ t_str *path_read_symlink(Arena *scratch, const t_str *path,
     uint64_t cap = (target_size > 0) ? target_size + 1 : PATH_MAX;
     while (true) {
         const Arena_Mark mark = arena_get_mark(scratch);
-        t_str *str = scratch_str_(scratch, cap);
+        t_str *str = str_arena_new(scratch, cap);
         if (!str) {
             return NULL;
         }
@@ -43,7 +42,7 @@ t_str *path_read_symlink(Arena *scratch, const t_str *path,
 
             if (err == ENOENT || err == EINVAL || err == EACCES ||
                 err == EPERM) {
-                return scratch_str_(scratch, 0);
+                return str_arena_new(scratch, 0);
             }
 
             return NULL;
@@ -62,18 +61,4 @@ t_str *path_read_symlink(Arena *scratch, const t_str *path,
 
         cap *= 2;
     }
-}
-
-static t_str *scratch_str_(Arena *scratch, const uint64_t cap) {
-    if (cap > UINT64_MAX - (uint64_t)sizeof(t_str) - 1) {
-        return NULL;
-    }
-
-    t_str *str = arena_push(scratch, sizeof(*str) + cap + 1);
-    if (!str) {
-        return NULL;
-    }
-
-    str_init(str, (char *)(str + 1), cap);
-    return str;
 }

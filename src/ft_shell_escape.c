@@ -76,9 +76,10 @@ uint64_t shell_escaped_len(const t_str *str, const char quote,
     return escaped_len_(str->str, str->len, quote, pad_unquoted);
 }
 
-bool shell_escape_append(t_str *dst, const t_str *str, const char quote,
-                         const bool pad_unquoted) {
-    if (dst->cap - 1 - dst->len < shell_escaped_len(str, quote, pad_unquoted)) {
+bool shell_escape_append_len(t_str *dst, const t_str *str, const char quote,
+                             const bool pad_unquoted,
+                             const uint64_t escaped_len) {
+    if (dst->cap - 1 - dst->len < escaped_len) {
         return false;
     }
 

@@ -10,6 +10,9 @@
 #include "./ft_printer_helper.h"
 #include "./ft_shell_escape.h"
 
+static bool put_shell_escaped_(t_str *out, const t_str *str, const char quote,
+                               const bool pad_unquoted);
+
 bool put_mem(t_str *out, const char *src, uint64_t len) {
     while (len) {
         if (out->len == out->cap - 1 && !flush_str(out)) {
@@ -28,16 +31,18 @@ bool put_mem(t_str *out, const char *src, uint64_t len) {
     return true;
 }
 
-bool put_shell_escaped(t_str *out, const t_str *str, const char quote,
-                       const bool pad_unquoted) {
-    const uint64_t need = shell_escaped_len(str, quote, pad_unquoted);
+bool put_shell_escaped_scan(t_str *out, const t_str *str,
+                            const t_shell_scan *scan, const bool pad_unquoted) {
+    const uint64_t need =
+        pad_unquoted ? scan->padded_display_len : scan->display_len;
+
     if (need > out->cap - 1) {
-        if (quote == '\0') {
+        if (scan->quote == '\0') {
             return (!pad_unquoted || put_mem(out, " ", 1)) &&
                    put_mem(out, str->str, str->len);
         }
 
-        t_str *escaped = shell_escape_str(str, quote);
+        t_str *escaped = shell_escape_str(str, scan->quote);
         if (!escaped) {
             return false;
         }
@@ -51,7 +56,7 @@ bool put_shell_escaped(t_str *out, const t_str *str, const char quote,
         return false;
     }
 
-    return shell_escape_append(out, str, quote, pad_unquoted);
+    return shell_escape_append_len(out, str, scan->quote, pad_unquoted, need);
 }
 
 bool flush_str(t_str *out) {
@@ -99,27 +104,17 @@ bool put_dir_header(t_str *out, const t_str *dir_header) {
         scan.quote = '\'';
     }
 
-    return put_shell_escaped(out, dir_header, scan.quote, false) &&
+    return put_shell_escaped_(out, dir_header, scan.quote, false) &&
            put_mem(out, ":\n", 2);
 }
 
-bool needs_padding(const t_array *context) {
-    if (!context) {
-        return false;
-    }
+static bool put_shell_escaped_(t_str *out, const t_str *str, const char quote,
+                               const bool pad_unquoted) {
+    const uint64_t need = shell_escaped_len(str, quote, pad_unquoted);
 
-    for (uint64_t index = 0; index < context->len; ++index) {
-        const t_str *str = context->data[index];
-        if (!str) {
-            continue;
-        }
-
-        t_shell_scan scan;
-        shell_scan_str(str, &scan);
-        if (scan.quote != '\0') {
-            return true;
-        }
-    }
-
-    return false;
+    return put_shell_escaped_scan(out, str,
+                                  &(t_shell_scan){.display_len = need,
+                                                  .padded_display_len = need,
+                                                  .quote = quote},
+                                  pad_unquoted);
 }

@@ -13,7 +13,6 @@
 #include "./ft_file_info.h"
 #include "./ft_printer_helper.h"
 #include "./ft_printer_list.h"
-#include "./ft_shell_escape.h"
 
 typedef struct {
     uint64_t total;
@@ -95,9 +94,7 @@ static void update_stats_(t_list_stats *stats, const t_entry *entry,
     }
 
     if (!stats->have_quote) {
-        t_shell_scan scan;
-        shell_scan_str(entry->name, &scan);
-        stats->have_quote = scan.quote != '\0';
+        stats->have_quote = entry->name_scan.quote != '\0';
     }
 
     stats->total += info->blocks;
@@ -113,7 +110,7 @@ static bool print_list_(const t_print_request *req, const t_file_info *infos,
 
     apply_width_(req->list_width_context, context_infos, &sizes);
     if (!sizes.have_quote) {
-        sizes.have_quote = needs_padding(req->quote_padding_context);
+        sizes.have_quote = req->quote_padding;
     }
 
     if (!put_dir_header(req->buffer, req->dir_header)) {
@@ -169,9 +166,6 @@ static bool print_list_rows_(t_str *out, const t_array *array,
     for (uint64_t index = 0; index < array->len; ++index) {
         const t_entry *entry = array->data[index];
         const t_file_info *info = &infos[index];
-        t_shell_scan scan;
-
-        shell_scan_str(entry->name, &scan);
 
         if (!put_mem(out, info->perm->str, info->perm->len) ||
             !left_pad_(out, info->perm->len, sizes->max_len_perm) ||
@@ -188,8 +182,8 @@ static bool print_list_rows_(t_str *out, const t_array *array,
             !put_mem(out, " ", 1) ||
             !put_mem(out, info->dt->str, info->dt->len) ||
             !put_mem(out, " ", 1) ||
-            !put_shell_escaped(out, entry->name, scan.quote,
-                               sizes->have_quote)) {
+            !put_shell_escaped_scan(out, entry->name, &entry->name_scan,
+                                    sizes->have_quote)) {
             return false;
         }
 

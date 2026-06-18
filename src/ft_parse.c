@@ -43,7 +43,6 @@ bool parse_args(const uint64_t argc, char **argv, t_args *args,
                 default: print_error_(argv[index]); return clean_up_(inputs);
             }
         }
-        continue;
     }
 
     if (!inputs->len) {
