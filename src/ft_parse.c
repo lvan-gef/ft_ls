@@ -16,39 +16,33 @@ static void print_error_(const char *flag);
 bool parse_args(const uint64_t argc, char **argv, t_args *args,
                 t_array *inputs) {
     bool is_flag = true;
+
     for (uint64_t index = 1; index < argc; ++index) {
         const size_t len = ft_strlen(argv[index]);
-        if (argv[index][0] == '-' && argv[index][1] == '-' &&
+        if (is_flag && argv[index][0] == '-' && argv[index][1] == '-' &&
             argv[index][2] == '\0') {
             is_flag = false;
             continue;
         }
 
-        if (is_flag && *argv[index] == '-') {
-            if (len == 1) {
-                if (!append_input_(argv[index], inputs)) {
-                    return fail_inputs_(inputs);
-                }
-            }
-
-            for (uint64_t sub_index = 1; sub_index < len; ++sub_index) {
-                switch (argv[index][sub_index]) {
-                    case 'R': args->recursive = true; break;
-                    case 'a': args->all = true; break;
-                    case 'l': args->list = true; break;
-                    case 'r': args->reverse = true; break;
-                    case 't': args->time = true; break;
-                    default:
-                        print_error_(argv[index]);
-                        return fail_inputs_(inputs);
-                }
+        if (!is_flag || *argv[index] != '-' || len == 1) {
+            if (!append_input_(argv[index], inputs)) {
+                return fail_inputs_(inputs);
             }
             continue;
         }
 
-        if (!append_input_(argv[index], inputs)) {
-            return fail_inputs_(inputs);
+        for (size_t sub_index = 1; sub_index < len; ++sub_index) {
+            switch (argv[index][sub_index]) {
+                case 'R': args->recursive = true; break;
+                case 'a': args->all = true; break;
+                case 'l': args->list = true; break;
+                case 'r': args->reverse = true; break;
+                case 't': args->time = true; break;
+                default: print_error_(argv[index]); return fail_inputs_(inputs);
+            }
         }
+        continue;
     }
 
     if (!inputs->len) {

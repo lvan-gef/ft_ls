@@ -5,9 +5,9 @@
 #include "../include/ft_entry.h"
 #include "../include/ft_printer.h"
 
-#include "ft_printer_helper.h"
-#include "ft_printer_list.h"
-#include "ft_shell_escape.h"
+#include "./ft_printer_helper.h"
+#include "./ft_printer_list.h"
+#include "./ft_shell_escape.h"
 
 #ifndef TERM_SIZE
 #define TERM_SIZE 80
@@ -16,6 +16,10 @@
 #if TERM_SIZE < 1
 #error "TERM_SIZE must be at least 1"
 #endif
+
+#ifndef MAX_COLS
+#define MAX_COLS ((TERM_SIZE + SPACE_GAP) / (1 + SPACE_GAP))
+#endif /* ifndef MAX_COLS */
 
 typedef struct {
     uint64_t rows;
@@ -34,22 +38,21 @@ static bool create_row_(t_str *out, const t_array *array, const t_map *map,
 static bool indent_(t_str *out, uint64_t from, uint64_t to);
 
 bool printer(const t_print_request *req) {
-    if (!req->list_mode) {
-        return init_print_row_(req);
+    if (req->list_mode) {
+        return printer_list(req);
     }
 
-    return printer_list(req);
+    return init_print_row_(req);
 }
 
 static bool init_print_row_(const t_print_request *req) {
-    const uint64_t max_cols = (TERM_SIZE + SPACE_GAP) / (1 + SPACE_GAP);
     t_map map = {.cols = 1,
                  .rows = req->entries->len,
-                 .max = req->entries->len < max_cols ? req->entries->len
-                                                     : max_cols};
+                 .max = req->entries->len < MAX_COLS ? req->entries->len
+                                                     : MAX_COLS};
 
-    bool quoted = context_needs_padding(req->quote_padding_context);
-    uint64_t col_widths[(TERM_SIZE + SPACE_GAP) / (1 + SPACE_GAP)];
+    bool quoted = needs_padding(req->quote_padding_context);
+    uint64_t col_widths[MAX_COLS];
     calc_cols_(req->entries, &map, &quoted, col_widths);
 
     if (!put_dir_header(req->buffer, req->dir_header)) {
@@ -173,7 +176,7 @@ static uint64_t display_len_(const t_entry *entry, const bool quoted) {
 
 static bool indent_(t_str *out, uint64_t from, const uint64_t to) {
     while (from < to) {
-        if (TABSIZE != 0 && to / TABSIZE > (from + 1) / TABSIZE) {
+        if (to / TABSIZE > (from + 1) / TABSIZE) {
             if (!put_mem(out, "\t", 1)) {
                 return false;
             }

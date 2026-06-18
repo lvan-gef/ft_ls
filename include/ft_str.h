@@ -9,7 +9,6 @@ typedef struct {
     char *str;
     uint64_t cap;
     uint64_t len;
-    uint64_t pos;
 } t_str;
 
 void str_init(t_str *str, char *buf, uint64_t cap);

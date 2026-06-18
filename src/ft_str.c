@@ -10,14 +10,12 @@ void str_init(t_str *str, char *buf, const uint64_t cap) {
     str->str = buf;
     str->cap = cap + 1;
     str->len = 0;
-    str->pos = 0;
     str->str[0] = '\0';
 }
 
 void str_copy_cstr(t_str *str, const char *src, const uint64_t len) {
     ft_memcpy(str->str, src, (size_t)len);
     str->len = len;
-    str->pos = 0;
     str->str[str->len] = '\0';
 }
 
@@ -25,7 +23,6 @@ void str_copy_uint(t_str *str, uint64_t value) {
     const uint64_t len = str_uint_len(value);
 
     str->len = len;
-    str->pos = 0;
     str->str[len] = '\0';
     for (uint64_t pos = len; pos > 0;) {
         --pos;
@@ -66,7 +63,7 @@ t_str *str_dup(const t_str *src) {
         return NULL;
     }
 
-    str_copy_cstr(new_str, src->str + src->pos, src->len);
+    str_copy_cstr(new_str, src->str, src->len);
 
     return new_str;
 }
@@ -75,11 +72,11 @@ void str_free(t_str *str) {
     free(str);
 }
 
-uint64_t str_uint_len(uint64_t nbr) {
+uint64_t str_uint_len(uint64_t value) {
     uint64_t len = 1;
 
-    while (nbr >= 10) {
-        nbr /= 10;
+    while (value >= 10) {
+        value /= 10;
         ++len;
     }
 

@@ -11,6 +11,7 @@ def gen_data(paths: Paths) -> Generator[list[str], None, None]:
     yield ["--", "-"]
     yield ["--"]
     yield ["--", ""]
+    yield ["--", "." , "--"]
 
     yield ["-R", "/mnt/bulk2/"]
     for size in range(1, len(ALLOWED_FLAGS) + 1):

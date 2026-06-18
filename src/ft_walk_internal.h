@@ -9,7 +9,7 @@
 #include "../include/ft_entry.h"
 #include "../include/ft_str.h"
 
-#include "ft_arena.h"
+#include "./ft_arena.h"
 
 t_entry *walk_entry_new_file_operand(const t_str *path, const struct stat *st);
 t_entry *walk_entry_new_owned_path(const t_str *path, const struct stat *st,

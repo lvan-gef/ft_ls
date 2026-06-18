@@ -19,7 +19,7 @@ typedef struct {
 } t_owned_operand_entry;
 
 static t_str *join_dir_path_scratch_(Arena *scratch, const t_str *lhs,
-                                      const t_str *rhs);
+                                     const t_str *rhs);
 static bool is_packed_operand_entry_(const t_entry *entry);
 
 t_entry *walk_entry_new_file_operand(const t_str *path, const struct stat *st) {
@@ -35,7 +35,7 @@ t_entry *walk_entry_new_file_operand(const t_str *path, const struct stat *st) {
     }
 
     str_init(&owned->name, owned->buf, path->len);
-    str_copy_cstr(&owned->name, path->str + path->pos, path->len);
+    str_copy_cstr(&owned->name, path->str, path->len);
     owned->entry = (t_entry){.name = &owned->name,
                              .path = &owned->name,
                              .st = *st,
@@ -123,8 +123,7 @@ void walk_entry_del(void *ptr) {
 
 static t_str *join_dir_path_scratch_(Arena *scratch, const t_str *lhs,
                                      const t_str *rhs) {
-    const bool need_slash =
-        lhs->len != 0 && lhs->str[lhs->pos + lhs->len - 1] != '/';
+    const bool need_slash = lhs->len != 0 && lhs->str[lhs->len - 1] != '/';
     const uint64_t slash_len = need_slash ? 1U : 0U;
     if (lhs->len > UINT64_MAX - rhs->len - slash_len) {
         return NULL;
@@ -142,13 +141,13 @@ static t_str *join_dir_path_scratch_(Arena *scratch, const t_str *lhs,
 
     str_init(path, (char *)(path + 1), total_len);
 
-    ft_memcpy(path->str, lhs->str + lhs->pos, (size_t)lhs->len);
+    ft_memcpy(path->str, lhs->str, (size_t)lhs->len);
     path->len = lhs->len;
     if (need_slash) {
         path->str[path->len++] = '/';
     }
 
-    ft_memcpy(path->str + path->len, rhs->str + rhs->pos, (size_t)rhs->len);
+    ft_memcpy(path->str + path->len, rhs->str, (size_t)rhs->len);
     path->len += rhs->len;
     path->str[path->len] = '\0';
 

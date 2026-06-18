@@ -59,12 +59,12 @@ static void init_analysis_(t_shell_analysis *analysis);
 static char quote_from_analysis_(const t_shell_analysis *analysis);
 
 void shell_scan_str(const t_str *str, t_shell_scan *scan) {
-    scan_shell_(str->str + str->pos, str->len, scan);
+    scan_shell_(str->str, str->len, scan);
 }
 
 uint64_t shell_escaped_len(const t_str *str, const char quote,
                            const bool pad_unquoted) {
-    return escaped_len_(str->str + str->pos, str->len, quote, pad_unquoted);
+    return escaped_len_(str->str, str->len, quote, pad_unquoted);
 }
 
 bool shell_escape_append(t_str *dst, const t_str *str, const char quote,
@@ -96,19 +96,19 @@ static void escape_str_(t_str *dst, const t_str *str, const char quote,
             append_bytes_(dst, " ", 1);
         }
 
-        append_bytes_(dst, str->str + str->pos, str->len);
+        append_bytes_(dst, str->str, str->len);
         return;
     }
 
     if (quote == '"') {
         append_bytes_(dst, "\"", 1);
-        append_bytes_(dst, str->str + str->pos, str->len);
+        append_bytes_(dst, str->str, str->len);
         append_bytes_(dst, "\"", 1);
         return;
     }
 
     shell_escape_bytes_(&(t_shell_out){.dst = dst, .len = 0},
-                        str->str + str->pos, str->len);
+                        str->str, str->len);
 }
 
 static void append_bytes_(t_str *dst, const char *src, const uint64_t len) {

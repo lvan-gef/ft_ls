@@ -9,8 +9,11 @@
 
 #include "../libft/include/libft.h"
 
+#ifndef MAX_ALLOC_SIZE
+#define MAX_ALLOC_SIZE ((uint64_t)(PTRDIFF_MAX / sizeof(void *)))
+#endif /* ifndef MAX_ALLOC_SIZE */
+
 static bool realloc_arr_(t_array *array);
-static uint64_t max_array_cap_(void);
 
 bool array_init(t_array *array, uint64_t initial_cap) {
     array->len = 0;
@@ -21,7 +24,7 @@ bool array_init(t_array *array, uint64_t initial_cap) {
         return true;
     }
 
-    if (initial_cap > max_array_cap_()) {
+    if (initial_cap > MAX_ALLOC_SIZE) {
         errno = ERANGE;
         return false;
     }
@@ -82,15 +85,14 @@ void array_clear_with(t_array *array, t_array_del del) {
 }
 
 static bool realloc_arr_(t_array *array) {
-    const uint64_t max_cap = max_array_cap_();
-    if (array->cap >= max_cap) {
+    if (array->cap > MAX_ALLOC_SIZE) {
         errno = ERANGE;
         return false;
     }
 
     uint64_t new_cap = array->cap ? array->cap * 2 : 1;
-    if (new_cap < array->cap || new_cap > max_cap) {
-        new_cap = max_cap;
+    if (new_cap < array->cap || new_cap > MAX_ALLOC_SIZE) {
+        new_cap = MAX_ALLOC_SIZE;
     }
 
     void **old_data = array->data;
@@ -108,8 +110,4 @@ static bool realloc_arr_(t_array *array) {
     array->cap = new_cap;
 
     return true;
-}
-
-static uint64_t max_array_cap_(void) {
-    return (uint64_t)(PTRDIFF_MAX / (ptrdiff_t)sizeof(void *));
 }

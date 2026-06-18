@@ -2,12 +2,11 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "ft_walk_internal.h"
-
 #include "../libft/include/ft_fprintf.h"
 
-#include "ft_printer_helper.h"
-#include "ft_shell_escape.h"
+#include "./ft_printer_helper.h"
+#include "./ft_shell_escape.h"
+#include "./ft_walk_internal.h"
 
 bool walk_path_print_error(t_str *out, const t_str *path, const int e,
                            const char *prefix, bool *output_failed) {
@@ -30,8 +29,8 @@ bool walk_path_print_error(t_str *out, const t_str *path, const int e,
         }
     }
 
-    ft_fprintf(STDERR_FILENO, "ft_ls: %s '%s': %s\n", prefix,
-               path->str + path->pos, strerror(e));
+    ft_fprintf(STDERR_FILENO, "ft_ls: %s '%s': %s\n", prefix, path->str,
+               strerror(e));
     return true;
 }
 

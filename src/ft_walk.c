@@ -59,10 +59,8 @@ void process(const t_args *args, const t_array *array, int *exit_code) {
     t_params params = {0};
 
     params.args = args;
-    params.out = (t_str){.str = params.out_buf,
-                         .cap = sizeof(params.out_buf),
-                         .len = 0,
-                         .pos = 0};
+    params.out =
+        (t_str){.str = params.out_buf, .cap = sizeof(params.out_buf), .len = 0};
     params.out.str[0] = '\0';
     params.temp_arena = arena_alloc(ARENA_SIZE);
     if (!params.temp_arena) {
@@ -94,7 +92,6 @@ static bool run_listing_(t_params *params, const t_array *array,
                          int *exit_code) {
     bool printed_files = false;
     params->out.len = 0;
-    params->out.pos = 0;
     params->out.str[0] = '\0';
     params->output_failed = false;
 
@@ -252,7 +249,7 @@ static t_operand_state classify_operand_(t_params *params, t_str *str,
     Arena_Mark mark = arena_get_mark(params->temp_arena);
     t_operand_state state = OPERAND_FILE;
 
-    if (lstat(str->str + str->pos, st) == -1) {
+    if (lstat(str->str, st) == -1) {
         e = errno;
         const char *prefix = "cannot access";
         if (!walk_path_print_error(&params->out, str, e, prefix,
@@ -268,8 +265,7 @@ static t_operand_state classify_operand_(t_params *params, t_str *str,
     const struct stat *st_dir = st;
     struct stat st_target;
     if (S_ISLNK(st->st_mode)) {
-        if (stat(str->str + str->pos, &st_target) == 0 &&
-            S_ISDIR(st_target.st_mode)) {
+        if (stat(str->str, &st_target) == 0 && S_ISDIR(st_target.st_mode)) {
             is_dir_operand = true;
             st_dir = &st_target;
         }
@@ -320,7 +316,7 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
     errno = 0;
     bool ok = false;
     bool hard_failure = false;
-    DIR *d = opendir(path->path->str + path->path->pos);
+    DIR *d = opendir(path->path->str);
     if (!d) {
         const int e = errno;
         (void)walk_path_print_error(&params->out, path->path, e,
@@ -354,7 +350,7 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
                 goto cleanup;
             }
 
-            if (lstat(entry->path->str + entry->path->pos, &entry->st) == -1) {
+            if (lstat(entry->path->str, &entry->st) == -1) {
                 const int e = errno;
                 if (!walk_path_print_error(&params->out, entry->path, e,
                                            "cannot access",
@@ -407,10 +403,8 @@ static bool queue_recursive_dirs_(t_params *params, const t_str *parent_path) {
                 continue;
             }
 
-            if (ft_strncmp(entry->name->str + entry->name->pos, ".",
-                           entry->name->len) == 0 ||
-                ft_strncmp(entry->name->str + entry->name->pos, "..",
-                           entry->name->len) == 0) {
+            if (ft_strncmp(entry->name->str, ".", entry->name->len) == 0 ||
+                ft_strncmp(entry->name->str, "..", entry->name->len) == 0) {
                 continue;
             }
 
