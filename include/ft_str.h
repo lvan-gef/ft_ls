@@ -19,6 +19,5 @@ uint64_t str_uint_len(uint64_t value);
 t_str *str_new(uint64_t cap);
 t_str *str_from_cstr(const char *src);
 t_str *str_dup(const t_str *src);
-t_str *str_from_uint(uint64_t value);
 void str_free(t_str *str);
 #endif // !FT_STR_H
