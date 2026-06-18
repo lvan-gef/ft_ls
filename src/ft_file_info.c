@@ -1,4 +1,3 @@
-
 #include <errno.h>
 #include <grp.h>
 #include <pwd.h>
@@ -13,11 +12,11 @@
 #include "../include/ft_entry.h"
 #include "../include/ft_str.h"
 
+#include "../libft/include/libft.h"
+
 #include "./ft_arena.h"
 #include "./ft_file_info.h"
 #include "./ft_path_scratch.h"
-
-#include "../libft/include/libft.h"
 
 #ifndef CACHE_SIZE
 #define CACHE_SIZE UINT64_C(8)
@@ -355,8 +354,8 @@ static t_str *get_symlink_(Arena *arena, const t_entry *entry) {
         return NULL;
     }
 
-    return path_read_symlink_scratch(arena, entry->path,
-                                     (uint64_t)entry->st.st_size, NULL);
+    return path_read_symlink(arena, entry->path, (uint64_t)entry->st.st_size,
+                             NULL);
 }
 
 static char *cache_lookup_(t_id_cache_entry *cache, const uint64_t id) {

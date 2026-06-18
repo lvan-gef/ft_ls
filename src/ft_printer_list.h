@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+// forward declaration
 typedef struct s_print_request t_print_request;
 
 bool printer_list(const t_print_request *req);

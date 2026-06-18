@@ -23,11 +23,10 @@ typedef struct {
     bool have_quote;
 } t_list_stats;
 
-static void apply_list_width_context_(const t_array *context,
-                                      const t_file_info *context_infos,
-                                      t_list_stats *sizes);
-static void update_list_stats_(t_list_stats *stats, const t_entry *entry,
-                               const t_file_info *info);
+static void apply_width_(const t_array *context,
+                         const t_file_info *context_infos, t_list_stats *sizes);
+static void update_stats_(t_list_stats *stats, const t_entry *entry,
+                          const t_file_info *info);
 static bool print_list_(const t_print_request *req, const t_file_info *infos,
                         const t_file_info *context_infos);
 static bool left_pad_(t_str *out, uint64_t src_len, uint64_t max_size);
@@ -43,7 +42,7 @@ bool printer_list(const t_print_request *req) {
     bool ok = false;
 
     if (!scratch) {
-        return false;
+        return ok;
     }
 
     if (!prepare_list_infos(scratch, req->entries, &infos) ||
@@ -57,9 +56,9 @@ cleanup:
     return ok;
 }
 
-static void apply_list_width_context_(const t_array *context,
-                                      const t_file_info *context_infos,
-                                      t_list_stats *sizes) {
+static void apply_width_(const t_array *context,
+                         const t_file_info *context_infos,
+                         t_list_stats *sizes) {
     if (!context || !context_infos) {
         return;
     }
@@ -81,8 +80,8 @@ static void apply_list_width_context_(const t_array *context,
     }
 }
 
-static void update_list_stats_(t_list_stats *stats, const t_entry *entry,
-                               const t_file_info *info) {
+static void update_stats_(t_list_stats *stats, const t_entry *entry,
+                          const t_file_info *info) {
     if (info->links->len > stats->max_len_links) {
         stats->max_len_links = info->links->len;
     }
@@ -109,10 +108,10 @@ static bool print_list_(const t_print_request *req, const t_file_info *infos,
     t_list_stats sizes = {0};
     for (uint64_t index = 0; index < req->entries->len; ++index) {
         const t_entry *entry = req->entries->data[index];
-        update_list_stats_(&sizes, entry, &infos[index]);
+        update_stats_(&sizes, entry, &infos[index]);
     }
-    apply_list_width_context_(req->list_width_context, context_infos, &sizes);
 
+    apply_width_(req->list_width_context, context_infos, &sizes);
     if (!sizes.have_quote) {
         sizes.have_quote = needs_padding(req->quote_padding_context);
     }

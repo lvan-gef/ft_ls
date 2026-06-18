@@ -14,8 +14,8 @@
 
 static t_str *scratch_str_(Arena *scratch, uint64_t cap);
 
-t_str *path_read_symlink_scratch(Arena *scratch, const t_str *path,
-                                 const uint64_t target_size, int *read_err) {
+t_str *path_read_symlink(Arena *scratch, const t_str *path,
+                         const uint64_t target_size, int *read_err) {
     if (read_err) {
         *read_err = 0;
     }

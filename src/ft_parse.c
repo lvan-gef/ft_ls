@@ -9,7 +9,7 @@
 #include "../libft/include/libft.h"
 
 static bool append_input_(const char *arg, t_array *inputs);
-static bool fail_inputs_(t_array *inputs);
+static bool clean_up_(t_array *inputs);
 static void del_str_(void *ptr);
 static void print_error_(const char *flag);
 
@@ -27,8 +27,9 @@ bool parse_args(const uint64_t argc, char **argv, t_args *args,
 
         if (!is_flag || *argv[index] != '-' || len == 1) {
             if (!append_input_(argv[index], inputs)) {
-                return fail_inputs_(inputs);
+                return clean_up_(inputs);
             }
+
             continue;
         }
 
@@ -39,7 +40,7 @@ bool parse_args(const uint64_t argc, char **argv, t_args *args,
                 case 'l': args->list = true; break;
                 case 'r': args->reverse = true; break;
                 case 't': args->time = true; break;
-                default: print_error_(argv[index]); return fail_inputs_(inputs);
+                default: print_error_(argv[index]); return clean_up_(inputs);
             }
         }
         continue;
@@ -47,7 +48,7 @@ bool parse_args(const uint64_t argc, char **argv, t_args *args,
 
     if (!inputs->len) {
         if (!append_input_(".", inputs)) {
-            return fail_inputs_(inputs);
+            return clean_up_(inputs);
         }
     }
 
@@ -68,7 +69,7 @@ static bool append_input_(const char *arg, t_array *inputs) {
     return true;
 }
 
-static bool fail_inputs_(t_array *inputs) {
+static bool clean_up_(t_array *inputs) {
     array_clear_with(inputs, del_str_);
     return false;
 }

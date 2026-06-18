@@ -5,7 +5,7 @@
 
 #include "../libft/include/libft.h"
 
-#include "ft_shell_escape.h"
+#include "./ft_shell_escape.h"
 
 #define OCTAL_DIGIT_MASK 0x7
 #define BYTE_OCTAL_HIGH_SHIFT 6
@@ -45,21 +45,30 @@ static void escape_byte_(t_shell_out *out, t_escape_state *state,
                          unsigned char c);
 static uint64_t escaped_len_(const char *src, uint64_t len, char quote,
                              bool pad_unquoted);
-static uint64_t single_quoted_len_(const char *src, uint64_t len);
-static void scan_shell_(const char *src, uint64_t len, t_shell_scan *scan);
 static void fill_scan_(t_shell_scan *scan, const char *src,
                        const t_shell_analysis *analysis);
 static bool needs_raw_quote_(unsigned char c, uint64_t index);
 static bool is_safe_punct_(unsigned char c, uint64_t index);
-static void analyze_shell_span_(const char *src, uint64_t len,
-                                t_shell_analysis *analysis);
 static void analyze_shell_byte_(t_shell_analysis *analysis, unsigned char c,
                                 uint64_t index);
-static void init_analysis_(t_shell_analysis *analysis);
 static char quote_from_analysis_(const t_shell_analysis *analysis);
 
 void shell_scan_str(const t_str *str, t_shell_scan *scan) {
-    scan_shell_(str->str, str->len, scan);
+    t_shell_analysis analysis;
+
+    analysis.len = 0;
+    analysis.quote = '\0';
+    analysis.needs_quote = false;
+    analysis.has_single = false;
+    analysis.can_use_double = true;
+    analysis.has_non_print = false;
+    analysis.len = str->len;
+    for (uint64_t i = 0; i < str->len; ++i) {
+        analyze_shell_byte_(&analysis, (unsigned char)str->str[i], i);
+    }
+
+    analysis.quote = quote_from_analysis_(&analysis);
+    fill_scan_(scan, str->str, &analysis);
 }
 
 uint64_t shell_escaped_len(const t_str *str, const char quote,
@@ -107,8 +116,8 @@ static void escape_str_(t_str *dst, const t_str *str, const char quote,
         return;
     }
 
-    shell_escape_bytes_(&(t_shell_out){.dst = dst, .len = 0},
-                        str->str, str->len);
+    shell_escape_bytes_(&(t_shell_out){.dst = dst, .len = 0}, str->str,
+                        str->len);
 }
 
 static void append_bytes_(t_str *dst, const char *src, const uint64_t len) {
@@ -256,22 +265,10 @@ static uint64_t escaped_len_(const char *src, const uint64_t len,
         return len + 2;
     }
 
-    return single_quoted_len_(src, len);
-}
-
-static uint64_t single_quoted_len_(const char *src, const uint64_t len) {
     t_shell_out out = {.dst = NULL, .len = 0};
 
     shell_escape_bytes_(&out, src, len);
     return out.len;
-}
-
-static void scan_shell_(const char *src, const uint64_t len,
-                        t_shell_scan *scan) {
-    t_shell_analysis analysis;
-
-    analyze_shell_span_(src, len, &analysis);
-    fill_scan_(scan, src, &analysis);
 }
 
 static void fill_scan_(t_shell_scan *scan, const char *src,
@@ -338,17 +335,6 @@ static bool is_safe_punct_(const unsigned char c, const uint64_t index) {
     }
 }
 
-static void analyze_shell_span_(const char *src, const uint64_t len,
-                                t_shell_analysis *analysis) {
-    init_analysis_(analysis);
-    analysis->len = len;
-    for (uint64_t i = 0; i < len; ++i) {
-        analyze_shell_byte_(analysis, (unsigned char)src[i], i);
-    }
-
-    analysis->quote = quote_from_analysis_(analysis);
-}
-
 static void analyze_shell_byte_(t_shell_analysis *analysis,
                                 const unsigned char c, const uint64_t index) {
     if (!ft_isprint(c)) {
@@ -365,15 +351,6 @@ static void analyze_shell_byte_(t_shell_analysis *analysis,
     if (c == '\'') {
         analysis->has_single = true;
     }
-}
-
-static void init_analysis_(t_shell_analysis *analysis) {
-    analysis->len = 0;
-    analysis->quote = '\0';
-    analysis->needs_quote = false;
-    analysis->has_single = false;
-    analysis->can_use_double = true;
-    analysis->has_non_print = false;
 }
 
 static char quote_from_analysis_(const t_shell_analysis *analysis) {

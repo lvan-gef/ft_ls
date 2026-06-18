@@ -6,7 +6,7 @@
 #include "../include/ft_array.h"
 #include "../include/ft_entry.h"
 
-#include "ft_sort.h"
+#include "./ft_sort.h"
 
 typedef int (*t_cmp_entry)(const t_entry *a, const t_entry *b);
 

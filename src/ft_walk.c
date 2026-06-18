@@ -270,8 +270,8 @@ static t_operand_state classify_operand_(t_params *params, t_str *str,
             st_dir = &st_target;
         }
 
-        if (!path_read_symlink_scratch(params->temp_arena, str,
-                                       (uint64_t)st->st_size, &e)) {
+        if (!path_read_symlink(params->temp_arena, str, (uint64_t)st->st_size,
+                               &e)) {
             state = OPERAND_FATAL;
             goto cleanup;
         }
