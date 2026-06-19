@@ -1,3 +1,4 @@
+#include <bits/local_lim.h>
 #include <errno.h>
 #include <grp.h>
 #include <pwd.h>
@@ -6,18 +7,15 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
-#include <unistd.h>
-
-#include "../include/ft_array.h"
-#include "../include/ft_str.h"
 
 #include "../libft/include/libft.h"
-
 #include "./ft_arena.h"
 #include "./ft_entry.h"
 #include "./ft_file_info.h"
 #include "./ft_path_scratch.h"
 #include "./ft_str_arena.h"
+
+struct timespec;
 
 #ifndef CACHE_SIZE
 #define CACHE_SIZE UINT64_C(8)

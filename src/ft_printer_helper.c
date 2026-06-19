@@ -1,14 +1,15 @@
 #include <errno.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include "../include/ft_str.h"
-
 #include "../libft/include/libft.h"
-
 #include "./ft_printer_helper.h"
 #include "./ft_shell_escape.h"
+#include "ft_shell_scan.h"
 
 bool put_mem(t_str *out, const char *src, uint64_t len) {
     while (len) {

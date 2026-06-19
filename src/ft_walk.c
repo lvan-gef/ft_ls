@@ -1,24 +1,25 @@
 #include <dirent.h>
 #include <errno.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "../include/ft_array.h"
 #include "../include/ft_parse.h"
 #include "../include/ft_str.h"
 #include "../include/ft_walk.h"
-
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
-
 #include "./ft_arena.h"
-#include "./ft_entry.h"
 #include "./ft_path_scratch.h"
 #include "./ft_printer.h"
 #include "./ft_printer_helper.h"
 #include "./ft_shell_escape.h"
+#include "./ft_shell_scan.h"
 #include "./ft_sort.h"
 #include "./ft_walk_entry.h"
 

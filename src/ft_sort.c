@@ -1,12 +1,14 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <sys/stat.h>
+#include <time.h>
 
-#include "../include/ft_array.h"
 #include "../include/ft_str.h"
-
 #include "./ft_entry.h"
 #include "./ft_sort.h"
+
+struct timespec;
 
 typedef int (*t_cmp_entry)(const t_entry *a, const t_entry *b);
 

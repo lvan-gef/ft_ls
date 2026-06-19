@@ -1,10 +1,11 @@
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
+#include <unistd.h>
 
 #include "../include/ft_array.h"
 #include "../include/ft_parse.h"
 #include "../include/ft_str.h"
-
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
 

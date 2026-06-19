@@ -3,6 +3,10 @@
 
 #include <stdbool.h>
 
+#include "ft_arena.h"
+#include "ft_entry.h"
+#include "ft_str.h"
+
 struct dirent;
 struct stat;
 

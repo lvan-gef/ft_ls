@@ -4,6 +4,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "ft_arena.h"
+#include "ft_array.h"
+#include "ft_str.h"
+
 typedef struct s_arena Arena;
 typedef struct s_array t_array;
 typedef struct s_str t_str;

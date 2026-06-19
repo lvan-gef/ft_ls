@@ -2,9 +2,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <sys/types.h>
 #include <unistd.h>
-
-#include "../include/ft_str.h"
 
 #include "./ft_arena.h"
 #include "./ft_path_scratch.h"

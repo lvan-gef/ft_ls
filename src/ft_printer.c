@@ -1,8 +1,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "../include/ft_array.h"
-
 #include "./ft_entry.h"
 #include "./ft_printer.h"
 #include "./ft_printer_helper.h"

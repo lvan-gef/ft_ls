@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "ft_array.h"
+
 typedef struct s_array t_array;
 
 typedef struct {

@@ -1,16 +1,13 @@
 #include <dirent.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 
 #include "../include/ft_str.h"
-
-#include "./ft_arena.h"
-#include "./ft_entry.h"
-#include "./ft_walk_entry.h"
-
 #include "../libft/include/libft.h"
-
+#include "./ft_arena.h"
 #include "./ft_shell_escape.h"
+#include "./ft_walk_entry.h"
 
 typedef struct {
     t_entry entry;
