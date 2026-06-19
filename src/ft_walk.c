@@ -12,8 +12,10 @@
 #include "../include/ft_parse.h"
 #include "../include/ft_str.h"
 #include "../include/ft_walk.h"
+
 #include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
+
 #include "./ft_arena.h"
 #include "./ft_path_scratch.h"
 #include "./ft_printer.h"

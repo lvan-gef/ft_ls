@@ -3,8 +3,9 @@
 
 #include <stdint.h>
 
-#include "ft_arena.h"
-#include "ft_str.h"
+#include "../include/ft_str.h"
+
+#include "./ft_arena.h"
 
 typedef struct s_arena Arena;
 typedef struct s_str t_str;

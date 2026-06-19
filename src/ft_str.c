@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "../include/ft_str.h"
+
 #include "../libft/include/libft.h"
 
 void str_init(t_str *str, char *buf, const uint64_t cap) {

@@ -4,7 +4,9 @@
 #include <sys/stat.h>
 
 #include "../include/ft_str.h"
+
 #include "../libft/include/libft.h"
+
 #include "./ft_arena.h"
 #include "./ft_shell_escape.h"
 #include "./ft_walk_entry.h"

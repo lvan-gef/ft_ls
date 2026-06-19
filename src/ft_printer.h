@@ -3,8 +3,8 @@
 
 #include <stdbool.h>
 
-#include "ft_array.h"
-#include "ft_entry.h"
+#include "../include/ft_array.h"
+#include "../include/ft_str.h"
 
 typedef struct s_array t_array;
 typedef struct s_str t_str;
