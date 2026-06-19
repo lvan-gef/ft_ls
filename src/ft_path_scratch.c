@@ -50,8 +50,14 @@ t_str *path_read_symlink(Arena *scratch, const t_str *path,
             return NULL;
         }
 
-        if ((uint64_t)len < cap) {
-            str->len = (uint64_t)len;
+        const uint64_t read_len = (uint64_t)len;
+        if (read_len < cap) {
+            if (read_len >= str->cap) {
+                arena_pop_to_mark(scratch, mark);
+                return NULL;
+            }
+
+            str->len = read_len;
             str->str[str->len] = '\0';
             return str;
         }

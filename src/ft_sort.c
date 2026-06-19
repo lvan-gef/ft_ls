@@ -11,13 +11,18 @@
 
 struct timespec;
 
+typedef struct {
+    uint64_t left;
+    uint64_t mid;
+    uint64_t right;
+} t_range;
+
 typedef int (*t_cmp_entry)(const t_entry *a, const t_entry *b);
 
 static bool ensure_sort_scratch_(t_sort_scratch *scratch, uint64_t need);
 static void merge_sort_(void **tmp, const t_array *array, t_cmp_entry cmp);
 static uint64_t add_capped_(uint64_t lhs, uint64_t rhs, uint64_t cap);
-static void merge_(void **data, void **tmp, uint64_t left, uint64_t mid,
-                   uint64_t right, t_cmp_entry cmp);
+static void merge_(void **data, void **tmp, const t_range *range, t_cmp_entry cmp);
 static int cmp_name_entry_(const t_entry *a, const t_entry *b);
 static int cmp_name_entry_rev_(const t_entry *a, const t_entry *b);
 static int cmp_time_entry_(const t_entry *a, const t_entry *b);
@@ -85,9 +90,11 @@ static void merge_sort_(void **tmp, const t_array *array,
         uint64_t left = 0;
         while (left < array->len) {
             const uint64_t mid = add_capped_(left, width, array->len);
-            const uint64_t right = add_capped_(mid, width, array->len);
-            if (mid < right) {
-                merge_(array->data, tmp, left, mid, right, cmp);
+            t_range range = {.left = left,
+                             .mid = mid,
+                             .right = add_capped_(mid, width, array->len)};
+            if (range.mid < range.right) {
+                merge_(array->data, tmp, &range, cmp);
             }
 
             const uint64_t step = add_capped_(width, width, array->len);
@@ -111,14 +118,13 @@ static uint64_t add_capped_(const uint64_t lhs, const uint64_t rhs,
     return lhs + rhs;
 }
 
-static void merge_(void **data, void **tmp, const uint64_t left,
-                   const uint64_t mid, const uint64_t right,
+static void merge_(void **data, void **tmp, const t_range *range,
                    const t_cmp_entry cmp) {
-    uint64_t i = left;
-    uint64_t j = mid;
-    uint64_t out = left;
+    uint64_t i = range->left;
+    uint64_t j = range->mid;
+    uint64_t out = range->left;
 
-    while (i < mid && j < right) {
+    while (i < range->mid && j < range->right) {
         const t_entry *a = data[i];
         const t_entry *b = data[j];
 
@@ -129,15 +135,15 @@ static void merge_(void **data, void **tmp, const uint64_t left,
         }
     }
 
-    while (i < mid) {
+    while (i < range->mid) {
         tmp[out++] = data[i++];
     }
 
-    while (j < right) {
+    while (j < range->right) {
         tmp[out++] = data[j++];
     }
 
-    for (uint64_t idx = left; idx < right; ++idx) {
+    for (uint64_t idx = range->left; idx < range->right; ++idx) {
         data[idx] = tmp[idx];
     }
 }

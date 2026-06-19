@@ -5,10 +5,17 @@ Checks: >
   clang-analyzer-*,
   performance-*,
   misc-*,
+  portability-*,
+  readability-braces-around-statements,
+  readability-duplicate-include,
+  readability-inconsistent-declaration-parameter-name,
+  readability-misleading-indentation,
+  readability-non-const-parameter,
+  readability-redundant-control-flow,
+  readability-redundant-declaration,
+  readability-suspicious-call-argument,
   -cert-dcl37-c,
   -cert-dcl51-c,
-  -cert-err33-c,
-  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
 
 CheckOptions:
   - key: 'Language'

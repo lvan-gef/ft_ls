@@ -212,8 +212,8 @@ error:
 
 static bool collect_operands_(t_params *params, const t_array *array,
                               int *exit_code) {
-    struct stat st;
     for (uint64_t index = 0; index < array->len; ++index) {
+        struct stat st = {0};
         t_str *str = array->data[index];
 
         const t_operand_state state =

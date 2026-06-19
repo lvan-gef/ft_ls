@@ -109,8 +109,7 @@ help:  ## Get help
 
 # Release build
 $(NAME): $(LIBFT) $(R_OBJECTS)
-	$(CC) $(R_OBJECTS) $(R_LDFLAGS) -g3 $(LIBFT) -o $@
-	# $(CC) $(R_OBJECTS) $(R_LDFLAGS) -s $(LIBFT) -o $@
+	$(CC) $(R_OBJECTS) $(R_LDFLAGS) -s $(LIBFT) -o $@
 	@echo "Build complete: $(NAME) (release)"
 
 # Debug build
@@ -120,7 +119,7 @@ $(NAME_D): $(LIBFT_D) $(D_OBJECTS)
 
 # Release pattern rule
 $(R_OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(R_OBJ_DIR)
-	$(CC) $(CPPFLAGS) $(CFLAGS) $(R_CFLAGS) -g3 $(DEPSFLAGS) -c $< -o $@
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(R_CFLAGS) $(DEPSFLAGS) -c $< -o $@
 
 # Debug pattern rule
 $(D_OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(D_OBJ_DIR)

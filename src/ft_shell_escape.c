@@ -308,7 +308,7 @@ static bool needs_raw_quote_(const unsigned char c, const uint64_t index) {
         case '$':
         case '`':
         case '\\':
-        case '^': needs_quote = true; break;
+        case '^':
         case '=': needs_quote = true; break;
         default:
             needs_quote =
