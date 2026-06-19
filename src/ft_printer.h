@@ -3,8 +3,8 @@
 
 #include <stdbool.h>
 
-#include "./ft_array.h"
-#include "./ft_str.h"
+typedef struct s_array t_array;
+typedef struct s_str t_str;
 
 typedef struct s_print_request {
     const t_array *entries;
@@ -17,5 +17,6 @@ typedef struct s_print_request {
 } t_print_request;
 
 bool printer(const t_print_request *req);
+bool printer_list(const t_print_request *req);
 
 #endif // !FT_PRINTER_H

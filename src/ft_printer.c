@@ -2,11 +2,10 @@
 #include <stdint.h>
 
 #include "../include/ft_array.h"
-#include "../include/ft_entry.h"
-#include "../include/ft_printer.h"
 
+#include "./ft_entry.h"
+#include "./ft_printer.h"
 #include "./ft_printer_helper.h"
-#include "./ft_printer_list.h"
 
 #ifndef TERM_SIZE
 #define TERM_SIZE 80
@@ -23,12 +22,11 @@
 typedef struct {
     uint64_t rows;
     uint64_t cols;
-    uint64_t max;
 } t_map;
 
 static bool init_print_row_(const t_print_request *req);
 static bool entries_have_quote_(const t_array *array);
-static void calc_cols_(const t_array *array, t_map *map, const bool *quoted,
+static void calc_cols_(const t_array *array, t_map *map, bool quoted,
                        uint64_t *col_widths);
 static bool calc_width_(const t_array *array, bool quoted, uint64_t num_cols,
                         uint64_t *col_widths);
@@ -45,14 +43,11 @@ bool printer(const t_print_request *req) {
 }
 
 static bool init_print_row_(const t_print_request *req) {
-    t_map map = {.cols = 1,
-                 .rows = req->entries->len,
-                 .max = req->entries->len < MAX_COLS ? req->entries->len
-                                                     : MAX_COLS};
+    t_map map = {.cols = 1, .rows = req->entries->len};
 
-    bool quoted = req->quote_padding || entries_have_quote_(req->entries);
+    const bool quoted = req->quote_padding || entries_have_quote_(req->entries);
     uint64_t col_widths[MAX_COLS];
-    calc_cols_(req->entries, &map, &quoted, col_widths);
+    calc_cols_(req->entries, &map, quoted, col_widths);
 
     if (!put_dir_header(req->buffer, req->dir_header)) {
         return false;
@@ -72,13 +67,16 @@ static bool entries_have_quote_(const t_array *array) {
     return false;
 }
 
-static void calc_cols_(const t_array *array, t_map *map, const bool *quoted,
+static void calc_cols_(const t_array *array, t_map *map, const bool quoted,
                        uint64_t *col_widths) {
-    const uint64_t width_count = map->max ? map->max : 1;
+    uint64_t width_count = array->len < MAX_COLS ? array->len : MAX_COLS;
+    if (!width_count) {
+        width_count = 1;
+    }
 
     uint64_t best = 1;
     for (uint64_t cols = width_count; cols > 0; --cols) {
-        if (calc_width_(array, *quoted, cols, col_widths)) {
+        if (calc_width_(array, quoted, cols, col_widths)) {
             best = cols;
             break;
         }
@@ -86,7 +84,7 @@ static void calc_cols_(const t_array *array, t_map *map, const bool *quoted,
 
     map->cols = best;
     map->rows = (array->len + best - 1) / best;
-    (void)calc_width_(array, *quoted, best, col_widths);
+    (void)calc_width_(array, quoted, best, col_widths);
 }
 
 static bool calc_width_(const t_array *array, const bool quoted,

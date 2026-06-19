@@ -1,11 +1,9 @@
 #ifndef FT_STR_H
 #define FT_STR_H
 
-#include <stdbool.h>
-#include <stddef.h>
 #include <stdint.h>
 
-typedef struct {
+typedef struct s_str {
     char *str;
     uint64_t cap;
     uint64_t len;

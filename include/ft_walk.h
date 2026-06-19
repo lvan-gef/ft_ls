@@ -1,9 +1,9 @@
 #ifndef FT_WALK_H
 #define FT_WALK_H
 
-#include "./ft_array.h"
-#include "./ft_parse.h"
+typedef struct s_args t_args;
+typedef struct s_array t_array;
 
-void process(const t_args *args, const t_array *array, int *exit_code);
+int process(const t_args *args, const t_array *array);
 
 #endif // !FT_WALK_H

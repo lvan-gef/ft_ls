@@ -1,8 +1,12 @@
-#include <stddef.h>
+#include <dirent.h>
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "./ft_walk_internal.h"
+#include "../include/ft_str.h"
+
+#include "./ft_arena.h"
+#include "./ft_entry.h"
+#include "./ft_walk_entry.h"
 
 #include "../libft/include/libft.h"
 
@@ -14,38 +18,28 @@ typedef struct {
     char name_buf[];
 } t_scratch_dir_entry;
 
-typedef struct {
-    t_entry entry;
-    t_str name;
-    char buf[];
-} t_owned_operand_entry;
-
 static t_str *join_dir_path_scratch_(Arena *scratch, const t_str *lhs,
                                      const t_str *rhs);
-static bool is_packed_operand_entry_(const t_entry *entry);
 
 t_entry *walk_entry_new_file_operand(const t_str *path, const struct stat *st) {
-    if (path->len > (uint64_t)(PTRDIFF_MAX -
-                               (ptrdiff_t)sizeof(t_owned_operand_entry) - 1)) {
+    t_entry *entry = malloc(sizeof(*entry));
+    if (!entry) {
         return NULL;
     }
 
-    t_owned_operand_entry *owned =
-        malloc(sizeof(*owned) + (size_t)path->len + 1);
-    if (!owned) {
+    *entry = (t_entry){0};
+    entry->name = str_dup(path);
+    if (!entry->name) {
+        free(entry);
         return NULL;
     }
 
-    str_init(&owned->name, owned->buf, path->len);
-    str_copy_cstr(&owned->name, path->str, path->len);
-    owned->entry = (t_entry){.name = &owned->name,
-                             .path = &owned->name,
-                             .st = *st,
-                             .stat_unavailable = false,
-                             .is_operand = true};
-    shell_scan_str(owned->entry.name, &owned->entry.name_scan);
+    entry->path = entry->name;
+    entry->st = *st;
+    entry->is_operand = true;
+    shell_scan_str(entry->name, &entry->name_scan);
 
-    return &owned->entry;
+    return entry;
 }
 
 t_entry *walk_entry_new_owned_path(const t_str *path, const struct stat *st,
@@ -111,12 +105,11 @@ void walk_entry_free(t_entry *entry) {
         return;
     }
 
-    const bool packed = is_packed_operand_entry_(entry);
-    if (!packed && entry->path && entry->path != entry->name) {
+    if (entry->path && entry->path != entry->name) {
         str_free(entry->path);
     }
 
-    if (!packed && entry->name) {
+    if (entry->name) {
         str_free(entry->name);
     }
 
@@ -158,10 +151,4 @@ static t_str *join_dir_path_scratch_(Arena *scratch, const t_str *lhs,
     path->str[path->len] = '\0';
 
     return path;
-}
-
-static bool is_packed_operand_entry_(const t_entry *entry) {
-    return entry->path == entry->name &&
-           (uintptr_t)entry->name ==
-               (uintptr_t)entry + offsetof(t_owned_operand_entry, name);
 }

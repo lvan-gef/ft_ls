@@ -40,7 +40,7 @@ SRC_FILES := ft_arena.c ft_array.c ft_file_info.c ft_parse.c ft_path_scratch.c \
 			 ft_printer.c ft_printer_helper.c ft_printer_list.c                \
 			 ft_shell_escape.c ft_sort.c                                       \
 			 ft_str_arena.c ft_str.c                                           \
-			 ft_walk.c ft_walk_entry.c ft_walk_path.c                          \
+			 ft_walk.c ft_walk_entry.c                                         \
 			 main.c
 
 SRCS := $(addprefix $(SRC_DIR)/, $(SRC_FILES))
@@ -56,6 +56,9 @@ D_DEPS    := $(D_OBJECTS:.o=.d)
 BLUE := \033[36m
 MARGENTA := \033[35m
 NC := \033[0m
+
+IWYU ?= include-what-you-use
+IWYU_FLAGS := $(CPPFLAGS) -std=c11 -D_DEFAULT_SOURCE
 
 .PHONY: all
 all: $(NAME)  ## Build release version (default)
@@ -93,6 +96,10 @@ fmt:  ## Format code via clang-format
 	@echo "Format code"
 	@find . -type f -name "*.c" -print0 | xargs -0 clang-format -i
 	@find . -type f -name "*.h" -print0 | xargs -0 clang-format -i
+
+.PHONY: iwyu
+iwyu: ## Check includes with include-what-you-use
+	iwyu-tool -p . $(SRCS)
 
 .PHONY: help
 help:  ## Get help

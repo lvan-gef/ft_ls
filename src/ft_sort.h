@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "../include/ft_array.h"
+typedef struct s_array t_array;
 
 typedef struct {
     void **data;

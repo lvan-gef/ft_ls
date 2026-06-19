@@ -9,12 +9,12 @@
 #include <unistd.h>
 
 #include "../include/ft_array.h"
-#include "../include/ft_entry.h"
 #include "../include/ft_str.h"
 
 #include "../libft/include/libft.h"
 
 #include "./ft_arena.h"
+#include "./ft_entry.h"
 #include "./ft_file_info.h"
 #include "./ft_path_scratch.h"
 #include "./ft_str_arena.h"
@@ -34,10 +34,6 @@
 #ifndef LOGIN_NAME_MAX
 #define LOGIN_NAME_MAX INT64_C(256)
 #endif // ifndef LOGIN_NAME_MAX //
-
-#ifndef PATH_MAX
-#define PATH_MAX INT64_C(4096)
-#endif // ifndef PATH_MAX //
 
 #ifndef LS_RECENT_SECS
 #define LS_RECENT_SECS ((time_t)(31556952 / 2))
@@ -124,7 +120,7 @@ static bool fill_file_info_(Arena *arena, t_file_info *info,
             return false;
         }
 
-        info->symlink = str_arena_new(arena, 1);
+        info->symlink = str_arena_new(arena, 0);
         if (!info->symlink) {
             return false;
         }
@@ -345,7 +341,7 @@ static t_str *get_dt_(Arena *arena, const struct timespec *ctim) {
 
 static t_str *get_symlink_(Arena *arena, const t_entry *entry) {
     if (!S_ISLNK(entry->st.st_mode)) {
-        return str_arena_new(arena, 1);
+        return str_arena_new(arena, 0);
     }
 
     if (!entry->path) {

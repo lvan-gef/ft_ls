@@ -10,9 +10,6 @@
 #include "./ft_printer_helper.h"
 #include "./ft_shell_escape.h"
 
-static bool put_shell_escaped_(t_str *out, const t_str *str, const char quote,
-                               const bool pad_unquoted);
-
 bool put_mem(t_str *out, const char *src, uint64_t len) {
     while (len) {
         if (out->len == out->cap - 1 && !flush_str(out)) {
@@ -104,17 +101,12 @@ bool put_dir_header(t_str *out, const t_str *dir_header) {
         scan.quote = '\'';
     }
 
-    return put_shell_escaped_(out, dir_header, scan.quote, false) &&
-           put_mem(out, ":\n", 2);
-}
+    const uint64_t need = shell_escaped_len(dir_header, scan.quote, false);
 
-static bool put_shell_escaped_(t_str *out, const t_str *str, const char quote,
-                               const bool pad_unquoted) {
-    const uint64_t need = shell_escaped_len(str, quote, pad_unquoted);
-
-    return put_shell_escaped_scan(out, str,
+    return put_shell_escaped_scan(out, dir_header,
                                   &(t_shell_scan){.display_len = need,
                                                   .padded_display_len = need,
-                                                  .quote = quote},
-                                  pad_unquoted);
+                                                  .quote = scan.quote},
+                                  false) &&
+           put_mem(out, ":\n", 2);
 }

@@ -1,18 +1,16 @@
-#include <grp.h>
-#include <pwd.h>
 #include <stdbool.h>
 #include <stdint.h>
 
 #include "../include/ft_array.h"
-#include "../include/ft_entry.h"
-#include "../include/ft_printer.h"
+#include "../include/ft_str.h"
 
 #include "../libft/include/libft.h"
 
 #include "./ft_arena.h"
+#include "./ft_entry.h"
 #include "./ft_file_info.h"
+#include "./ft_printer.h"
 #include "./ft_printer_helper.h"
-#include "./ft_printer_list.h"
 
 typedef struct {
     uint64_t total;
@@ -63,11 +61,7 @@ static void apply_width_(const t_array *context,
     }
 
     for (uint64_t index = 0; index < context->len; ++index) {
-        const t_entry *entry = context->data[index];
         const t_file_info *info = &context_infos[index];
-        if (!entry) {
-            continue;
-        }
 
         if (info->links->len > sizes->max_len_links) {
             sizes->max_len_links = info->links->len;
@@ -150,14 +144,12 @@ static bool left_pad_(t_str *out, const uint64_t src_len,
 
 static bool put_uint_(t_str *out, uint64_t value) {
     char digits[32];
-    size_t index = sizeof(digits);
+    t_str str;
 
-    do {
-        digits[--index] = (char)('0' + (value % 10));
-        value /= 10;
-    } while (value > 0);
+    str_init(&str, digits, sizeof(digits) - 1);
+    str_copy_uint(&str, value);
 
-    return put_mem(out, digits + index, (uint64_t)(sizeof(digits) - index));
+    return put_mem(out, str.str, str.len);
 }
 
 static bool print_list_rows_(t_str *out, const t_array *array,

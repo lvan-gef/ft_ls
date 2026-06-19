@@ -4,6 +4,9 @@
 #include <stdint.h>
 #include <unistd.h>
 
+#include "../include/ft_str.h"
+
+#include "./ft_arena.h"
 #include "./ft_path_scratch.h"
 #include "./ft_str_arena.h"
 

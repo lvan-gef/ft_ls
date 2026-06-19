@@ -1,5 +1,4 @@
 #include <stdint.h>
-#include <unistd.h>
 
 #include "../include/ft_array.h"
 #include "../include/ft_parse.h"
@@ -10,7 +9,6 @@ static void del_str_(void *ptr);
 
 int main(const int argc, char *argv[]) {
     t_args args = {0};
-
     t_array inputs = {0};
     if (!array_init(&inputs, (uint64_t)(argc))) {
         return 1;
@@ -21,9 +19,7 @@ int main(const int argc, char *argv[]) {
         return 1;
     }
 
-    int exit_code = 0;
-    process(&args, &inputs, &exit_code);
-
+    const int exit_code = process(&args, &inputs);
     array_destroy_with(&inputs, del_str_);
     return exit_code;
 }

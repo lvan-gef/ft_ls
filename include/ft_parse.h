@@ -4,9 +4,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "./ft_array.h"
+typedef struct s_array t_array;
 
-typedef struct {
+typedef struct s_args {
     bool list;
     bool recursive;
     bool all;

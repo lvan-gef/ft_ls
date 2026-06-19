@@ -5,9 +5,10 @@
 #include <sys/stat.h>
 
 #include "./ft_shell_scan.h"
-#include "./ft_str.h"
 
-typedef struct {
+typedef struct s_str t_str;
+
+typedef struct s_entry {
     t_str *name;
     t_str *path;
     t_shell_scan name_scan;

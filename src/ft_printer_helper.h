@@ -4,10 +4,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "../include/ft_array.h"
-#include "../include/ft_str.h"
+#include "./ft_shell_scan.h"
 
-#include "./ft_shell_escape.h"
+typedef struct s_str t_str;
 
 #ifndef TABSIZE
 #define TABSIZE UINT64_C(8)

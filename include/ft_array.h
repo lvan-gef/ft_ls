@@ -2,7 +2,6 @@
 #define FT_ARRAY_H
 
 #include <stdbool.h>
-#include <stddef.h>
 #include <stdint.h>
 
 #ifndef ARRAY_SIZE

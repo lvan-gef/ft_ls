@@ -11,7 +11,7 @@ struct Arena_block {
     Arena_Block *prev;
 };
 
-typedef struct {
+typedef struct s_arena {
     uint64_t align;
     uint64_t block_size;
     Arena_Block *first;

@@ -2,22 +2,25 @@
 #include <errno.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 
 #include "../include/ft_array.h"
-#include "../include/ft_entry.h"
-#include "../include/ft_printer.h"
+#include "../include/ft_parse.h"
 #include "../include/ft_str.h"
 #include "../include/ft_walk.h"
 
+#include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
 
 #include "./ft_arena.h"
+#include "./ft_entry.h"
 #include "./ft_path_scratch.h"
+#include "./ft_printer.h"
 #include "./ft_printer_helper.h"
 #include "./ft_shell_escape.h"
 #include "./ft_sort.h"
-#include "./ft_walk_internal.h"
+#include "./ft_walk_entry.h"
 
 typedef struct {
     const t_args *args;
@@ -56,9 +59,13 @@ static t_operand_state classify_operand_(t_params *params, t_str *str,
 static void cleanup_process_(t_params *params);
 static bool queue_operand_dir_(t_params *params, const t_str *str,
                                const struct stat *st);
+static bool print_error_(t_str *out, const t_str *path, const int e,
+                         const char *prefix, bool *output_failed);
+static mode_t dtype_to_mode_(unsigned char dtype);
 
-void process(const t_args *args, const t_array *array, int *exit_code) {
+int process(const t_args *args, const t_array *array) {
     t_params params = {0};
+    int exit_code = 0;
 
     params.args = args;
     params.out =
@@ -66,28 +73,29 @@ void process(const t_args *args, const t_array *array, int *exit_code) {
     params.out.str[0] = '\0';
     params.temp_arena = arena_alloc(ARENA_SIZE);
     if (!params.temp_arena) {
-        *exit_code = 2;
+        exit_code = 2;
         goto cleanup;
     }
 
     if (!array_init(&params.dir_queue, ARRAY_SIZE) ||
         !array_init(&params.operand_files, ARRAY_SIZE) ||
         !array_init(&params.current_entries, ARRAY_SIZE)) {
-        *exit_code = 2;
+        exit_code = 2;
         goto cleanup;
     }
 
-    if (!collect_operands_(&params, array, exit_code)) {
-        *exit_code = 2;
+    if (!collect_operands_(&params, array, &exit_code)) {
+        exit_code = 2;
         goto cleanup;
     }
 
-    if (!run_listing_(&params, array, exit_code)) {
-        *exit_code = 2;
+    if (!run_listing_(&params, array, &exit_code)) {
+        exit_code = 2;
     }
 
 cleanup:
     cleanup_process_(&params);
+    return exit_code;
 }
 
 static bool run_listing_(t_params *params, const t_array *array,
@@ -261,8 +269,8 @@ static t_operand_state classify_operand_(t_params *params, t_str *str,
     if (lstat(str->str, st) == -1) {
         e = errno;
         const char *prefix = "cannot access";
-        if (!walk_path_print_error(&params->out, str, e, prefix,
-                                   &params->output_failed)) {
+        if (!print_error_(&params->out, str, e, prefix,
+                          &params->output_failed)) {
             return OPERAND_FATAL;
         }
 
@@ -288,16 +296,15 @@ static t_operand_state classify_operand_(t_params *params, t_str *str,
         if (e != 0) {
             *exit_code = 2;
             if (params->args->list) {
-                if (!walk_path_print_error(&params->out, str, e,
-                                           "cannot read symbolic link",
-                                           &params->output_failed)) {
+                if (!print_error_(&params->out, str, e,
+                                  "cannot read symbolic link",
+                                  &params->output_failed)) {
                     state = OPERAND_FATAL;
                     goto cleanup;
                 }
             } else {
-                if (!walk_path_print_error(&params->out, str, e,
-                                           "cannot access",
-                                           &params->output_failed)) {
+                if (!print_error_(&params->out, str, e, "cannot access",
+                                  &params->output_failed)) {
                     state = OPERAND_FATAL;
                     goto cleanup;
                 }
@@ -328,9 +335,8 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
     DIR *d = opendir(path->path->str);
     if (!d) {
         const int e = errno;
-        (void)walk_path_print_error(&params->out, path->path, e,
-                                    "cannot open directory",
-                                    &params->output_failed);
+        (void)print_error_(&params->out, path->path, e, "cannot open directory",
+                           &params->output_failed);
         *exit_code = (path->is_operand ? 2 : 1);
         return false;
     }
@@ -339,8 +345,10 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
     const struct dirent *dp;
     while ((dp = readdir(d)) != NULL) {
         const unsigned char dtype = dp->d_type;
-        const bool need_lstat = walk_dtype_needs_lstat(
-            params->args->list, params->args->time, dtype);
+        const mode_t mode = dtype_to_mode_(dtype);
+        const bool need_lstat =
+            params->args->list || params->args->time || mode == 0;
+
         if (!params->args->all && dp->d_name[0] == '.' &&
             dp->d_name[1] != '/') {
             continue;
@@ -352,7 +360,7 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
             goto cleanup;
         }
 
-        entry->st.st_mode = walk_dtype_to_mode(dtype);
+        entry->st.st_mode = mode;
         if (need_lstat) {
             if (!walk_entry_build_path(params->temp_arena, entry, path->path)) {
                 hard_failure = true;
@@ -361,9 +369,8 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
 
             if (lstat(entry->path->str, &entry->st) == -1) {
                 const int e = errno;
-                if (!walk_path_print_error(&params->out, entry->path, e,
-                                           "cannot access",
-                                           &params->output_failed)) {
+                if (!print_error_(&params->out, entry->path, e, "cannot access",
+                                  &params->output_failed)) {
                     goto cleanup;
                 }
 
@@ -469,4 +476,43 @@ static bool queue_operand_dir_(t_params *params, const t_str *str,
     }
 
     return true;
+}
+
+static bool print_error_(t_str *out, const t_str *path, const int e,
+                         const char *prefix, bool *output_failed) {
+    if (!flush_str(out)) {
+        if (output_failed) {
+            *output_failed = true;
+        }
+        return false;
+    }
+
+    t_shell_scan scan;
+    shell_scan_str(path, &scan);
+    if (scan.quote != '\0') {
+        t_str *escaped = shell_escape_str(path, scan.quote);
+        if (escaped) {
+            ft_fprintf(STDERR_FILENO, "ft_ls: %s %s: %s\n", prefix,
+                       escaped->str, strerror(e));
+            str_free(escaped);
+            return true;
+        }
+    }
+
+    ft_fprintf(STDERR_FILENO, "ft_ls: %s '%s': %s\n", prefix, path->str,
+               strerror(e));
+    return true;
+}
+
+static mode_t dtype_to_mode_(const unsigned char dtype) {
+    switch (dtype) {
+        case DT_BLK: return S_IFBLK;
+        case DT_CHR: return S_IFCHR;
+        case DT_DIR: return S_IFDIR;
+        case DT_FIFO: return S_IFIFO;
+        case DT_LNK: return S_IFLNK;
+        case DT_REG: return S_IFREG;
+        case DT_SOCK: return S_IFSOCK;
+        default: return 0;
+    }
 }
