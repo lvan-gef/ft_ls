@@ -43,7 +43,7 @@ class TestFailure(NamedTuple):
 
 
 DEBUG = True
-TERMINAL_MIN = 80  # include
+TERMINAL_MIN = 1  # include
 TERMINAL_MAX = 250  # exclude
 BATCH_SIZE = 32
 
@@ -54,18 +54,18 @@ def main() -> None:
     if test_path.exists():
         remove_test_root(test_path)
 
-    # subprocess.run("make fclean", shell=True, capture_output=True)
-    # compile_ls(term_size=80, debug=args.debug)
-    # print("=" * 60)
-    # print("Phase 1: Invalid Flags")
-    # print("=" * 60)
-    # invalid_flags(debug=args.debug)
+    subprocess.run("make fclean", shell=True, capture_output=True)
+    compile_ls(term_size=80, debug=args.debug)
+    print("=" * 60)
+    print("Phase 1: Invalid Flags")
+    print("=" * 60)
+    invalid_flags(debug=args.debug)
 
     try:
         data = create_test_folders(path=test_path)
         cases = list(gen_data(paths=data))
         for term_size in range(TERMINAL_MIN, TERMINAL_MAX, 1):
-            # subprocess.run("make fclean", shell=True, capture_output=True)
+            subprocess.run("make fclean", shell=True, capture_output=True)
             print("=" * 60)
             compile_ls(term_size=term_size, debug=args.debug)
             print(
@@ -81,7 +81,6 @@ def main() -> None:
             if failure is not None:
                 print(format_failure(failure), file=sys.stderr)
                 sys.exit(1)
-            break
     except Exception as e:
         print(e, file=sys.stderr)
         sys.exit(1)
