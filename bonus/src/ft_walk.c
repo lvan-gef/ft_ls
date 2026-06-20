@@ -117,7 +117,7 @@ static bool run_listing_(t_params *params, const t_array *array,
                            .list_mode = params->args->list,
                            .print_total = false,
                            .no_owner = params->args->no_owner,
-                           .access_time = params->args->acces_time,
+                           .access_time = params->args->access_time,
                            .term_size = get_terminal_width()};
 
     if (!req.arena) {
@@ -151,8 +151,9 @@ static bool print_operand_files_(t_params *params, const t_print_request *req,
         return true;
     }
 
+    const bool sort_time = params->args->time || (params->args->access_time && !params->args->list);
     const bool ok = sort(&params->sort_scratch, &params->operand_files,
-                         params->args->reverse, params->args->time, params->args->acces_time) &&
+                         params->args->reverse, sort_time, params->args->access_time) &&
                     printer(req);
     if (ok) {
         *printed_files = true;
@@ -168,6 +169,7 @@ static bool process_queue_(t_params *params, const t_array *array,
     bool printed_dir = false;
     bool inserted_files_dirs_gap = false;
     const bool print_dir_path = params->args->recursive || array->len > 1;
+    const bool sort_time = params->args->time || (params->args->access_time && !params->args->list);
     t_entry *dir_path = NULL;
 
     while (params->dir_queue.len) {
@@ -191,7 +193,7 @@ static bool process_queue_(t_params *params, const t_array *array,
         }
 
         if (!sort(&params->sort_scratch, &params->current_entries,
-                  params->args->reverse, params->args->time, params->args->acces_time)) {
+                  params->args->reverse, sort_time, params->args->access_time)) {
             goto error;
         }
 
@@ -264,9 +266,10 @@ static bool collect_operands_(t_params *params, const t_array *array,
         }
     }
 
+    const bool sort_time = params->args->time || (params->args->access_time && !params->args->list);
     if (params->dir_queue.len &&
         !sort(&params->sort_scratch, &params->dir_queue, !params->args->reverse,
-              params->args->time, params->args->acces_time)) {
+              sort_time, params->args->access_time)) {
         goto failed;
     }
 
@@ -359,11 +362,13 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
 
     clear_directory_entries_(params);
     const struct dirent *dp;
+    const bool sort_time =
+    params->args->time || (params->args->access_time && !params->args->list);
     while ((dp = readdir(d)) != NULL) {
         const unsigned char dtype = dp->d_type;
         const mode_t mode = dtype_to_mode_(dtype);
         const bool need_lstat =
-            params->args->list || params->args->time || mode == 0;
+            params->args->list || sort_time || mode == 0;
 
         if (!params->args->all && dp->d_name[0] == '.' &&
             dp->d_name[1] != '/') {
