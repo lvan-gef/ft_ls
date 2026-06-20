@@ -326,15 +326,15 @@ static t_str *get_dt_(Arena *arena, const struct timespec *ctim, time_t now) {
     }
 
     if (recent) {
-        ft_memcpy(new_str->str, dt + 4, 12);
+        ft_memcpy(new_str->str, dt + 4, DT_LEN - 1);
     } else {
         ft_memcpy(new_str->str, dt + 4, 7);
         new_str->str[7] = ' ';
         ft_memcpy(new_str->str + 8, dt + 20, 4);
     }
 
-    new_str->len = 12;
-    new_str->str[12] = '\0';
+    new_str->len = DT_LEN - 1;
+    new_str->str[DT_LEN - 1] = '\0';
     return new_str;
 }
 
