@@ -128,6 +128,11 @@ static bool run_listing_(t_params *params, const t_array *array,
         goto cleanup;
     }
 
+    if (params->args->directory) {
+        ok = true;
+        goto cleanup;
+    }
+
     req.print_total = true;
     req.quote_padding = false;
     req.list_width_context = NULL;
@@ -257,7 +262,7 @@ static bool collect_operands_(t_params *params, const t_array *array,
             goto failed;
         }
 
-        if (S_ISDIR(st.st_mode)) {
+        if (S_ISDIR(st.st_mode) && !params->args->directory) {
             if (!queue_operand_dir_(params, str, &st)) {
                 goto failed;
             }
