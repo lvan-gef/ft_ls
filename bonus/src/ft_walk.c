@@ -151,17 +151,17 @@ static bool print_operand_files_(t_params *params, const t_print_request *req,
         return true;
     }
 
-    bool ok = true;
+    bool ok = false;
     const bool sort_time = params->args->time ||
                            (params->args->access_time && !params->args->list);
     if (!params->args->unsort) {
-        ok =
-            sort(&params->sort_scratch, &params->operand_files,
-                 params->args->reverse, sort_time, params->args->access_time) &&
-            printer(req);
-        if (ok) {
-            *printed_files = true;
-        }
+        ok = sort(&params->sort_scratch, &params->operand_files,
+                  params->args->reverse, sort_time, params->args->access_time);
+    }
+
+    ok = printer(req);
+    if (ok) {
+        *printed_files = true;
     }
 
     array_clear_with(&params->operand_files, walk_entry_del);
@@ -179,7 +179,7 @@ static bool process_queue_(t_params *params, const t_array *array,
     t_entry *dir_path = NULL;
 
     if (params->args->unsort) {
-       array_reverse(&params->dir_queue);
+        array_reverse(&params->dir_queue);
     }
 
     while (params->dir_queue.len) {
