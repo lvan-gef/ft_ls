@@ -20,7 +20,7 @@ from typing import Generator
 from typing import NamedTuple
 
 from create_test_folders import create_test_folders
-from gen_data import ALLOWED_FLAGS, gen_data
+from gen_data import BASE_FLAGS, KNOWN_BONUS_FLAGS, gen_data
 
 
 class PtyResult(NamedTuple):
@@ -50,37 +50,55 @@ BATCH_SIZE = 32
 
 def main() -> None:
     args = parse_args()
+    bonus_mode = bool(args.bonus_flags)
+    allowed_flags = BASE_FLAGS + args.bonus_flags
     test_path = Path.cwd().joinpath("ft_ls_tester")
     if test_path.exists():
         remove_test_root(test_path)
 
-    subprocess.run("make fclean", shell=True, capture_output=True)
-    compile_ls(term_size=80, debug=args.debug)
-    print("=" * 60)
-    print("Phase 1: Invalid Flags")
-    print("=" * 60)
-    invalid_flags(debug=args.debug)
-
     try:
         data = create_test_folders(path=test_path)
-        cases = list(gen_data(paths=data))
-        for term_size in range(TERMINAL_MIN, TERMINAL_MAX, 1):
-            subprocess.run("make fclean", shell=True, capture_output=True)
+        cases = list(
+            gen_data(
+                paths=data,
+                allowed_flags=allowed_flags,
+                bonus_flags=args.bonus_flags,
+            )
+        )
+        checked_invalid_flags = False
+        for term_size in range(args.cols_start, args.cols_end, args.cols_step):
             print("=" * 60)
-            compile_ls(term_size=term_size, debug=args.debug)
+            if bonus_mode:
+                print("Bonus mode: using runtime PTY width", term_size)
+            else:
+                compile_ls(term_size=term_size, ft_bin=args.bin)
+
+            if not checked_invalid_flags:
+                print("=" * 60)
+                print("Phase 1: Invalid Flags")
+                print("=" * 60)
+                invalid_flags(ft_bin=args.bin, allowed_flags=allowed_flags)
+                checked_invalid_flags = True
+
+            print("=" * 60)
             print(
                 "Flag Combinations and Feature Tests",
+                f"(bin={args.bin})",
                 f"(jobs={args.jobs})",
             )
             print("=" * 60)
 
             failure = run_cases_parallel(
-                cases=cases, term_size=term_size, jobs=args.jobs, debug=args.debug
+                cases=cases,
+                term_size=term_size,
+                jobs=args.jobs,
+                ft_bin=args.bin,
             )
 
             if failure is not None:
                 print(format_failure(failure), file=sys.stderr)
                 sys.exit(1)
+            break
     except Exception as e:
         print(e, file=sys.stderr)
         sys.exit(1)
@@ -95,10 +113,46 @@ def main() -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
+        "-b",
+        "--bin",
+        default=None,
+        help="binary to test (default: ./ft_ls, or ./ft_ls_d with --debug)",
+    )
+
+    parser.add_argument(
         "-d",
         "--debug",
         action="store_true",
-        help="Runs the debug version of ft_ls. (called ft_ls_d)",
+        help="shortcut for --bin ./ft_ls_d",
+    )
+
+    parser.add_argument(
+        "--cols-start",
+        type=positive_int,
+        default=TERMINAL_MIN,
+        help="inclusive start of terminal column widths to test",
+    )
+
+    parser.add_argument(
+        "--cols-end",
+        type=positive_int,
+        default=TERMINAL_MAX,
+        help="exclusive end of terminal column widths to test",
+    )
+
+    parser.add_argument(
+        "--cols-step",
+        type=positive_int,
+        default=1,
+        help="step between terminal column widths",
+    )
+
+    parser.add_argument(
+        "--bonus-flags",
+        type=parse_bonus_flags,
+        default=(),
+        metavar="FLAGS",
+        help="comma-separated or compact GNU-comparable bonus flags, e.g. g,u or gu",
     )
 
     parser.add_argument(
@@ -109,7 +163,69 @@ def parse_args() -> argparse.Namespace:
         help="worker processes to use for test execution",
     )
 
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.bin is not None and args.debug:
+        parser.error("--debug cannot be combined with --bin")
+
+    if args.bin is None:
+        args.bin = "./ft_ls_d" if args.debug else "./ft_ls"
+    elif args.bin in ("ft_ls", "ft_ls_d"):
+        args.bin = f"./{args.bin}"
+
+    if args.cols_end <= args.cols_start:
+        parser.error("--cols-end must be greater than --cols-start")
+
+    if not args.bonus_flags:
+        assert_base_compile_binary(parser, args.bin)
+    else:
+        assert_binary_exists(parser, args.bin)
+
+    return args
+
+
+def parse_bonus_flags(value: str) -> tuple[str, ...]:
+    if not value:
+        return ()
+
+    raw_flags = value.split(",") if "," in value else list(value)
+    flags: list[str] = []
+    for raw_flag in raw_flags:
+        flag = raw_flag.strip()
+        if not flag:
+            continue
+        if len(flag) != 1:
+            raise argparse.ArgumentTypeError(
+                f"bonus flag must be one character, got {flag!r}"
+            )
+        if flag not in KNOWN_BONUS_FLAGS:
+            known = ",".join(KNOWN_BONUS_FLAGS)
+            raise argparse.ArgumentTypeError(
+                f"unknown bonus flag {flag!r}; known flags: {known}"
+            )
+        if flag in flags:
+            raise argparse.ArgumentTypeError(f"duplicate bonus flag {flag!r}")
+
+        flags.append(flag)
+
+    return tuple(flags)
+
+
+def assert_base_compile_binary(parser: argparse.ArgumentParser, ft_bin: str) -> None:
+    if Path(ft_bin).name not in ("ft_ls", "ft_ls_d"):
+        parser.error("base mode auto-compiles only ./ft_ls or ./ft_ls_d")
+
+
+def assert_binary_exists(parser: argparse.ArgumentParser, ft_bin: str) -> None:
+    if "/" not in ft_bin and not ft_bin.startswith("."):
+        if shutil.which(ft_bin) is None:
+            parser.error(f"binary not found in PATH: {ft_bin}")
+        return
+
+    path = Path(ft_bin)
+    if not path.exists():
+        parser.error(f"binary does not exist: {ft_bin}")
+    if not os.access(path, os.X_OK):
+        parser.error(f"binary is not executable: {ft_bin}")
 
 
 def positive_int(value: str) -> int:
@@ -149,53 +265,44 @@ def remove_test_root(test_path: Path) -> None:
     shutil.rmtree(test_path)
 
 
-def compile_ls(term_size: int, debug: bool) -> None:
+def compile_ls(term_size: int, ft_bin: str) -> None:
     print("", "-" * 5, "Compile with column width:", term_size, "-" * 5)
-    if debug:
-        result = subprocess.run(
-            f"make TERM_SIZE={term_size} debug",
-            shell=True,
-            capture_output=True,
-            text=True,
-        )
-    else:
-        result = subprocess.run(
-            f"make TERM_SIZE={term_size}", shell=True, capture_output=True, text=True
-        )
+    subprocess.run(["make", "fclean"], capture_output=True, text=True)
+    cmd = ["make", f"TERM_SIZE={term_size}"]
+    if Path(ft_bin).name == "ft_ls_d":
+        cmd.append("debug")
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
 
     assert result.returncode == 0, f"Compilation failed: {result.stderr}"
 
 
-def invalid_flags(debug: bool) -> None:
-    own_bin = "./ft_ls"
-    if debug:
-        own_bin = f"{own_bin}_d"
-
+def invalid_flags(ft_bin: str, allowed_flags: tuple[str, ...]) -> None:
     counter = 0
     for lttr in string.ascii_letters:
-        if lttr in ALLOWED_FLAGS:
+        if lttr in allowed_flags:
             continue
 
         result = subprocess.run(
-            f"{own_bin} -{lttr}", shell=True, capture_output=True, text=True
+            [ft_bin, f"-{lttr}"], capture_output=True, text=True
         )
 
         try:
             assert result.returncode == 1
         except AssertionError:
-            msg = f"{own_bin} -{lttr} should return exit code 1, goth: {result.returncode}"
+            msg = f"{ft_bin} -{lttr} should return exit code 1, goth: {result.returncode}"
             raise AssertionError(msg)
 
         try:
             assert result.stdout == ""
         except AssertionError:
-            msg = f"{own_bin} -{lttr} should have empty stdout, goth: {result.stdout}"
+            msg = f"{ft_bin} -{lttr} should have empty stdout, goth: {result.stdout}"
             raise AssertionError(msg)
 
         try:
             assert result.stderr != ""
         except AssertionError:
-            msg = f"{own_bin} -{lttr} should have stderr message, goth: nothing..."
+            msg = f"{ft_bin} -{lttr} should have stderr message, goth: nothing..."
             raise AssertionError(msg)
 
         counter += 1
@@ -204,21 +311,17 @@ def invalid_flags(debug: bool) -> None:
 
 
 def run_cases_parallel(
-    cases: list[list[str]], term_size: int, jobs: int, debug: bool
+    cases: list[list[str]], term_size: int, jobs: int, ft_bin: str
 ) -> TestFailure | None:
-    own_bin = "./ft_ls"
-    if debug:
-        own_bin = f"{own_bin}_d"
-
     if jobs == 1:
         return run_case_batch(
-            TestBatch(term_size=term_size, ft_bin=own_bin, cases=cases)
+            TestBatch(term_size=term_size, ft_bin=ft_bin, cases=cases)
         )
 
     ctx = get_context("fork")
     with ctx.Pool(processes=jobs) as pool:
         batches = iter_case_batches(
-            cases=cases, term_size=term_size, ft_bin=own_bin, batch_size=BATCH_SIZE
+            cases=cases, term_size=term_size, ft_bin=ft_bin, batch_size=BATCH_SIZE
         )
 
         for failure in pool.imap_unordered(run_case_batch, batches, chunksize=1):

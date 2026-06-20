@@ -7,3 +7,11 @@ obj/
 obj_debug/
 libft_d.a
 tester/__pycache__/
+
+ft_ls_bonus
+ft_ls_bonus_d
+
+obj_bonus/
+obj_bonus_debug/
+
+libft/libft.a
