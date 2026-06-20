@@ -48,8 +48,7 @@ bool parse_args(const uint64_t argc, char **argv, t_args *args,
                     args->list = true;
                     break;
                 case 'u':
-                    args->acces_time = true;
-                    args->time = true;
+                    args->access_time = true;
                     break;
                 default: print_error_(argv[index]); return clean_up_(inputs);
             }

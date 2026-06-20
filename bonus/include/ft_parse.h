@@ -13,7 +13,7 @@ typedef struct s_args {
     bool reverse;
     bool time;
     bool no_owner;
-    bool acces_time;
+    bool access_time;
 } t_args;
 
 bool parse_args(uint64_t argc, char **argv, t_args *args, t_array *inputs);
