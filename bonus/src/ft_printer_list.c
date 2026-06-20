@@ -35,7 +35,8 @@ bool printer_list(const t_print_request *req) {
     t_file_info *infos = NULL;
     bool ok = false;
 
-    if (!prepare_list_infos(req->arena, req->entries, &infos)) {
+    if (!prepare_list_infos(req->arena, req->entries, &infos,
+                            req->access_time)) {
         goto cleanup;
     }
 

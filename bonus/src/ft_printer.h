@@ -22,6 +22,7 @@ typedef struct s_print_request {
     bool list_mode;
     bool print_total;
     bool no_owner;
+    bool access_time;
     uint64_t term_size;
 } t_print_request;
 

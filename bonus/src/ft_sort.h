@@ -13,7 +13,7 @@ typedef struct {
     uint64_t cap;
 } t_sort_scratch;
 
-bool sort(t_sort_scratch *scratch, const t_array *array, bool reverse,
-          bool sort_time);
+    bool sort(t_sort_scratch *scratch, const t_array *array, bool reverse,
+              bool sort_time, bool access_time);
 
 #endif // !FT_SORT_H

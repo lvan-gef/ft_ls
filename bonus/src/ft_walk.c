@@ -117,6 +117,7 @@ static bool run_listing_(t_params *params, const t_array *array,
                            .list_mode = params->args->list,
                            .print_total = false,
                            .no_owner = params->args->no_owner,
+                           .access_time = params->args->acces_time,
                            .term_size = get_terminal_width()};
 
     if (!req.arena) {
@@ -151,7 +152,7 @@ static bool print_operand_files_(t_params *params, const t_print_request *req,
     }
 
     const bool ok = sort(&params->sort_scratch, &params->operand_files,
-                         params->args->reverse, params->args->time) &&
+                         params->args->reverse, params->args->time, params->args->acces_time) &&
                     printer(req);
     if (ok) {
         *printed_files = true;
@@ -190,7 +191,7 @@ static bool process_queue_(t_params *params, const t_array *array,
         }
 
         if (!sort(&params->sort_scratch, &params->current_entries,
-                  params->args->reverse, params->args->time)) {
+                  params->args->reverse, params->args->time, params->args->acces_time)) {
             goto error;
         }
 
@@ -265,7 +266,7 @@ static bool collect_operands_(t_params *params, const t_array *array,
 
     if (params->dir_queue.len &&
         !sort(&params->sort_scratch, &params->dir_queue, !params->args->reverse,
-              params->args->time)) {
+              params->args->time, params->args->acces_time)) {
         goto failed;
     }
 

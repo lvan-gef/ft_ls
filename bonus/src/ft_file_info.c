@@ -49,7 +49,7 @@ static uint64_t group_index = 0;
 static t_id_cache_entry group_cache[CACHE_SIZE] = {0};
 
 static bool fill_file_info_(Arena *arena, t_file_info *info,
-                            const t_entry *entry, time_t now);
+                            const t_entry *entry, time_t now, bool acces_time);
 static t_str *get_perm_(Arena *arena, const t_entry *entry);
 static t_str *get_user_(Arena *arena, uid_t user_id);
 static t_str *get_group_(Arena *arena, gid_t group_id);
@@ -63,7 +63,7 @@ static char exec_char_(mode_t mode, mode_t exec_bit, mode_t special_bit,
                        char lower, char upper);
 
 bool prepare_list_infos(Arena *arena, const t_array *entries,
-                        t_file_info **infos) {
+                        t_file_info **infos, const bool acces_time) {
     if (!entries || entries->len == 0) {
         *infos = NULL;
         return true;
@@ -82,7 +82,7 @@ bool prepare_list_infos(Arena *arena, const t_array *entries,
     for (uint64_t index = 0; index < entries->len; ++index) {
         const t_entry *entry = entries->data[index];
 
-        if (!fill_file_info_(arena, &(*infos)[index], entry, now)) {
+        if (!fill_file_info_(arena, &(*infos)[index], entry, now, acces_time)) {
             return false;
         }
     }
@@ -91,7 +91,8 @@ bool prepare_list_infos(Arena *arena, const t_array *entries,
 }
 
 static bool fill_file_info_(Arena *arena, t_file_info *info,
-                            const t_entry *entry, time_t now) {
+                            const t_entry *entry, time_t now,
+                            const bool acces_time) {
     if (entry->stat_unavailable) {
         info->perm = get_perm_(arena, entry);
         if (!info->perm) {
@@ -153,7 +154,11 @@ static bool fill_file_info_(Arena *arena, t_file_info *info,
         return false;
     }
 
-    info->dt = get_dt_(arena, &entry->st.st_mtim, now);
+    if (acces_time) {
+        info->dt = get_dt_(arena, &entry->st.st_atim, now);
+    } else {
+        info->dt = get_dt_(arena, &entry->st.st_mtim, now);
+    }
     if (!info->dt) {
         return false;
     }
@@ -326,15 +331,15 @@ static t_str *get_dt_(Arena *arena, const struct timespec *ctim, time_t now) {
     }
 
     if (recent) {
-        ft_memcpy(new_str->str, dt + 4, 12);
+        ft_memcpy(new_str->str, dt + 4, DT_LEN - 1);
     } else {
         ft_memcpy(new_str->str, dt + 4, 7);
         new_str->str[7] = ' ';
         ft_memcpy(new_str->str + 8, dt + 20, 4);
     }
 
-    new_str->len = 12;
-    new_str->str[12] = '\0';
+    new_str->len = DT_LEN - 1;
+    new_str->str[DT_LEN - 1] = '\0';
     return new_str;
 }
 

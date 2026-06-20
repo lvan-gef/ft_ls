@@ -137,7 +137,7 @@ static bool run_listing_(t_params *params, const t_array *array,
 
     ok = true;
 cleanup:
-    ok  = flush_fd(&params->out, STDOUT_FILENO) && ok;
+    ok = flush_fd(&params->out, STDOUT_FILENO) && ok;
     if (req.file_info_arena) {
         arena_release(req.file_info_arena);
     }

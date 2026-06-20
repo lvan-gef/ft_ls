@@ -47,6 +47,10 @@ bool parse_args(const uint64_t argc, char **argv, t_args *args,
                     args->no_owner = true;
                     args->list = true;
                     break;
+                case 'u':
+                    args->acces_time = true;
+                    args->time = true;
+                    break;
                 default: print_error_(argv[index]); return clean_up_(inputs);
             }
         }
@@ -88,12 +92,11 @@ static void print_error_(const char *flag) {
     char buf[256];
     t_str out;
 
+    const char cmd[] = "ft_ls: invalid option -- ";
+    const char usage[] = "\nusage: ft_ls [-Ralrtgu] [file ...]\n";
     str_init(&out, buf, sizeof(buf) - 1);
-    (void)(put_mem_fd(&out, "ft_ls: invalid option -- ",
-                      sizeof("ft_ls: invalid option -- ") - 1, STDERR_FILENO) &&
+    (void)(put_mem_fd(&out, cmd, sizeof(cmd) - 1, STDERR_FILENO) &&
            put_mem_fd(&out, flag, (uint64_t)ft_strlen(flag), STDERR_FILENO) &&
-           put_mem_fd(&out, "\nusage: ft_ls [-Ralrtg] [file ...]\n",
-                      sizeof("\nusage: ft_ls [-Ralrtg] [file ...]\n") - 1,
-                      STDERR_FILENO) &&
+           put_mem_fd(&out, usage, sizeof(usage) - 1, STDERR_FILENO) &&
            flush_fd(&out, STDERR_FILENO));
 }

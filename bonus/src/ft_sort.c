@@ -28,19 +28,24 @@ static int cmp_name_entry_(const t_entry *a, const t_entry *b);
 static int cmp_name_entry_rev_(const t_entry *a, const t_entry *b);
 static int cmp_time_entry_(const t_entry *a, const t_entry *b);
 static int cmp_time_entry_rev_(const t_entry *a, const t_entry *b);
+static int cmp_atime_entry_(const t_entry *a, const t_entry *b);
+static int cmp_atime_entry_rev_(const t_entry *a, const t_entry *b);
 static t_str *entry_name_(const t_entry *entry);
 static int compare_(const t_str *lhs, const t_str *rhs);
 static int compare_time_(const struct timespec *a, const struct timespec *b);
 
 bool sort(t_sort_scratch *scratch, const t_array *array, const bool reverse,
-          const bool sort_time) {
+          const bool sort_time, const bool access_time) {
     if (array->len <= 1) {
         return true;
     }
 
     t_cmp_entry cmp;
 
-    if (sort_time) {
+    if (sort_time && access_time) {
+        cmp = reverse ? cmp_atime_entry_rev_ : cmp_atime_entry_;
+    }
+    else if (sort_time) {
         cmp = reverse ? cmp_time_entry_rev_ : cmp_time_entry_;
     } else {
         cmp = reverse ? cmp_name_entry_rev_ : cmp_name_entry_;
@@ -168,6 +173,19 @@ static int cmp_time_entry_(const t_entry *a, const t_entry *b) {
 
 static int cmp_time_entry_rev_(const t_entry *a, const t_entry *b) {
     return cmp_time_entry_(b, a);
+}
+
+static int cmp_atime_entry_(const t_entry *a, const t_entry *b) {
+    const int cmp = compare_time_(&a->st.st_atim, &b->st.st_atim);
+    if (cmp != 0) {
+        return -cmp;
+    }
+
+    return compare_(entry_name_(a), entry_name_(b));
+}
+
+static int cmp_atime_entry_rev_(const t_entry *a, const t_entry *b) {
+    return cmp_atime_entry_(b, a);
 }
 
 static t_str *entry_name_(const t_entry *entry) {

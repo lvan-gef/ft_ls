@@ -25,6 +25,6 @@ typedef struct s_file_info {
 } t_file_info;
 
 bool prepare_list_infos(Arena *arena, const t_array *entries,
-                        t_file_info **infos);
+                        t_file_info **infos, bool acces_time);
 
 #endif // !FT_FILE_INFO_H
