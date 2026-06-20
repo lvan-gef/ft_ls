@@ -13,7 +13,6 @@
 #include "../include/ft_str.h"
 #include "../include/ft_walk.h"
 
-#include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
 
 #include "./ft_arena.h"
@@ -107,29 +106,43 @@ static bool run_listing_(t_params *params, const t_array *array,
     params->out.len = 0;
     params->out.str[0] = '\0';
     params->output_failed = false;
+    bool ok = false;
 
     t_print_request req = {.entries = &params->operand_files,
                            .list_width_context = &params->dir_queue,
                            .dir_header = NULL,
                            .buffer = &params->out,
+                           .file_info_arena = NULL,
                            .quote_padding = params->quote_padding,
                            .list_mode = params->args->list,
                            .print_total = false};
+
+    if (params->args->list) {
+        req.file_info_arena = arena_alloc(ARENA_SIZE);
+        if (!req.file_info_arena) {
+            goto cleanup;
+        }
+    }
+
     if (!print_operand_files_(params, &req, &printed_files)) {
-        goto error;
+        goto cleanup;
     }
 
     req.print_total = true;
     req.quote_padding = false;
     req.list_width_context = NULL;
     if (!process_queue_(params, array, &req, exit_code, printed_files)) {
-        goto error;
+        goto cleanup;
     }
 
-    return flush_str(&params->out);
-error:
-    flush_str(&params->out);
-    return false;
+    ok = true;
+cleanup:
+    ok  = flush_fd(&params->out, STDOUT_FILENO) && ok;
+    if (req.file_info_arena) {
+        arena_release(req.file_info_arena);
+    }
+
+    return ok;
 }
 
 static bool print_operand_files_(t_params *params, const t_print_request *req,
@@ -483,28 +496,51 @@ static bool queue_operand_dir_(t_params *params, const t_str *str,
 
 static bool print_error_(t_str *out, const t_str *path, const int e,
                          const char *prefix, bool *output_failed) {
-    if (!flush_str(out)) {
+    if (!flush_fd(out, STDOUT_FILENO)) {
         if (output_failed) {
             *output_failed = true;
         }
         return false;
     }
 
+    char err_buf[1024];
+    t_str err_out;
+    str_init(&err_out, err_buf, sizeof(err_buf) - 1);
+
     t_shell_scan scan;
     shell_scan_str(path, &scan);
+    const char *msg = strerror(e);
     if (scan.quote != '\0') {
         t_str *escaped = shell_escape_str(path, scan.quote);
         if (escaped) {
-            ft_fprintf(STDERR_FILENO, "ft_ls: %s %s: %s\n", prefix,
-                       escaped->str, strerror(e));
+            const bool ok =
+                put_mem_fd(&err_out, "ft_ls: ", sizeof("ft_ls: ") - 1,
+                           STDERR_FILENO) &&
+                put_mem_fd(&err_out, prefix, (uint64_t)ft_strlen(prefix),
+                           STDERR_FILENO) &&
+                put_mem_fd(&err_out, " ", 1, STDERR_FILENO) &&
+                put_mem_fd(&err_out, escaped->str, escaped->len,
+                           STDERR_FILENO) &&
+                put_mem_fd(&err_out, ": ", 2, STDERR_FILENO) &&
+                put_mem_fd(&err_out, msg, (uint64_t)ft_strlen(msg),
+                           STDERR_FILENO) &&
+                put_mem_fd(&err_out, "\n", 1, STDERR_FILENO) &&
+                flush_fd(&err_out, STDERR_FILENO);
             str_free(escaped);
-            return true;
+            return ok;
         }
     }
 
-    ft_fprintf(STDERR_FILENO, "ft_ls: %s '%s': %s\n", prefix, path->str,
-               strerror(e));
-    return true;
+    return put_mem_fd(&err_out, "ft_ls: ", sizeof("ft_ls: ") - 1,
+                      STDERR_FILENO) &&
+           put_mem_fd(&err_out, prefix, (uint64_t)ft_strlen(prefix),
+                      STDERR_FILENO) &&
+           put_mem_fd(&err_out, " '", 2, STDERR_FILENO) &&
+           put_mem_fd(&err_out, path->str, path->len, STDERR_FILENO) &&
+           put_mem_fd(&err_out, "': ", 3, STDERR_FILENO) &&
+           put_mem_fd(&err_out, msg, (uint64_t)ft_strlen(msg), STDERR_FILENO) &&
+           put_mem_fd(&err_out, "\n", 1, STDERR_FILENO) &&
+           flush_fd(&err_out, STDERR_FILENO);
 }
 
 static mode_t dtype_to_mode_(const unsigned char dtype) {

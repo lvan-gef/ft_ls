@@ -7,8 +7,9 @@
 #include "../include/ft_parse.h"
 #include "../include/ft_str.h"
 
-#include "../libft/include/ft_fprintf.h"
 #include "../libft/include/libft.h"
+
+#include "./ft_printer_helper.h"
 
 static bool append_input_(const char *arg, t_array *inputs);
 static bool clean_up_(t_array *inputs);
@@ -80,8 +81,15 @@ static void del_str_(void *ptr) {
 }
 
 static void print_error_(const char *flag) {
-    ft_fprintf(STDERR_FILENO,
-               "ft_ls: invalid option -- %s\nusage: ft_ls "
-               "[-Ralrt] [file ...]\n",
-               flag);
+    char buf[256];
+    t_str out;
+
+    str_init(&out, buf, sizeof(buf) - 1);
+    (void)(put_mem_fd(&out, "ft_ls: invalid option -- ",
+                      sizeof("ft_ls: invalid option -- ") - 1, STDERR_FILENO) &&
+           put_mem_fd(&out, flag, (uint64_t)ft_strlen(flag), STDERR_FILENO) &&
+           put_mem_fd(&out, "\nusage: ft_ls [-Ralrt] [file ...]\n",
+                      sizeof("\nusage: ft_ls [-Ralrt] [file ...]\n") - 1,
+                      STDERR_FILENO) &&
+           flush_fd(&out, STDERR_FILENO));
 }

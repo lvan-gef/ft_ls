@@ -24,7 +24,7 @@ typedef struct {
 } Arena_Mark;
 
 #ifndef ARENA_SIZE
-#define ARENA_SIZE UINT64_C(4096)
+#define ARENA_SIZE UINT64_C(65536)
 #endif // ifndef !ARENA_SIZE
 
 Arena *arena_alloc(uint64_t cap);

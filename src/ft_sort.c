@@ -22,7 +22,8 @@ typedef int (*t_cmp_entry)(const t_entry *a, const t_entry *b);
 static bool ensure_sort_scratch_(t_sort_scratch *scratch, uint64_t need);
 static void merge_sort_(void **tmp, const t_array *array, t_cmp_entry cmp);
 static uint64_t add_capped_(uint64_t lhs, uint64_t rhs, uint64_t cap);
-static void merge_(void **data, void **tmp, const t_range *range, t_cmp_entry cmp);
+static void merge_(void **data, void **tmp, const t_range *range,
+                   t_cmp_entry cmp);
 static int cmp_name_entry_(const t_entry *a, const t_entry *b);
 static int cmp_name_entry_rev_(const t_entry *a, const t_entry *b);
 static int cmp_time_entry_(const t_entry *a, const t_entry *b);

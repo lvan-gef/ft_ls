@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #ifndef ARRAY_SIZE
-#define ARRAY_SIZE UINT64_C(10)
+#define ARRAY_SIZE UINT64_C(64)
 #endif // ifndef ARRAY_SIZE //
 
 typedef void (*t_array_del)(void *ptr);

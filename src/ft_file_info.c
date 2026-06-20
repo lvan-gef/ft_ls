@@ -18,7 +18,7 @@
 struct timespec;
 
 #ifndef CACHE_SIZE
-#define CACHE_SIZE UINT64_C(8)
+#define CACHE_SIZE UINT64_C(64)
 #endif // ifndef CACHE_SIZE //
 
 #ifndef PERMISSION_SIZE
@@ -49,11 +49,11 @@ static uint64_t group_index = 0;
 static t_id_cache_entry group_cache[CACHE_SIZE] = {0};
 
 static bool fill_file_info_(Arena *arena, t_file_info *info,
-                            const t_entry *entry);
+                            const t_entry *entry, time_t now);
 static t_str *get_perm_(Arena *arena, const t_entry *entry);
 static t_str *get_user_(Arena *arena, uid_t user_id);
 static t_str *get_group_(Arena *arena, gid_t group_id);
-static t_str *get_dt_(Arena *arena, const struct timespec *ctim);
+static t_str *get_dt_(Arena *arena, const struct timespec *ctim, time_t now);
 static t_str *get_symlink_(Arena *arena, const t_entry *entry);
 static char *cache_lookup_(t_id_cache_entry *cache, uint64_t id);
 static void cache_store_(t_id_cache_entry *cache, uint64_t *next, uint64_t id,
@@ -64,9 +64,14 @@ static char exec_char_(mode_t mode, mode_t exec_bit, mode_t special_bit,
 
 bool prepare_list_infos(Arena *arena, const t_array *entries,
                         t_file_info **infos) {
-    if (!entries) {
+    if (!entries || entries->len == 0) {
         *infos = NULL;
         return true;
+    }
+
+    const time_t now = time(NULL);
+    if (now == (time_t)-1) {
+        return false;
     }
 
     *infos = arena_push(arena, sizeof(**infos) * entries->len);
@@ -77,7 +82,7 @@ bool prepare_list_infos(Arena *arena, const t_array *entries,
     for (uint64_t index = 0; index < entries->len; ++index) {
         const t_entry *entry = entries->data[index];
 
-        if (!fill_file_info_(arena, &(*infos)[index], entry)) {
+        if (!fill_file_info_(arena, &(*infos)[index], entry, now)) {
             return false;
         }
     }
@@ -86,7 +91,7 @@ bool prepare_list_infos(Arena *arena, const t_array *entries,
 }
 
 static bool fill_file_info_(Arena *arena, t_file_info *info,
-                            const t_entry *entry) {
+                            const t_entry *entry, time_t now) {
     if (entry->stat_unavailable) {
         info->perm = get_perm_(arena, entry);
         if (!info->perm) {
@@ -118,11 +123,7 @@ static bool fill_file_info_(Arena *arena, t_file_info *info,
             return false;
         }
 
-        info->symlink = str_arena_new(arena, 0);
-        if (!info->symlink) {
-            return false;
-        }
-
+        info->symlink = NULL;
         info->blocks = 0;
         return true;
     }
@@ -152,14 +153,18 @@ static bool fill_file_info_(Arena *arena, t_file_info *info,
         return false;
     }
 
-    info->dt = get_dt_(arena, &entry->st.st_mtim);
+    info->dt = get_dt_(arena, &entry->st.st_mtim, now);
     if (!info->dt) {
         return false;
     }
 
-    info->symlink = get_symlink_(arena, entry);
-    if (!info->symlink) {
-        return false;
+    if (S_ISLNK(entry->st.st_mode)) {
+        info->symlink = get_symlink_(arena, entry);
+        if (!info->symlink) {
+            return false;
+        }
+    } else {
+        info->symlink = NULL;
     }
 
     info->blocks = (uint64_t)entry->st.st_blocks;
@@ -241,6 +246,7 @@ static t_str *get_user_(Arena *arena, const uid_t user_id) {
         return str_arena_from_cstr(arena, name);
     }
 
+    errno = 0;
     const struct passwd *pwd = getpwuid(user_id);
     t_str *new_str = NULL;
     if (pwd) {
@@ -272,6 +278,7 @@ static t_str *get_group_(Arena *arena, const gid_t group_id) {
         return str_arena_from_cstr(arena, name);
     }
 
+    errno = 0;
     const struct group *grp = getgrgid(group_id);
     t_str *new_str = NULL;
     if (grp) {
@@ -299,7 +306,7 @@ static t_str *get_group_(Arena *arena, const gid_t group_id) {
     return new_str;
 }
 
-static t_str *get_dt_(Arena *arena, const struct timespec *ctim) {
+static t_str *get_dt_(Arena *arena, const struct timespec *ctim, time_t now) {
     Arena_Mark mark = arena_get_mark(arena);
     t_str *new_str = str_arena_new(arena, DT_LEN);
     if (!new_str) {
@@ -309,12 +316,6 @@ static t_str *get_dt_(Arena *arena, const struct timespec *ctim) {
     const time_t stamp = ctim->tv_sec;
     const char *dt = ctime(&stamp);
     if (!dt) {
-        arena_pop_to_mark(arena, mark);
-        return NULL;
-    }
-
-    const time_t now = time(NULL);
-    if (now == (time_t)-1) {
         arena_pop_to_mark(arena, mark);
         return NULL;
     }
@@ -338,10 +339,6 @@ static t_str *get_dt_(Arena *arena, const struct timespec *ctim) {
 }
 
 static t_str *get_symlink_(Arena *arena, const t_entry *entry) {
-    if (!S_ISLNK(entry->st.st_mode)) {
-        return str_arena_new(arena, 0);
-    }
-
     if (!entry->path) {
         return NULL;
     }

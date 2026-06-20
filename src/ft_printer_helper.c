@@ -14,8 +14,12 @@
 #include "./ft_shell_scan.h"
 
 bool put_mem(t_str *out, const char *src, uint64_t len) {
+    return put_mem_fd(out, src, len, STDOUT_FILENO);
+}
+
+bool put_mem_fd(t_str *out, const char *src, uint64_t len, const int fd) {
     while (len) {
-        if (out->len == out->cap - 1 && !flush_str(out)) {
+        if (out->len == out->cap - 1 && !flush_fd(out, fd)) {
             return false;
         }
 
@@ -52,21 +56,21 @@ bool put_shell_escaped_scan(t_str *out, const t_str *str,
         return ok;
     }
 
-    if (out->cap - 1 - out->len < need && !flush_str(out)) {
+    if (out->cap - 1 - out->len < need && !flush_fd(out, STDOUT_FILENO)) {
         return false;
     }
 
     return shell_escape_append_len(out, str, scan->quote, pad_unquoted, need);
 }
 
-bool flush_str(t_str *out) {
+bool flush_fd(t_str *out, const int fd) {
     if (!out->len) {
         return true;
     }
 
     uint64_t written_total = 0;
     while (written_total < out->len) {
-        const ssize_t written = write(STDOUT_FILENO, out->str + written_total,
+        const ssize_t written = write(fd, out->str + written_total,
                                       (size_t)(out->len - written_total));
 
         if (written > 0) {

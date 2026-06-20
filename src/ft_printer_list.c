@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <unistd.h>
 
 #include "../include/ft_str.h"
 
@@ -20,12 +21,10 @@ typedef struct {
     bool have_quote;
 } t_list_stats;
 
-static void apply_width_(const t_array *context,
-                         const t_file_info *context_infos, t_list_stats *sizes);
+static void apply_width_(const t_array *context, t_list_stats *sizes);
 static void update_stats_(t_list_stats *stats, const t_entry *entry,
                           const t_file_info *info);
-static bool print_list_(const t_print_request *req, const t_file_info *infos,
-                        const t_file_info *context_infos);
+static bool print_list_(const t_print_request *req, const t_file_info *infos);
 static bool left_pad_(t_str *out, uint64_t src_len, uint64_t max_size);
 static bool put_uint_(t_str *out, uint64_t value);
 static bool print_list_rows_(t_str *out, const t_array *array,
@@ -34,41 +33,36 @@ static bool print_list_rows_(t_str *out, const t_array *array,
 
 bool printer_list(const t_print_request *req) {
     t_file_info *infos = NULL;
-    t_file_info *context_infos = NULL;
-    Arena *scratch = arena_alloc(ARENA_SIZE);
     bool ok = false;
 
-    if (!scratch) {
-        return ok;
-    }
-
-    if (!prepare_list_infos(scratch, req->entries, &infos) ||
-        !prepare_list_infos(scratch, req->list_width_context, &context_infos)) {
+    if (!prepare_list_infos(req->file_info_arena, req->entries, &infos)) {
         goto cleanup;
     }
 
-    ok = print_list_(req, infos, context_infos);
+    ok = print_list_(req, infos);
 cleanup:
-    arena_release(scratch);
+    arena_clear(req->file_info_arena);
     return ok;
 }
 
-static void apply_width_(const t_array *context,
-                         const t_file_info *context_infos,
-                         t_list_stats *sizes) {
-    if (!context || !context_infos) {
+static void apply_width_(const t_array *context, t_list_stats *sizes) {
+    if (!context) {
         return;
     }
 
     for (uint64_t index = 0; index < context->len; ++index) {
-        const t_file_info *info = &context_infos[index];
+        const t_entry *entry = context->data[index];
+        const uint64_t links_len =
+            entry->stat_unavailable ? 1 : str_uint_len(entry->st.st_nlink);
+        const uint64_t size_len =
+            entry->stat_unavailable ? 1
+                                    : str_uint_len((uint64_t)entry->st.st_size);
 
-        if (info->links->len > sizes->max_len_links) {
-            sizes->max_len_links = info->links->len;
+        if (links_len > sizes->max_len_links) {
+            sizes->max_len_links = links_len;
         }
-
-        if (info->size->len > sizes->max_len_sizes) {
-            sizes->max_len_sizes = info->size->len;
+        if (size_len > sizes->max_len_sizes) {
+            sizes->max_len_sizes = size_len;
         }
     }
 }
@@ -94,15 +88,14 @@ static void update_stats_(t_list_stats *stats, const t_entry *entry,
     stats->total += info->blocks;
 }
 
-static bool print_list_(const t_print_request *req, const t_file_info *infos,
-                        const t_file_info *context_infos) {
+static bool print_list_(const t_print_request *req, const t_file_info *infos) {
     t_list_stats sizes = {0};
     for (uint64_t index = 0; index < req->entries->len; ++index) {
         const t_entry *entry = req->entries->data[index];
         update_stats_(&sizes, entry, &infos[index]);
     }
 
-    apply_width_(req->list_width_context, context_infos, &sizes);
+    apply_width_(req->list_width_context, &sizes);
     if (!sizes.have_quote) {
         sizes.have_quote = req->quote_padding;
     }
@@ -127,7 +120,7 @@ static bool left_pad_(t_str *out, const uint64_t src_len,
     uint64_t count = max_size - src_len;
 
     while (count) {
-        if (out->len == out->cap - 1 && !flush_str(out)) {
+        if (out->len == out->cap - 1 && !flush_fd(out, STDOUT_FILENO)) {
             return false;
         }
 
