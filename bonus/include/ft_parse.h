@@ -14,6 +14,7 @@ typedef struct s_args {
     bool time;
     bool no_owner;
     bool access_time;
+    bool unsort;
 } t_args;
 
 bool parse_args(uint64_t argc, char **argv, t_args *args, t_array *inputs);

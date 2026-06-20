@@ -107,3 +107,16 @@ static bool realloc_arr_(t_array *array) {
 
     return true;
 }
+
+void array_reverse(t_array *array) {
+    uint64_t left = 0;
+    uint64_t right = array->len;
+
+    while (left < right) {
+        --right;
+        void *tmp = array->data[left];
+        array->data[left] = array->data[right];
+        array->data[right] = tmp;
+        ++left;
+    }
+}

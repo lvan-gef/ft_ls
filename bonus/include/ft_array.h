@@ -23,5 +23,6 @@ bool array_append(t_array *array, void *item);
 void *array_pop(t_array *array);
 void array_clear(t_array *array);
 void array_clear_with(t_array *array, t_array_del del);
+void array_reverse(t_array *array);
 
 #endif // !FT_ARRAY_H
