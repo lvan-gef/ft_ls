@@ -118,6 +118,7 @@ static bool run_listing_(t_params *params, const t_array *array,
                            .print_total = false,
                            .no_owner = params->args->no_owner,
                            .access_time = params->args->access_time,
+                           .no_group = params->args->no_group,
                            .term_size = get_terminal_width()};
 
     if (!req.arena) {
