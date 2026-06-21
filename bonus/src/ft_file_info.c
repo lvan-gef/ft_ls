@@ -38,6 +38,10 @@ struct timespec;
 #define LS_RECENT_SECS ((time_t)(31556952 / 2))
 #endif // ifndef LS_RECENT_SECS //
 
+#ifndef XATTR_STACK_SIZE
+#define XATTR_STACK_SIZE 1024
+#endif // ifndef XATTR_STACK_SIZE
+
 typedef struct {
     char name[LOGIN_NAME_MAX];
     uint64_t id;
@@ -63,6 +67,10 @@ static char file_type_char_(mode_t mode);
 static char exec_char_(mode_t mode, mode_t exec_bit, mode_t special_bit,
                        char lower, char upper);
 static char get_acl_attr_(Arena *arena, const char *path);
+static char classify_xattrs_(const char *names, ssize_t size);
+static bool is_posix_acl_(const char *name);
+static bool is_security_context_(const char *name);
+static char xattr_error_marker_(int e);
 
 bool prepare_list_infos(Arena *arena, const t_array *entries,
                         t_file_info **infos, const bool acces_time) {
@@ -210,7 +218,11 @@ static t_str *get_perm_(Arena *arena, const t_entry *entry) {
     str->str[index++] =
         exec_char_(entry->st.st_mode, S_IXOTH, S_ISVTX, 't', 'T');
 
-    str->str[index++] = get_acl_attr_(arena, entry->path->str);
+    const char chr = get_acl_attr_(arena, entry->path->str);
+    if (chr != ' ') {
+        str->str[index++] = chr;
+    }
+
     str->len = index;
     str->str[index] = '\0';
     return str;
@@ -391,30 +403,79 @@ static char exec_char_(const mode_t mode, const mode_t exec_bit,
 }
 
 static char get_acl_attr_(Arena *arena, const char *path) {
-    char chr = ' ';
-    ssize_t size = llistxattr(path, NULL, 0);
+    errno = 0;
+    char names[XATTR_STACK_SIZE];
+
+    ssize_t size = llistxattr(path, names, sizeof(names));
+    if (size == 0) {
+        return ' ';
+    } else if (size > 0) {
+        return classify_xattrs_(names, size);
+    }
+
+    if (errno != ERANGE) {
+        return xattr_error_marker_(errno);
+    }
+
+    size = llistxattr(path, NULL, 0);
     if (size < 0) {
-        return chr;
+        return xattr_error_marker_(errno);
+    }
+
+    if (size == 0) {
+        return ' ';
     }
 
     Arena_Mark mark = arena_get_mark(arena);
-    char *names = arena_push(arena, (size_t)size);
-    if (!names) {
-        return chr;
+    char *large_names = arena_push(arena, (size_t)size);
+    if (!large_names) {
+        arena_pop_to_mark(arena, mark);
+        return '?';
     }
 
-    llistxattr(path, names, (size_t)size);
-    for (char *p = names; p < names + size; p += ft_strlen(p) + 1) {
-        if (ft_strncmp(p, "system.posix_acl_access", 24) == 0 ||
-            ft_strncmp(p, "system.posix_acl_default", 25) == 0) {
-            chr = '+';
-            goto done;
-        } else {
-            chr = '@';
-            goto done;
-        }
-    }
-done:
+    size = llistxattr(path, large_names, (size_t)size);
+    const char chr = size >= 0 ? classify_xattrs_(large_names, size)
+                               : xattr_error_marker_(errno);
+
     arena_pop_to_mark(arena, mark);
     return chr;
+}
+
+static bool is_posix_acl_(const char *name) {
+    return ft_strncmp(name, "system.posix_acl_access",
+                      sizeof("system.posix_acl_access")) == 0 ||
+           ft_strncmp(name, "system.posix_acl_default",
+                      sizeof("system.posix_acl_default")) == 0;
+}
+
+static bool is_security_context_(const char *name) {
+    return ft_strncmp(name, "security.selinux", sizeof("security.selinux")) ==
+           0;
+}
+
+static char classify_xattrs_(const char *names, ssize_t size) {
+    bool security_context = false;
+    const char *end = names + size;
+
+    for (const char *p = names; p < end; p += ft_strlen(p) + 1) {
+        if (is_posix_acl_(p)) {
+            return '+';
+        }
+
+        if (is_security_context_(p)) {
+            security_context = true;
+        } else {
+            return '+';
+        }
+    }
+
+    return security_context ? '.' : ' ';
+}
+
+static char xattr_error_marker_(const int e) {
+    if (e == ENOTSUP || e == EOPNOTSUPP) {
+        return ' ';
+    }
+
+    return '?';
 }
