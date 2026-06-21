@@ -50,11 +50,12 @@ def print_stats(name: str, durations: list[float]) -> float:
 def run():
     p = "/mnt/bulk2"
 
-    flags = ["R", "a", "l", "r", "t"]
+    flags = ["R", "l"]
+    # flags = ["R", "a", "l", "r", "t"]
     runs = 21
     batch_size = 5
     ls_bin = which("ls")
-    ft_bin = str(Path("./ft_ls").resolve())
+    ft_bin = str(Path("./ft_ls_bonus").resolve())
 
     if ls_bin is None:
         raise RuntimeError("could not find ls in PATH")
