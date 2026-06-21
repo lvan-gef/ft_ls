@@ -20,7 +20,12 @@ from typing import Generator
 from typing import NamedTuple
 
 from create_test_folders import create_test_folders
-from gen_data import BASE_FLAGS, KNOWN_BONUS_FLAGS, gen_data
+from gen_data import (
+    BASE_FLAGS,
+    KNOWN_BONUS_FLAGS,
+    NON_COMPARABLE_BONUS_FLAGS,
+    gen_data,
+)
 
 
 class PtyResult(NamedTuple):
@@ -52,6 +57,9 @@ def main() -> None:
     args = parse_args()
     bonus_mode = bool(args.bonus_flags)
     allowed_flags = BASE_FLAGS + args.bonus_flags
+    invalid_allowed_flags = allowed_flags
+    if bonus_mode:
+        invalid_allowed_flags += NON_COMPARABLE_BONUS_FLAGS
     test_path = Path.cwd().joinpath("ft_ls_tester")
     if test_path.exists():
         remove_test_root(test_path)
@@ -77,7 +85,7 @@ def main() -> None:
                 print("=" * 60)
                 print("Phase 1: Invalid Flags")
                 print("=" * 60)
-                invalid_flags(ft_bin=args.bin, allowed_flags=allowed_flags)
+                invalid_flags(ft_bin=args.bin, allowed_flags=invalid_allowed_flags)
                 checked_invalid_flags = True
 
             print("=" * 60)

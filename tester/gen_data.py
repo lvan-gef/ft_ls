@@ -4,7 +4,8 @@ from typing import Generator
 
 
 BASE_FLAGS = ("R", "a", "l", "r", "t")
-KNOWN_BONUS_FLAGS = ("g", "u", "f", "d", "o", "Z")
+KNOWN_BONUS_FLAGS = ("g", "u", "f", "d", "o")
+NON_COMPARABLE_BONUS_FLAGS = ("G",)
 
 
 def gen_data(
