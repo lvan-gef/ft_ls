@@ -1,5 +1,7 @@
 import os
+import shutil
 import socket
+import subprocess
 import time
 from pathlib import Path
 from typing import Generator
@@ -43,6 +45,11 @@ def create_test_folders(path: Path) -> Paths:
 
     # Various permissions for -l testing
     new_path, files = create_permissions(path=path)
+    out_paths.extend(new_path)
+    out_files.extend(files)
+
+    # ACL/xattr entries for long-list permission marker testing
+    new_path, files = create_acl_xattr(path=path)
     out_paths.extend(new_path)
     out_files.extend(files)
 
@@ -380,6 +387,52 @@ def create_permissions(path: Path) -> tuple[list[Path], list[Path]]:
     restricted_quoted.joinpath("secret.txt").touch()
     restricted_quoted.chmod(0o000)
     out_paths.append(restricted_quoted)
+
+    return out_paths, out_files
+
+
+def create_acl_xattr(path: Path) -> tuple[list[Path], list[Path]]:
+    meta_path = path.joinpath("acl_xattr").absolute()
+    out_files: list[Path] = []
+    out_paths: list[Path] = []
+
+    setfacl = shutil.which("setfacl")
+    setfattr = shutil.which("setfattr")
+    if not setfacl and not setfattr:
+        return out_paths, out_files
+
+    meta_path.mkdir(parents=True, exist_ok=True)
+    out_paths.append(meta_path)
+
+    if setfacl:
+        acl_file = meta_path.joinpath("acl_file.txt")
+        acl_file.touch()
+        acl_result = subprocess.run(
+            [setfacl, "-m", f"u:{os.getuid()}:rw", str(acl_file)],
+            capture_output=True,
+            text=True,
+        )
+        if acl_result.returncode == 0:
+            out_files.append(acl_file)
+        else:
+            acl_file.unlink(missing_ok=True)
+
+    if setfattr:
+        xattr_file = meta_path.joinpath("xattr_file.txt")
+        xattr_file.touch()
+        xattr_result = subprocess.run(
+            [setfattr, "-n", "user.ft_ls_test", "-v", "value", str(xattr_file)],
+            capture_output=True,
+            text=True,
+        )
+        if xattr_result.returncode == 0:
+            out_files.append(xattr_file)
+        else:
+            xattr_file.unlink(missing_ok=True)
+
+    if not out_files:
+        meta_path.rmdir()
+        out_paths.clear()
 
     return out_paths, out_files
 
