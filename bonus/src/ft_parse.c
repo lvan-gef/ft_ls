@@ -56,6 +56,10 @@ bool parse_args(const uint64_t argc, char **argv, t_args *args,
                     args->all = true;
                     break;
                 case 'd': args->directory = true; break;
+                case 'o':
+                    args->no_group = true;
+                    args->list = true;
+                    break;
                 default: print_error_(argv[index]); return clean_up_(inputs);
             }
         }

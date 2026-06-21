@@ -29,7 +29,8 @@ static bool left_pad_(t_str *out, uint64_t src_len, uint64_t max_size);
 static bool put_uint_(t_str *out, uint64_t value);
 static bool print_list_rows_(t_str *out, const t_array *array,
                              const t_file_info *infos,
-                             const t_list_stats *sizes, bool no_owner);
+                             const t_list_stats *sizes, bool no_owner,
+                             bool no_group);
 
 bool printer_list(const t_print_request *req) {
     t_file_info *infos = NULL;
@@ -114,7 +115,7 @@ static bool print_list_(const t_print_request *req, const t_file_info *infos) {
     }
 
     return print_list_rows_(req->buffer, req->entries, infos, &sizes,
-                            req->no_owner);
+                            req->no_owner, req->no_group);
 }
 
 static bool left_pad_(t_str *out, const uint64_t src_len,
@@ -149,7 +150,8 @@ static bool put_uint_(t_str *out, uint64_t value) {
 
 static bool print_list_rows_(t_str *out, const t_array *array,
                              const t_file_info *infos,
-                             const t_list_stats *sizes, const bool no_owner) {
+                             const t_list_stats *sizes, const bool no_owner,
+                             const bool no_group) {
     for (uint64_t index = 0; index < array->len; ++index) {
         const t_entry *entry = array->data[index];
         const t_file_info *info = &infos[index];
@@ -169,9 +171,13 @@ static bool print_list_rows_(t_str *out, const t_array *array,
             return false;
         }
 
-        if (!put_mem(out, info->groupname->str, info->groupname->len) ||
-            !put_mem(out, " ", 1) ||
-            !left_pad_(out, info->size->len, sizes->max_len_sizes) ||
+        if (!no_group &&
+            (!put_mem(out, info->groupname->str, info->groupname->len) ||
+             !put_mem(out, " ", 1))) {
+            return false;
+        }
+
+        if (!left_pad_(out, info->size->len, sizes->max_len_sizes) ||
             !put_mem(out, info->size->str, info->size->len) ||
             !put_mem(out, " ", 1) ||
             !put_mem(out, info->dt->str, info->dt->len) ||

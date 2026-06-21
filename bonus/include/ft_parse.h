@@ -16,6 +16,7 @@ typedef struct s_args {
     bool access_time;
     bool unsort;
     bool directory;
+    bool no_group;
 } t_args;
 
 bool parse_args(uint64_t argc, char **argv, t_args *args, t_array *inputs);

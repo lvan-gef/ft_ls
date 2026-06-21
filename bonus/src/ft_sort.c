@@ -44,8 +44,7 @@ bool sort(t_sort_scratch *scratch, const t_array *array, const bool reverse,
 
     if (sort_time && access_time) {
         cmp = reverse ? cmp_atime_entry_rev_ : cmp_atime_entry_;
-    }
-    else if (sort_time) {
+    } else if (sort_time) {
         cmp = reverse ? cmp_time_entry_rev_ : cmp_time_entry_;
     } else {
         cmp = reverse ? cmp_name_entry_rev_ : cmp_name_entry_;
