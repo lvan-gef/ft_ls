@@ -157,8 +157,9 @@ static bool print_operand_files_(t_params *params, const t_print_request *req,
     }
 
     bool ok = false;
-    const bool sort_time = params->args->time ||
-                           (params->args->access_time && !params->args->list);
+    const bool sort_time = !params->args->unsort &&
+                           (params->args->time ||
+                            (params->args->access_time && !params->args->list));
     if (!params->args->unsort) {
         ok = sort(&params->sort_scratch, &params->operand_files,
                   params->args->reverse, sort_time, params->args->access_time);
@@ -183,8 +184,9 @@ static bool process_queue_(t_params *params, const t_array *array,
     bool printed_dir = false;
     bool inserted_files_dirs_gap = false;
     const bool print_dir_path = params->args->recursive || array->len > 1;
-    const bool sort_time = params->args->time ||
-                           (params->args->access_time && !params->args->list);
+    const bool sort_time = !params->args->unsort &&
+                           (params->args->time ||
+                            (params->args->access_time && !params->args->list));
     t_entry *dir_path = NULL;
 
     if (params->args->unsort) {
@@ -287,8 +289,9 @@ static bool collect_operands_(t_params *params, const t_array *array,
         }
     }
 
-    const bool sort_time = params->args->time ||
-                           (params->args->access_time && !params->args->list);
+    const bool sort_time = !params->args->unsort &&
+                           (params->args->time ||
+                            (params->args->access_time && !params->args->list));
     if (params->dir_queue.len && !params->args->unsort &&
         !sort(&params->sort_scratch, &params->dir_queue, !params->args->reverse,
               sort_time, params->args->access_time)) {
@@ -322,6 +325,11 @@ static t_operand_state classify_operand_(t_params *params, t_str *str,
     bool is_dir_operand = S_ISDIR(st->st_mode);
     const struct stat *st_dir = st;
     struct stat st_target;
+
+    if (params->args->directory && !params->args->list) {
+        goto cleanup;
+    }
+
     if (S_ISLNK(st->st_mode)) {
         if (stat(str->str, &st_target) == 0 && S_ISDIR(st_target.st_mode)) {
             is_dir_operand = true;
@@ -384,8 +392,9 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
 
     clear_directory_entries_(params);
     const struct dirent *dp;
-    const bool sort_time = params->args->time ||
-                           (params->args->access_time && !params->args->list);
+    const bool sort_time = !params->args->unsort &&
+                           (params->args->time ||
+                            (params->args->access_time && !params->args->list));
     while ((dp = readdir(d)) != NULL) {
         const unsigned char dtype = dp->d_type;
         const mode_t mode = dtype_to_mode_(dtype);
