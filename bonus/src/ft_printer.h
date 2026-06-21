@@ -9,13 +9,13 @@
 
 #include "./ft_arena.h"
 
-#define DIRECTORY   "\033[01;34m"
-#define SYMLINK     "\033[01;36m"
-#define SOCKET      "\033[01;35m"
-#define FIFO        "\033[33m"
-#define EXECUTABLE  "\033[01;32m"
-#define BLOCKCHAR   "\033[01;33m"
-#define RESET       "\033[0m"
+#define DIRECTORY "\033[01;34m"
+#define SYMLINK "\033[01;36m"
+#define SOCKET "\033[01;35m"
+#define FIFO "\033[33m"
+#define EXECUTABLE "\033[01;32m"
+#define BLOCKCHAR "\033[01;33m"
+#define RESET "\033[0m"
 
 typedef struct s_array t_array;
 typedef struct s_str t_str;

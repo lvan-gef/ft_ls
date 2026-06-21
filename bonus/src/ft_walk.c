@@ -13,7 +13,7 @@
 #include "../include/ft_str.h"
 #include "../include/ft_walk.h"
 
-#include "../libft/include/libft.h"
+#include "../../libft/include/libft.h"
 
 #include "./ft_arena.h"
 #include "./ft_path_scratch.h"
@@ -176,7 +176,7 @@ static bool print_operand_files_(t_params *params, const t_print_request *req,
     }
 
 cleanup:
-    array_clear_with(&params->operand_files, walk_entry_del);
+    array_clear_with(&params->operand_files, entry_del);
     return ok;
 }
 
@@ -210,7 +210,7 @@ static bool process_queue_(t_params *params, const t_array *array,
             if (params->output_failed) {
                 goto error;
             }
-            walk_entry_free(dir_path);
+            entry_free(dir_path);
             dir_path = NULL;
             continue;
         }
@@ -240,13 +240,13 @@ static bool process_queue_(t_params *params, const t_array *array,
 
         printed_dir = true;
         clear_directory_entries_(params);
-        walk_entry_free(dir_path);
+        entry_free(dir_path);
         dir_path = NULL;
     }
 
     return true;
 error:
-    walk_entry_free(dir_path);
+    entry_free(dir_path);
     return false;
 }
 
@@ -277,7 +277,7 @@ static bool collect_operands_(t_params *params, const t_array *array,
             continue;
         }
 
-        t_entry *entry = walk_entry_new_file_operand(str, &st);
+        t_entry *entry = entry_new_file_operand(str, &st);
         if (!entry) {
             goto failed;
         }
@@ -286,7 +286,7 @@ static bool collect_operands_(t_params *params, const t_array *array,
             params->quote_padding || entry->name_scan.quote != '\0';
 
         if (!array_append(&params->operand_files, entry)) {
-            walk_entry_free(entry);
+            entry_free(entry);
             goto failed;
         }
     }
@@ -400,15 +400,15 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
     while ((dp = readdir(d)) != NULL) {
         const unsigned char dtype = dp->d_type;
         const mode_t mode = dtype_to_mode_(dtype);
-        const bool need_lstat = params->args->list || sort_time ||
-                                params->args->color || mode == 0;
+        const bool need_lstat =
+            params->args->list || sort_time || params->args->color || mode == 0;
 
         if (!params->args->all && dp->d_name[0] == '.' &&
             dp->d_name[1] != '/') {
             continue;
         }
 
-        t_entry *entry = walk_entry_new_scratch_dirent(params->temp_arena, dp);
+        t_entry *entry = entry_new_dirent(params->temp_arena, dp);
         if (!entry) {
             hard_failure = true;
             goto cleanup;
@@ -416,7 +416,7 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
 
         entry->st.st_mode = mode;
         if (need_lstat) {
-            if (!walk_entry_build_path(params->temp_arena, entry, path->path)) {
+            if (!entry_build_path(params->temp_arena, entry, path->path)) {
                 hard_failure = true;
                 goto cleanup;
             }
@@ -478,19 +478,18 @@ static bool queue_recursive_dirs_(t_params *params, const t_str *parent_path) {
                 continue;
             }
 
-            if (!entry->path && !walk_entry_build_path(params->temp_arena,
-                                                       entry, parent_path)) {
+            if (!entry->path &&
+                !entry_build_path(params->temp_arena, entry, parent_path)) {
                 return false;
             }
 
-            t_entry *dir_entry =
-                walk_entry_new_owned_path(entry->path, &entry->st, false);
+            t_entry *dir_entry = entry_new_path(entry->path, &entry->st, false);
             if (!dir_entry) {
                 return false;
             }
 
             if (!array_append(&params->dir_queue, dir_entry)) {
-                walk_entry_free(dir_entry);
+                entry_free(dir_entry);
                 return false;
             }
         }
@@ -501,8 +500,8 @@ static bool queue_recursive_dirs_(t_params *params, const t_str *parent_path) {
 
 static void cleanup_process_(t_params *params) {
     clear_directory_entries_(params);
-    array_clear_with(&params->operand_files, walk_entry_del);
-    array_clear_with(&params->dir_queue, walk_entry_del);
+    array_clear_with(&params->operand_files, entry_del);
+    array_clear_with(&params->dir_queue, entry_del);
     array_destroy(&params->current_entries);
     array_destroy(&params->operand_files);
     array_destroy(&params->dir_queue);
@@ -516,7 +515,7 @@ static void cleanup_process_(t_params *params) {
 
 static bool queue_operand_dir_(t_params *params, const t_str *str,
                                const struct stat *st) {
-    t_entry *dir_entry = walk_entry_new_owned_path(str, st, true);
+    t_entry *dir_entry = entry_new_path(str, st, true);
     if (!dir_entry) {
         return false;
     }
@@ -525,7 +524,7 @@ static bool queue_operand_dir_(t_params *params, const t_str *str,
         params->quote_padding || dir_entry->name_scan.quote != '\0';
 
     if (!array_append(&params->dir_queue, dir_entry)) {
-        walk_entry_free(dir_entry);
+        entry_free(dir_entry);
         return false;
     }
 

@@ -15,13 +15,12 @@ typedef struct s_arena Arena;
 typedef struct s_entry t_entry;
 typedef struct s_str t_str;
 
-t_entry *walk_entry_new_file_operand(const t_str *path, const struct stat *st);
-t_entry *walk_entry_new_owned_path(const t_str *path, const struct stat *st,
-                                   bool is_operand);
-t_entry *walk_entry_new_scratch_dirent(Arena *scratch, const struct dirent *dp);
-bool walk_entry_build_path(Arena *scratch, t_entry *entry,
-                           const t_str *parent_path);
-void walk_entry_free(t_entry *entry);
-void walk_entry_del(void *ptr);
+t_entry *entry_new_file_operand(const t_str *path, const struct stat *st);
+t_entry *entry_new_path(const t_str *path, const struct stat *st,
+                        bool is_operand);
+t_entry *entry_new_dirent(Arena *scratch, const struct dirent *dp);
+bool entry_build_path(Arena *scratch, t_entry *entry, const t_str *parent_path);
+void entry_free(t_entry *entry);
+void entry_del(void *ptr);
 
 #endif // !FT_WALK_ENTRY_H

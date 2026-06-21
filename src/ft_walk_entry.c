@@ -17,10 +17,10 @@ typedef struct {
     char name_buf[];
 } t_scratch_dir_entry;
 
-static t_str *join_dir_path_scratch_(Arena *scratch, const t_str *lhs,
-                                     const t_str *rhs);
+static t_str *join_dir_path_(Arena *scratch, const t_str *lhs,
+                             const t_str *rhs);
 
-t_entry *walk_entry_new_file_operand(const t_str *path, const struct stat *st) {
+t_entry *entry_new_file_operand(const t_str *path, const struct stat *st) {
     t_entry *entry = malloc(sizeof(*entry));
     if (!entry) {
         return NULL;
@@ -41,8 +41,8 @@ t_entry *walk_entry_new_file_operand(const t_str *path, const struct stat *st) {
     return entry;
 }
 
-t_entry *walk_entry_new_owned_path(const t_str *path, const struct stat *st,
-                                   const bool is_operand) {
+t_entry *entry_new_path(const t_str *path, const struct stat *st,
+                        const bool is_operand) {
     t_entry *entry = malloc(sizeof(*entry));
     if (!entry) {
         return NULL;
@@ -54,7 +54,7 @@ t_entry *walk_entry_new_owned_path(const t_str *path, const struct stat *st,
     entry->is_operand = is_operand;
 
     if (!entry->path) {
-        walk_entry_free(entry);
+        entry_free(entry);
         return NULL;
     }
 
@@ -63,8 +63,7 @@ t_entry *walk_entry_new_owned_path(const t_str *path, const struct stat *st,
     return entry;
 }
 
-t_entry *walk_entry_new_scratch_dirent(Arena *scratch,
-                                       const struct dirent *dp) {
+t_entry *entry_new_dirent(Arena *scratch, const struct dirent *dp) {
     const uint64_t name_len = (uint64_t)ft_strlen(dp->d_name);
     if (name_len > UINT64_MAX - (uint64_t)sizeof(t_scratch_dir_entry) - 1) {
         return NULL;
@@ -86,8 +85,8 @@ t_entry *walk_entry_new_scratch_dirent(Arena *scratch,
     return &ent->entry;
 }
 
-bool walk_entry_build_path(Arena *scratch, t_entry *entry,
-                           const t_str *parent_path) {
+bool entry_build_path(Arena *scratch, t_entry *entry,
+                      const t_str *parent_path) {
     if (entry->path) {
         return true;
     }
@@ -95,11 +94,11 @@ bool walk_entry_build_path(Arena *scratch, t_entry *entry,
         return false;
     }
 
-    entry->path = join_dir_path_scratch_(scratch, parent_path, entry->name);
+    entry->path = join_dir_path_(scratch, parent_path, entry->name);
     return entry->path != NULL;
 }
 
-void walk_entry_free(t_entry *entry) {
+void entry_free(t_entry *entry) {
     if (!entry) {
         return;
     }
@@ -115,12 +114,12 @@ void walk_entry_free(t_entry *entry) {
     free(entry);
 }
 
-void walk_entry_del(void *ptr) {
-    walk_entry_free((t_entry *)ptr);
+void entry_del(void *ptr) {
+    entry_free((t_entry *)ptr);
 }
 
-static t_str *join_dir_path_scratch_(Arena *scratch, const t_str *lhs,
-                                     const t_str *rhs) {
+static t_str *join_dir_path_(Arena *scratch, const t_str *lhs,
+                             const t_str *rhs) {
     const bool need_slash = lhs->len != 0 && lhs->str[lhs->len - 1] != '/';
     const uint64_t slash_len = need_slash ? 1U : 0U;
     if (lhs->len > UINT64_MAX - rhs->len - slash_len) {

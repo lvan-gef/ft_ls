@@ -4,7 +4,7 @@
 
 #include "../include/ft_str.h"
 
-#include "../libft/include/libft.h"
+#include "../../libft/include/libft.h"
 
 #include "./ft_shell_escape.h"
 #include "./ft_shell_scan.h"
