@@ -162,6 +162,9 @@ static bool print_operand_files_(t_params *params, const t_print_request *req,
     if (!params->args->unsort) {
         ok = sort(&params->sort_scratch, &params->operand_files,
                   params->args->reverse, sort_time, params->args->access_time);
+        if (!ok) {
+            goto cleanup;
+        }
     }
 
     ok = printer(req);
@@ -169,6 +172,7 @@ static bool print_operand_files_(t_params *params, const t_print_request *req,
         *printed_files = true;
     }
 
+cleanup:
     array_clear_with(&params->operand_files, walk_entry_del);
     return ok;
 }
@@ -351,7 +355,7 @@ static t_operand_state classify_operand_(t_params *params, t_str *str,
         }
     }
 
-    if (is_dir_operand && !params->args->list) {
+    if (is_dir_operand && !params->args->list && !params->args->directory) {
         if (!queue_operand_dir_(params, str, st_dir)) {
             state = OPERAND_FATAL;
             goto cleanup;
