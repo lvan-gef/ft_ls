@@ -9,9 +9,13 @@
 
 #include "../libft/include/libft.h"
 
+#include "./ft_entry.h"
+#include "./ft_printer.h"
 #include "./ft_printer_helper.h"
 #include "./ft_shell_escape.h"
 #include "./ft_shell_scan.h"
+
+static const char *entry_color_(const t_entry *entry);
 
 bool put_mem(t_str *out, const char *src, uint64_t len) {
     return put_mem_fd(out, src, len, STDOUT_FILENO);
@@ -61,6 +65,55 @@ bool put_shell_escaped_scan(t_str *out, const t_str *str,
     }
 
     return shell_escape_append_len(out, str, scan->quote, pad_unquoted, need);
+}
+
+bool put_entry_name(t_str *out, const t_entry *entry, const bool pad_unquoted,
+                    const bool color) {
+    const char *start = NULL;
+    const t_str *name = entry->name ? entry->name : entry->path;
+
+    if (color) {
+        start = entry_color_(entry);
+    }
+
+    if (start && !put_mem(out, start, (uint64_t)ft_strlen(start))) {
+        return false;
+    }
+
+    if (!put_shell_escaped_scan(out, name, &entry->name_scan, pad_unquoted)) {
+        return false;
+    }
+
+    return !start || put_mem(out, RESET, sizeof(RESET) - 1);
+}
+
+static const char *entry_color_(const t_entry *entry) {
+    const mode_t mode = entry->st.st_mode;
+
+    if (entry->stat_unavailable) {
+        return NULL;
+    }
+
+    if (S_ISDIR(mode)) {
+        return DIRECTORY;
+    }
+    if (S_ISLNK(mode)) {
+        return SYMLINK;
+    }
+    if (S_ISSOCK(mode)) {
+        return SOCKET;
+    }
+    if (S_ISFIFO(mode)) {
+        return FIFO;
+    }
+    if (S_ISBLK(mode) || S_ISCHR(mode)) {
+        return BLOCKCHAR;
+    }
+    if (S_ISREG(mode) && (mode & (S_IXUSR | S_IXGRP | S_IXOTH))) {
+        return EXECUTABLE;
+    }
+
+    return NULL;
 }
 
 bool flush_fd(t_str *out, const int fd) {

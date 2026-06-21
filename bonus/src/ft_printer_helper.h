@@ -9,6 +9,7 @@
 #include "./ft_shell_scan.h"
 
 typedef struct s_str t_str;
+typedef struct s_entry t_entry;
 
 #ifndef TABSIZE
 #define TABSIZE UINT64_C(8)
@@ -30,6 +31,8 @@ bool put_mem(t_str *out, const char *src, uint64_t len);
 bool put_mem_fd(t_str *out, const char *src, uint64_t len, int fd);
 bool put_shell_escaped_scan(t_str *out, const t_str *str,
                             const t_shell_scan *scan, bool pad_unquoted);
+bool put_entry_name(t_str *out, const t_entry *entry, bool pad_unquoted,
+                    bool color);
 bool flush_fd(t_str *out, int fd);
 bool put_dir_header(t_str *out, const t_str *dir_header);
 

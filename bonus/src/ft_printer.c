@@ -20,7 +20,7 @@ static void calc_cols_(const t_array *array, t_map *map, bool quoted,
 static bool calc_width_(const t_array *array, bool quoted, uint64_t num_cols,
                         uint64_t *col_widths, uint64_t term_size);
 static bool create_row_(t_str *out, const t_array *array, const t_map *map,
-                        const uint64_t *col_widths, bool quoted);
+                        const uint64_t *col_widths, bool quoted, bool color);
 static bool indent_(t_str *out, uint64_t from, uint64_t to);
 
 bool printer(const t_print_request *req) {
@@ -59,8 +59,8 @@ static bool init_print_row_(const t_print_request *req) {
         return false;
     }
 
-    const bool ok =
-        create_row_(req->buffer, req->entries, &map, col_widths, quoted);
+    const bool ok = create_row_(req->buffer, req->entries, &map, col_widths,
+                                quoted, req->color);
     arena_clear(req->arena);
     return ok;
 }
@@ -131,7 +131,8 @@ static bool calc_width_(const t_array *array, const bool quoted,
 }
 
 static bool create_row_(t_str *out, const t_array *array, const t_map *map,
-                        const uint64_t *col_widths, const bool quoted) {
+                        const uint64_t *col_widths, const bool quoted,
+                        const bool color) {
     const uint64_t files_len = array->len;
 
     for (uint64_t row = 0; row < map->rows; ++row) {
@@ -146,8 +147,7 @@ static bool create_row_(t_str *out, const t_array *array, const t_map *map,
                        : entry->name_scan.display_len;
             const uint64_t max_name_length = col_widths[col++];
 
-            if (!put_shell_escaped_scan(out, entry->name, &entry->name_scan,
-                                        quoted)) {
+            if (!put_entry_name(out, entry, quoted, color)) {
                 return false;
             }
 

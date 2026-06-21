@@ -17,6 +17,7 @@ typedef struct s_args {
     bool unsort;
     bool directory;
     bool no_group;
+    bool color;
 } t_args;
 
 bool parse_args(uint64_t argc, char **argv, t_args *args, t_array *inputs);

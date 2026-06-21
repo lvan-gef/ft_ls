@@ -76,7 +76,6 @@ TEST_COLS_END   ?= 81
 # TEST_COLS_END   ?= 250
 TEST_COLS_STEP  ?= 1
 BONUS_FLAGS     ?= g,u,f,d,o
-# BONUS_FLAGS     ?= Z
 
 TESTER_COLS := --cols-start $(TEST_COLS_START) \
 			   --cols-end $(TEST_COLS_END) \

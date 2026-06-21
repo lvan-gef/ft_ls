@@ -30,7 +30,7 @@ static bool put_uint_(t_str *out, uint64_t value);
 static bool print_list_rows_(t_str *out, const t_array *array,
                              const t_file_info *infos,
                              const t_list_stats *sizes, bool no_owner,
-                             bool no_group);
+                             bool no_group, bool color);
 
 bool printer_list(const t_print_request *req) {
     t_file_info *infos = NULL;
@@ -115,7 +115,7 @@ static bool print_list_(const t_print_request *req, const t_file_info *infos) {
     }
 
     return print_list_rows_(req->buffer, req->entries, infos, &sizes,
-                            req->no_owner, req->no_group);
+                            req->no_owner, req->no_group, req->color);
 }
 
 static bool left_pad_(t_str *out, const uint64_t src_len,
@@ -151,7 +151,7 @@ static bool put_uint_(t_str *out, uint64_t value) {
 static bool print_list_rows_(t_str *out, const t_array *array,
                              const t_file_info *infos,
                              const t_list_stats *sizes, const bool no_owner,
-                             const bool no_group) {
+                             const bool no_group, const bool color) {
     for (uint64_t index = 0; index < array->len; ++index) {
         const t_entry *entry = array->data[index];
         const t_file_info *info = &infos[index];
@@ -182,8 +182,7 @@ static bool print_list_rows_(t_str *out, const t_array *array,
             !put_mem(out, " ", 1) ||
             !put_mem(out, info->dt->str, info->dt->len) ||
             !put_mem(out, " ", 1) ||
-            !put_shell_escaped_scan(out, entry->name, &entry->name_scan,
-                                    sizes->have_quote)) {
+            !put_entry_name(out, entry, sizes->have_quote, color)) {
             return false;
         }
 

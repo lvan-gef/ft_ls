@@ -60,6 +60,7 @@ bool parse_args(const uint64_t argc, char **argv, t_args *args,
                     args->no_group = true;
                     args->list = true;
                     break;
+                case 'G': args->color = true; break;
                 default: print_error_(argv[index]); return clean_up_(inputs);
             }
         }
@@ -102,7 +103,7 @@ static void print_error_(const char *flag) {
     t_str out;
 
     const char cmd[] = "ft_ls: invalid option -- ";
-    const char usage[] = "\nusage: ft_ls [-Ralrtgufd] [file ...]\n";
+    const char usage[] = "\nusage: ft_ls [-RalrtgufdoG] [file ...]\n";
     str_init(&out, buf, sizeof(buf) - 1);
     (void)(put_mem_fd(&out, cmd, sizeof(cmd) - 1, STDERR_FILENO) &&
            put_mem_fd(&out, flag, (uint64_t)ft_strlen(flag), STDERR_FILENO) &&

@@ -119,6 +119,7 @@ static bool run_listing_(t_params *params, const t_array *array,
                            .no_owner = params->args->no_owner,
                            .access_time = params->args->access_time,
                            .no_group = params->args->no_group,
+                           .color = params->args->color,
                            .term_size = get_terminal_width()};
 
     if (!req.arena) {
@@ -399,7 +400,8 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
     while ((dp = readdir(d)) != NULL) {
         const unsigned char dtype = dp->d_type;
         const mode_t mode = dtype_to_mode_(dtype);
-        const bool need_lstat = params->args->list || sort_time || mode == 0;
+        const bool need_lstat = params->args->list || sort_time ||
+                                params->args->color || mode == 0;
 
         if (!params->args->all && dp->d_name[0] == '.' &&
             dp->d_name[1] != '/') {
