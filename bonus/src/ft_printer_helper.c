@@ -72,18 +72,23 @@ static const char *entry_color_(const t_entry *entry) {
     if (S_ISDIR(mode)) {
         return DIRECTORY;
     }
+
     if (S_ISLNK(mode)) {
         return SYMLINK;
     }
+
     if (S_ISSOCK(mode)) {
         return SOCKET;
     }
+
     if (S_ISFIFO(mode)) {
         return FIFO;
     }
+
     if (S_ISBLK(mode) || S_ISCHR(mode)) {
         return BLOCKCHAR;
     }
+
     if (S_ISREG(mode) && (mode & (S_IXUSR | S_IXGRP | S_IXOTH))) {
         return EXECUTABLE;
     }
