@@ -14,7 +14,7 @@ class Paths(NamedTuple):
     cases: list[list[Path]]
 
 
-def create_test_folders(path: Path) -> Paths:
+def create_test_folders(path: Path, include_acl_xattr: bool = False) -> Paths:
     out_paths: list[Path] = []
     out_files: list[Path] = []
 
@@ -48,10 +48,11 @@ def create_test_folders(path: Path) -> Paths:
     out_paths.extend(new_path)
     out_files.extend(files)
 
-    # ACL/xattr entries for long-list permission marker testing
-    new_path, files = create_acl_xattr(path=path)
-    out_paths.extend(new_path)
-    out_files.extend(files)
+    if include_acl_xattr:
+        # ACL/xattr entries for bonus long-list permission marker testing
+        new_path, files = create_acl_xattr(path=path)
+        out_paths.extend(new_path)
+        out_files.extend(files)
 
     # Various file sizes for -l testing
     new_path, files = create_sizes(path=path)

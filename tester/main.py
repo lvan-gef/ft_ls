@@ -65,7 +65,10 @@ def main() -> None:
         remove_test_root(test_path)
 
     try:
-        data = create_test_folders(path=test_path)
+        data = create_test_folders(
+            path=test_path,
+            include_acl_xattr=bonus_mode,
+        )
         cases = list(
             gen_data(
                 paths=data,
