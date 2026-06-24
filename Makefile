@@ -16,17 +16,17 @@ LIBFT_D   := $(LIBFT_DIR)/libft_d.a
 
 CC         := cc
 CPPFLAGS   := -DTERM_SIZE=$(TERM_SIZE) -I include -I $(LIBFT_DIR)/include
-B_CPPFLAGS := -DTERM_SIZE=$(TERM_SIZE) -I bonus/include -I bonus -I $(LIBFT_DIR)/include
+B_CPPFLAGS := -I bonus/include -I bonus -I $(LIBFT_DIR)/include
 CFLAGS     := -std=c11 -D_DEFAULT_SOURCE                                       \
-			 -Wall -Wextra -Werror -Wshadow -Wpedantic                         \
-			 -Wconversion -Wsign-conversion -Wdouble-promotion                 \
-			 -Wformat=2 -Wformat-security                                      \
-			 -Wnull-dereference -Wcast-align -Wswitch-enum -Wundef             \
-			 -Wstrict-prototypes -Wmissing-prototypes                          \
-			 -Wredundant-decls -Wwrite-strings                                 \
-			 -Wimplicit-fallthrough                                            \
-			 -Wcast-qual                                                       \
-			 -Wvla -Walloca -Wold-style-definition
+			  -Wall -Wextra -Werror -Wshadow -Wpedantic                        \
+			  -Wconversion -Wsign-conversion -Wdouble-promotion                \
+			  -Wformat=2 -Wformat-security                                     \
+			  -Wnull-dereference -Wcast-align -Wswitch-enum -Wundef            \
+			  -Wstrict-prototypes -Wmissing-prototypes                         \
+			  -Wredundant-decls -Wwrite-strings                                \
+			  -Wimplicit-fallthrough                                           \
+			  -Wcast-qual                                                      \
+			  -Wvla -Walloca -Wold-style-definition
 
 DEPSFLAGS := -MMD -MP
 
