@@ -197,3 +197,8 @@ $(BD_OBJ_DIR):
 	@mkdir -p $@
 
 -include $(R_DEPS) $(D_DEPS) $(B_DEPS) $(BD_DEPS)
+
+# ./compare_ls.py --bin ./ft_ls_bonus --runs 21
+# ./compare_ls.py --bin ./ft_ls_bonus --flags=-Ral
+# ./compare_ls.py --bin ./ft_ls_bonus --wide-dirs 2000 --deep-levels 150
+# ./compare_ls.py --bin ./ft_ls_bonus --wide-dirs 20000 --deep-levels 150 --runs 20 --warmup 10
