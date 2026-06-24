@@ -3,6 +3,7 @@
 #include <grp.h>
 #include <pwd.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <sys/stat.h>
 #include <time.h>
