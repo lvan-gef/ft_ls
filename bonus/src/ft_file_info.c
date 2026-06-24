@@ -101,7 +101,7 @@ bool prepare_list_infos(Arena *arena, const t_array *entries,
 }
 
 static bool fill_file_info_(Arena *arena, t_file_info *info,
-                            const t_entry *entry, time_t now,
+                            const t_entry *entry, const time_t now,
                             const bool acces_time) {
     if (entry->stat_unavailable) {
         info->perm = get_perm_(arena, entry);
@@ -326,8 +326,9 @@ static t_str *get_group_(Arena *arena, const gid_t group_id) {
     return new_str;
 }
 
-static t_str *get_dt_(Arena *arena, const struct timespec *ctim, time_t now) {
-    Arena_Mark mark = arena_get_mark(arena);
+static t_str *get_dt_(Arena *arena, const struct timespec *ctim,
+                      const time_t now) {
+    const Arena_Mark mark = arena_get_mark(arena);
     t_str *new_str = str_arena_new(arena, DT_LEN);
     if (!new_str) {
         return NULL;
@@ -409,7 +410,9 @@ static char get_acl_attr_(Arena *arena, const char *path) {
     ssize_t size = llistxattr(path, names, sizeof(names));
     if (size == 0) {
         return ' ';
-    } else if (size > 0) {
+    }
+
+    if (size > 0) {
         return classify_xattrs_(names, size);
     }
 
@@ -426,7 +429,7 @@ static char get_acl_attr_(Arena *arena, const char *path) {
         return ' ';
     }
 
-    Arena_Mark mark = arena_get_mark(arena);
+    const Arena_Mark mark = arena_get_mark(arena);
     char *large_names = arena_push(arena, (size_t)size);
     if (!large_names) {
         arena_pop_to_mark(arena, mark);
@@ -453,7 +456,7 @@ static bool is_security_context_(const char *name) {
            0;
 }
 
-static char classify_xattrs_(const char *names, ssize_t size) {
+static char classify_xattrs_(const char *names, const ssize_t size) {
     bool security_context = false;
     const char *end = names + size;
 
@@ -464,8 +467,6 @@ static char classify_xattrs_(const char *names, ssize_t size) {
 
         if (is_security_context_(p)) {
             security_context = true;
-        } else {
-            return '+';
         }
     }
 

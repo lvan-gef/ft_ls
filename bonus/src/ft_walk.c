@@ -56,12 +56,12 @@ static bool queue_recursive_dirs_(t_params *params, const t_str *parent_path);
 static bool collect_operands_(t_params *params, const t_array *array,
                               int *exit_code);
 static void clear_directory_entries_(t_params *params);
-static t_operand_state classify_operand_(t_params *params, t_str *str,
+static t_operand_state classify_operand_(t_params *params, const t_str *str,
                                          struct stat *st, int *exit_code);
 static void cleanup_process_(t_params *params);
 static bool queue_operand_dir_(t_params *params, const t_str *str,
                                const struct stat *st);
-static bool print_error_(t_str *out, const t_str *path, const int e,
+static bool print_error_(t_str *out, const t_str *path, int e,
                          const char *prefix, bool *output_failed);
 static mode_t dtype_to_mode_(unsigned char dtype);
 
@@ -254,7 +254,7 @@ static bool collect_operands_(t_params *params, const t_array *array,
                               int *exit_code) {
     for (uint64_t index = 0; index < array->len; ++index) {
         struct stat st = {0};
-        t_str *str = array->data[index];
+        const t_str *str = array->data[index];
 
         const t_operand_state state =
             classify_operand_(params, str, &st, exit_code);
@@ -306,10 +306,10 @@ failed:
     return false;
 }
 
-static t_operand_state classify_operand_(t_params *params, t_str *str,
+static t_operand_state classify_operand_(t_params *params, const t_str *str,
                                          struct stat *st, int *exit_code) {
     int e = 0;
-    Arena_Mark mark = arena_get_mark(params->temp_arena);
+    const Arena_Mark mark = arena_get_mark(params->temp_arena);
     t_operand_state state = OPERAND_FILE;
 
     if (lstat(str->str, st) == -1) {

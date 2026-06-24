@@ -91,7 +91,7 @@ bool prepare_list_infos(Arena *arena, const t_array *entries,
 }
 
 static bool fill_file_info_(Arena *arena, t_file_info *info,
-                            const t_entry *entry, time_t now) {
+                            const t_entry *entry, const time_t now) {
     if (entry->stat_unavailable) {
         info->perm = get_perm_(arena, entry);
         if (!info->perm) {
@@ -306,8 +306,9 @@ static t_str *get_group_(Arena *arena, const gid_t group_id) {
     return new_str;
 }
 
-static t_str *get_dt_(Arena *arena, const struct timespec *ctim, time_t now) {
-    Arena_Mark mark = arena_get_mark(arena);
+static t_str *get_dt_(Arena *arena, const struct timespec *ctim,
+                      const time_t now) {
+    const Arena_Mark mark = arena_get_mark(arena);
     t_str *new_str = str_arena_new(arena, DT_LEN);
     if (!new_str) {
         return NULL;

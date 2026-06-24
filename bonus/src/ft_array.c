@@ -13,7 +13,7 @@
 
 static bool realloc_arr_(t_array *array);
 
-bool array_init(t_array *array, uint64_t initial_cap) {
+bool array_init(t_array *array, const uint64_t initial_cap) {
     array->len = 0;
     array->cap = 0;
     array->data = NULL;
@@ -43,7 +43,7 @@ void array_destroy(t_array *array) {
     array->cap = 0;
 }
 
-void array_destroy_with(t_array *array, t_array_del del) {
+void array_destroy_with(t_array *array, const t_array_del del) {
     for (uint64_t index = 0; index < array->len; ++index) {
         del(array->data[index]);
     }
@@ -73,7 +73,7 @@ void array_clear(t_array *array) {
     array->len = 0;
 }
 
-void array_clear_with(t_array *array, t_array_del del) {
+void array_clear_with(t_array *array, const t_array_del del) {
     while (array->len) {
         --array->len;
         del(array->data[array->len]);
@@ -108,7 +108,7 @@ static bool realloc_arr_(t_array *array) {
     return true;
 }
 
-void array_reverse(t_array *array) {
+void array_reverse(const t_array *array) {
     uint64_t left = 0;
     uint64_t right = array->len;
 

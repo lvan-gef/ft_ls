@@ -38,7 +38,7 @@ uint64_t get_terminal_width(void) {
         return (uint64_t)ws.ws_col;
     }
 
-    return TERM_SIZE;
+    return 80;
 }
 
 static bool init_print_row_(const t_print_request *req) {

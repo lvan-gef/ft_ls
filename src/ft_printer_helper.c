@@ -13,7 +13,7 @@
 #include "./ft_shell_escape.h"
 #include "./ft_shell_scan.h"
 
-bool put_mem(t_str *out, const char *src, uint64_t len) {
+bool put_mem(t_str *out, const char *src, const uint64_t len) {
     return put_mem_fd(out, src, len, STDOUT_FILENO);
 }
 

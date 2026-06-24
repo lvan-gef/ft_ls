@@ -138,7 +138,7 @@ static bool left_pad_(t_str *out, const uint64_t src_len,
     return true;
 }
 
-static bool put_uint_(t_str *out, uint64_t value) {
+static bool put_uint_(t_str *out, const uint64_t value) {
     char digits[32];
     t_str str;
 

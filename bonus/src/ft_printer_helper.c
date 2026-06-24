@@ -18,9 +18,9 @@
 static const char *entry_color_(const t_entry *entry);
 static bool put_shell_escaped_scan_(t_str *out, const t_str *str,
                                     const t_shell_scan *scan,
-                                    const bool pad_unquoted);
+                                    bool pad_unquoted);
 
-bool put_mem(t_str *out, const char *src, uint64_t len) {
+bool put_mem(t_str *out, const char *src, const uint64_t len) {
     return put_mem_fd(out, src, len, STDOUT_FILENO);
 }
 
