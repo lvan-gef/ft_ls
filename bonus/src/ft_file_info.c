@@ -1,4 +1,4 @@
-#include <bits/local_lim.h>
+#include <limits.h>
 #include <errno.h>
 #include <grp.h>
 #include <pwd.h>
@@ -14,8 +14,8 @@
 #include "./ft_arena.h"
 #include "./ft_entry.h"
 #include "./ft_file_info.h"
-#include "./ft_path_scratch.h"
 #include "./ft_str_arena.h"
+#include "./ft_symlink.h"
 
 struct timespec;
 
@@ -60,7 +60,6 @@ static t_str *get_perm_(Arena *arena, const t_entry *entry);
 static t_str *get_user_(Arena *arena, uid_t user_id);
 static t_str *get_group_(Arena *arena, gid_t group_id);
 static t_str *get_dt_(Arena *arena, const struct timespec *ctim, time_t now);
-static t_str *get_symlink_(Arena *arena, const t_entry *entry);
 static char *cache_lookup_(t_id_cache_entry *cache, uint64_t id);
 static void cache_store_(t_id_cache_entry *cache, uint64_t *next, uint64_t id,
                          const char *name);
@@ -175,7 +174,8 @@ static bool fill_file_info_(Arena *arena, t_file_info *info,
     }
 
     if (S_ISLNK(entry->st.st_mode)) {
-        info->symlink = get_symlink_(arena, entry);
+        info->symlink =
+            read_symlink(arena, entry->path, (uint64_t)entry->st.st_size, NULL);
         if (!info->symlink) {
             return false;
         }
@@ -358,15 +358,6 @@ static t_str *get_dt_(Arena *arena, const struct timespec *ctim,
     new_str->len = DT_LEN - 1;
     new_str->str[DT_LEN - 1] = '\0';
     return new_str;
-}
-
-static t_str *get_symlink_(Arena *arena, const t_entry *entry) {
-    if (!entry->path) {
-        return NULL;
-    }
-
-    return path_read_symlink(arena, entry->path, (uint64_t)entry->st.st_size,
-                             NULL);
 }
 
 static char *cache_lookup_(t_id_cache_entry *cache, const uint64_t id) {

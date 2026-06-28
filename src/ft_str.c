@@ -64,7 +64,6 @@ t_str *str_dup(const t_str *src) {
     }
 
     str_copy_cstr(new_str, src->str, src->len);
-
     return new_str;
 }
 

@@ -14,7 +14,7 @@ LIBFT_DIR := libft
 LIBFT     := $(LIBFT_DIR)/libft.a
 LIBFT_D   := $(LIBFT_DIR)/libft_d.a
 
-CC         := cc
+CC         ?= cc
 CPPFLAGS   := -DTERM_SIZE=$(TERM_SIZE) -I include -I $(LIBFT_DIR)/include
 B_CPPFLAGS := -I bonus/include -I bonus -I $(LIBFT_DIR)/include
 CFLAGS     := -std=c11 -D_DEFAULT_SOURCE                                       \
@@ -39,12 +39,12 @@ D_LDFLAGS  := $(SANITIZERS) -rdynamic
 
 SRC_DIR       := src
 BONUS_SRC_DIR := bonus/src
-SRC_FILES := ft_arena.c ft_array.c ft_file_info.c ft_parse.c ft_path_scratch.c \
-			 ft_printer.c ft_printer_helper.c ft_printer_list.c                \
-			 ft_shell_escape.c ft_sort.c                                       \
-			 ft_str_arena.c ft_str.c                                           \
-			 ft_walk.c ft_walk_entry.c                                         \
-			 main.c
+SRC_FILES     := ft_arena.c ft_array.c ft_file_info.c ft_parse.c ft_symlink.c  \
+				 ft_printer.c ft_printer_helper.c ft_printer_list.c            \
+			     ft_shell_escape.c ft_sort.c                                   \
+			     ft_str_arena.c ft_str.c                                       \
+			     ft_walk.c ft_walk_entry.c                                     \
+			     main.c
 
 SRCS   := $(addprefix $(SRC_DIR)/, $(SRC_FILES))
 B_SRCS := $(addprefix $(BONUS_SRC_DIR)/, $(SRC_FILES))

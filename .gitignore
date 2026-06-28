@@ -15,3 +15,6 @@ obj_bonus/
 obj_bonus_debug/
 
 libft/libft.a
+
+ft_ls_compare_tree/
+ft_ls_compare_results/

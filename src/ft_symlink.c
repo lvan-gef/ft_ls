@@ -6,8 +6,8 @@
 #include <unistd.h>
 
 #include "./ft_arena.h"
-#include "./ft_path_scratch.h"
 #include "./ft_str_arena.h"
+#include "./ft_symlink.h"
 
 #ifndef PATH_MAX
 #define PATH_MAX UINT64_C(4096)
@@ -15,8 +15,8 @@
 
 #define SYMLINK_CAP_MAX (UINT64_MAX / UINT64_C(2))
 
-t_str *path_read_symlink(Arena *scratch, const t_str *path,
-                         const uint64_t target_size, int *read_err) {
+t_str *read_symlink(Arena *scratch, const t_str *path,
+                    const uint64_t target_size, int *read_err) {
     if (read_err) {
         *read_err = 0;
     }
@@ -58,7 +58,7 @@ t_str *path_read_symlink(Arena *scratch, const t_str *path,
             }
 
             str->len = read_len;
-            str->str[str->len] = '\0';
+            str->str[read_len] = '\0';
             return str;
         }
 
