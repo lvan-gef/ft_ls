@@ -9,9 +9,14 @@
 
 #include "../libft/include/libft.h"
 
+#include "./ft_entry.h"
 #include "./ft_printer_helper.h"
 #include "./ft_shell_escape.h"
 #include "./ft_shell_scan.h"
+
+static bool put_shell_escaped_scan_(t_str *out, const t_str *str,
+                                    const t_shell_scan *scan,
+                                    bool pad_unquoted);
 
 bool put_mem(t_str *out, const char *src, const uint64_t len) {
     return put_mem_fd(out, src, len, STDOUT_FILENO);
@@ -35,8 +40,16 @@ bool put_mem_fd(t_str *out, const char *src, uint64_t len, const int fd) {
     return true;
 }
 
-bool put_shell_escaped_scan(t_str *out, const t_str *str,
-                            const t_shell_scan *scan, const bool pad_unquoted) {
+bool put_entry_name(t_str *out, const t_entry *entry,
+                    const bool pad_unquoted) {
+    const t_str *name = entry->name ? entry->name : entry->path;
+
+    return put_shell_escaped_scan_(out, name, &entry->name_scan, pad_unquoted);
+}
+
+static bool put_shell_escaped_scan_(t_str *out, const t_str *str,
+                                    const t_shell_scan *scan,
+                                    const bool pad_unquoted) {
     const uint64_t need =
         pad_unquoted ? scan->padded_display_len : scan->display_len;
 
@@ -110,10 +123,10 @@ bool put_dir_header(t_str *out, const t_str *dir_header) {
 
     const uint64_t need = shell_escaped_len(dir_header, scan.quote, false);
 
-    return put_shell_escaped_scan(out, dir_header,
-                                  &(t_shell_scan){.display_len = need,
-                                                  .padded_display_len = need,
-                                                  .quote = scan.quote},
-                                  false) &&
+    return put_shell_escaped_scan_(out, dir_header,
+                                   &(t_shell_scan){.display_len = need,
+                                                   .padded_display_len = need,
+                                                   .quote = scan.quote},
+                                   false) &&
            put_mem(out, ":\n", 2);
 }

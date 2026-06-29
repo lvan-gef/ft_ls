@@ -167,8 +167,7 @@ static bool print_list_rows_(t_str *out, const t_array *array,
             !put_mem(out, " ", 1) ||
             !put_mem(out, info->dt->str, info->dt->len) ||
             !put_mem(out, " ", 1) ||
-            !put_shell_escaped_scan(out, entry->name, &entry->name_scan,
-                                    sizes->have_quote)) {
+            !put_entry_name(out, entry, sizes->have_quote)) {
             return false;
         }
 

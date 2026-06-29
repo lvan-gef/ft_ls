@@ -133,8 +133,7 @@ static bool create_row_(t_str *out, const t_array *array, const t_map *map,
                        : entry->name_scan.display_len;
             const uint64_t max_name_length = col_widths[col++];
 
-            if (!put_shell_escaped_scan(out, entry->name, &entry->name_scan,
-                                        quoted)) {
+            if (!put_entry_name(out, entry, quoted)) {
                 return false;
             }
 
