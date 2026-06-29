@@ -58,7 +58,7 @@ bool parse_args(const uint64_t argc, char **argv, t_args *args,
                     args->list = true;
                     break;
                 case 'G': args->color = true; break;
-                default: print_error_(argv[index]); false;
+                default: print_error_(argv[index]); return false;
             }
         }
     }

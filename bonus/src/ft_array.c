@@ -37,6 +37,19 @@ bool array_init(t_array *array, const uint64_t initial_cap) {
     return true;
 }
 
+void array_reverse(const t_array *array) {
+    uint64_t left = 0;
+    uint64_t right = array->len;
+
+    while (left < right) {
+        --right;
+        void *tmp = array->data[left];
+        array->data[left] = array->data[right];
+        array->data[right] = tmp;
+        ++left;
+    }
+}
+
 void array_destroy(t_array *array) {
     free((void *)array->data);
     array->data = NULL;
