@@ -6,7 +6,7 @@
 
 #include "../include/ft_array.h"
 
-#include "../../libft/include/libft.h"
+#include "../libft/include/libft.h"
 
 #ifndef MAX_ALLOC_SIZE
 #define MAX_ALLOC_SIZE ((uint64_t)(PTRDIFF_MAX / sizeof(void *)))
@@ -75,10 +75,11 @@ void array_clear(t_array *array) {
 }
 
 void array_clear_with(t_array *array, const t_array_del del) {
-    while (array->len) {
-        --array->len;
+    for (uint64_t index = 0; index < array->len; ++index) {
         del(array->data[array->len]);
     }
+
+    array->len = 0;
 }
 
 static bool realloc_arr_(t_array *array) {
@@ -102,22 +103,10 @@ static bool realloc_arr_(t_array *array) {
         ft_memcpy((void *)new_data, (void *)old_data,
                   array->len * sizeof(*array->data));
     }
+
     free((void *)old_data);
     array->data = new_data;
     array->cap = new_cap;
 
     return true;
-}
-
-void array_reverse(const t_array *array) {
-    uint64_t left = 0;
-    uint64_t right = array->len;
-
-    while (left < right) {
-        --right;
-        void *tmp = array->data[left];
-        array->data[left] = array->data[right];
-        array->data[right] = tmp;
-        ++left;
-    }
 }
