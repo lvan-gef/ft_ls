@@ -40,4 +40,4 @@ bool printer(const t_print_request *req);
 bool printer_list(const t_print_request *req);
 uint64_t get_terminal_width(void);
 
-#endif // !FT_PRINTER_H
+#endif /* ifndef FT_PRINTER_H */

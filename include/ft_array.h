@@ -6,7 +6,7 @@
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE UINT64_C(64)
-#endif // ifndef ARRAY_SIZE //
+#endif /* ifndef ARRAY_SIZE */
 
 typedef void (*t_array_del)(void *ptr);
 
@@ -24,4 +24,4 @@ void *array_pop(t_array *array);
 void array_clear(t_array *array);
 void array_clear_with(t_array *array, t_array_del del);
 
-#endif // !FT_ARRAY_H
+#endif /* ifndef FT_ARRAY_H */

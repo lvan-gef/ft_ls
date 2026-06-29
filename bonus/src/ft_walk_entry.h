@@ -23,4 +23,4 @@ bool entry_build_path(Arena *scratch, t_entry *entry, const t_str *parent_path);
 void entry_free(t_entry *entry);
 void entry_del(void *ptr);
 
-#endif // !FT_WALK_ENTRY_H
+#endif /* ifndef FT_WALK_ENTRY_H */

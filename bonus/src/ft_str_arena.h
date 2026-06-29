@@ -14,4 +14,4 @@ t_str *str_arena_new(Arena *arena, uint64_t cap);
 t_str *str_arena_from_cstr(Arena *arena, const char *src);
 t_str *str_arena_from_uint(Arena *arena, uint64_t value);
 
-#endif // !FT_STR_ARENA_H
+#endif /* ifndef FT_STR_ARENA_H */

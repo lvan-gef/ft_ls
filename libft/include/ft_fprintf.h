@@ -70,4 +70,4 @@ int ft_fprintf(int fd, const char *s, ...);
 ssize_t f_write_str(const char *s, int fd);
 
 ssize_t f_write_ascii(int c, int fd);
-#endif
+#endif /* ifndef FT_FPRINTF_H */

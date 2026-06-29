@@ -17,7 +17,7 @@
 
 #ifndef BUFFER_SIZE
 #define BUFFER_SIZE 1024
-#endif
+#endif /* ifndef BUFFER_SIZE */
 
 /**
  * @brief Read a line from a file descriptor
@@ -77,4 +77,4 @@ size_t gnl_str_len(const char *str);
  * @return void
  */
 void gnl_strjoin(char *dst, const char *str1, const char *str2, size_t size);
-#endif
+#endif /* ifndef GET_NEXT_LINE_H */

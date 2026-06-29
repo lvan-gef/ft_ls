@@ -529,4 +529,4 @@ int ft_tolower(int c);
  */
 int ft_toupper(int c);
 
-#endif
+#endif /* ifndef LIBFT_H */

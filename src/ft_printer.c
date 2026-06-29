@@ -7,7 +7,7 @@
 
 #ifndef TERM_SIZE
 #define TERM_SIZE 80
-#endif // ifndef !TERM_SIZE
+#endif /* ifndef TERM_SIZE */
 
 #if TERM_SIZE < 1
 #error "TERM_SIZE must be at least 1"

@@ -77,4 +77,4 @@ int write_ascii(int c);
  * @return int >=0 | -1
  */
 int write_str(const char *s);
-#endif
+#endif /* ifndef FT_PRINTF_H */

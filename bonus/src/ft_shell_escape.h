@@ -16,4 +16,4 @@ t_str *shell_escape_str(const t_str *str, char quote);
 bool shell_escape_append_len(t_str *dst, const t_str *str, char quote,
                              bool pad_unquoted, uint64_t escaped_len);
 
-#endif // !FT_SHELL_ESCAPE_H
+#endif /* ifndef FT_SHELL_ESCAPE_H */

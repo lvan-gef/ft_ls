@@ -1,6 +1,6 @@
-#include <limits.h>
 #include <errno.h>
 #include <grp.h>
+#include <limits.h>
 #include <pwd.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -20,23 +20,23 @@ struct timespec;
 
 #ifndef CACHE_SIZE
 #define CACHE_SIZE UINT64_C(64)
-#endif // ifndef CACHE_SIZE //
+#endif /* ifndef CACHE_SIZE */
 
 #ifndef PERMISSION_SIZE
 #define PERMISSION_SIZE UINT64_C(12)
-#endif // ifndef PERMISSION_SIZE //
+#endif /* ifndef PERMISSION_SIZE */
 
 #ifndef DT_LEN
 #define DT_LEN UINT64_C(13)
-#endif // ifndef DT_LEN //
+#endif /* ifndef DT_LEN */
 
 #ifndef LOGIN_NAME_MAX
 #define LOGIN_NAME_MAX INT64_C(256)
-#endif // ifndef LOGIN_NAME_MAX //
+#endif /* ifndef LOGIN_NAME_MAX */
 
 #ifndef LS_RECENT_SECS
 #define LS_RECENT_SECS ((time_t)(31556952 / 2))
-#endif // ifndef LS_RECENT_SECS //
+#endif /* ifndef LS_RECENT_SECS */
 
 typedef struct {
     char name[LOGIN_NAME_MAX];
@@ -64,7 +64,7 @@ static char exec_char_(mode_t mode, mode_t exec_bit, mode_t special_bit,
 
 bool prepare_list_infos(Arena *arena, const t_array *entries,
                         t_file_info **infos) {
-    if (!entries || entries->len == 0) {
+    if (!entries || !entries->len) {
         *infos = NULL;
         return true;
     }
@@ -174,7 +174,6 @@ static bool fill_file_info_(Arena *arena, t_file_info *info,
 
 static t_str *get_perm_(Arena *arena, const t_entry *entry) {
     t_str *str = str_arena_new(arena, PERMISSION_SIZE);
-
     if (!str) {
         return NULL;
     }

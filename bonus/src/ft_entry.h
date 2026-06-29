@@ -17,4 +17,4 @@ typedef struct s_entry {
     bool is_operand;
 } t_entry;
 
-#endif // !FT_ENTRY_H
+#endif /* ifndef FT_ENTRY_H */

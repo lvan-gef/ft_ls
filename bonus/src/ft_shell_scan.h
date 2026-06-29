@@ -10,4 +10,4 @@ typedef struct s_shell_scan {
     char quote;
 } t_shell_scan;
 
-#endif // !FT_SHELL_SCAN_H
+#endif /* ifndef FT_SHELL_SCAN_H */

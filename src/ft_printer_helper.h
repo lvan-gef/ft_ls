@@ -12,7 +12,7 @@ typedef struct s_str t_str;
 
 #ifndef TABSIZE
 #define TABSIZE UINT64_C(8)
-#endif // ifndef TABSIZE //
+#endif /* ifndef TABSIZE */
 
 #ifndef SPACE_GAP
 #define SPACE_GAP UINT64_C(2)
@@ -20,11 +20,11 @@ typedef struct s_str t_str;
 
 #ifndef MIN_COLUMN_WIDTH
 #define MIN_COLUMN_WIDTH UINT64_C(3)
-#endif // ifndef !MIN_COLUMN_WIDTH
+#endif /* ifndef MIN_COLUMN_WIDTH */
 
 #ifndef OUTPUT_BUFFER_CAP
 #define OUTPUT_BUFFER_CAP UINT64_C(65536)
-#endif // ifndef !OUTPUT_BUFFER_CAP
+#endif /* ifndef OUTPUT_BUFFER_CAP */
 
 bool put_mem(t_str *out, const char *src, uint64_t len);
 bool put_mem_fd(t_str *out, const char *src, uint64_t len, int fd);
@@ -33,4 +33,4 @@ bool put_shell_escaped_scan(t_str *out, const t_str *str,
 bool flush_fd(t_str *out, int fd);
 bool put_dir_header(t_str *out, const t_str *dir_header);
 
-#endif // !FT_PRINTER_HELPER_H
+#endif /* ifndef FT_PRINTER_HELPER_H */

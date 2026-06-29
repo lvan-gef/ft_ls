@@ -11,7 +11,7 @@
 
 #ifndef PATH_MAX
 #define PATH_MAX UINT64_C(4096)
-#endif // ifndef PATH_MAX //
+#endif /* ifndef PATH_MAX */
 
 #define SYMLINK_CAP_MAX (UINT64_MAX / UINT64_C(2))
 
