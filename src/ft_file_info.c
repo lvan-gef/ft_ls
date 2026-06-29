@@ -52,13 +52,15 @@ static t_id_cache_entry group_cache[CACHE_SIZE] = {0};
 static bool fill_file_info_(Arena *arena, t_file_info *info,
                             const t_entry *entry, time_t now);
 static t_str *get_perm_(Arena *arena, const t_entry *entry);
-static t_str *get_user_(Arena *arena, uid_t user_id);
-static t_str *get_group_(Arena *arena, gid_t group_id);
-static t_str *get_dt_(Arena *arena, const struct timespec *ctim, time_t now);
+static char file_type_char_(mode_t mode);
+static t_str *get_links_(Arena *arena, const t_entry *entry);
+static t_str *get_user_(Arena *arena, const t_entry *entry);
+static t_str *get_group_(Arena *arena, const t_entry *entry);
+static t_str *get_size_(Arena *arena, const t_entry *entry);
+static t_str *get_dt_(Arena *arena, time_t now, const t_entry *entry);
 static char *cache_lookup_(t_id_cache_entry *cache, uint64_t id);
 static void cache_store_(t_id_cache_entry *cache, uint64_t *next, uint64_t id,
                          const char *name);
-static char file_type_char_(mode_t mode);
 static char exec_char_(mode_t mode, mode_t exec_bit, mode_t special_bit,
                        char lower, char upper);
 
@@ -92,68 +94,32 @@ bool prepare_list_infos(Arena *arena, const t_array *entries,
 
 static bool fill_file_info_(Arena *arena, t_file_info *info,
                             const t_entry *entry, const time_t now) {
-    if (entry->stat_unavailable) {
-        info->perm = get_perm_(arena, entry);
-        if (!info->perm) {
-            return false;
-        }
-
-        info->links = str_arena_from_cstr(arena, "?");
-        if (!info->links) {
-            return false;
-        }
-
-        info->username = str_arena_from_cstr(arena, "?");
-        if (!info->username) {
-            return false;
-        }
-
-        info->groupname = str_arena_from_cstr(arena, "?");
-        if (!info->groupname) {
-            return false;
-        }
-
-        info->size = str_arena_from_cstr(arena, "?");
-        if (!info->size) {
-            return false;
-        }
-
-        info->dt = str_arena_from_cstr(arena, "           ?");
-        if (!info->dt) {
-            return false;
-        }
-
-        info->symlink = NULL;
-        info->blocks = 0;
-        return true;
-    }
-
     info->perm = get_perm_(arena, entry);
     if (!info->perm) {
         return false;
     }
 
-    info->links = str_arena_from_uint(arena, entry->st.st_nlink);
+    info->links = get_links_(arena, entry);
     if (!info->links) {
         return false;
     }
 
-    info->username = get_user_(arena, entry->st.st_uid);
+    info->username = get_user_(arena, entry);
     if (!info->username) {
         return false;
     }
 
-    info->groupname = get_group_(arena, entry->st.st_gid);
+    info->groupname = get_group_(arena, entry);
     if (!info->groupname) {
         return false;
     }
 
-    info->size = str_arena_from_uint(arena, (uint64_t)entry->st.st_size);
+    info->size = get_size_(arena, entry);
     if (!info->size) {
         return false;
     }
 
-    info->dt = get_dt_(arena, &entry->st.st_mtim, now);
+    info->dt = get_dt_(arena, now, entry);
     if (!info->dt) {
         return false;
     }
@@ -240,46 +206,63 @@ static char file_type_char_(const mode_t mode) {
     return '?';
 }
 
-static t_str *get_user_(Arena *arena, const uid_t user_id) {
-    const char *name = cache_lookup_(user_cache, (uint64_t)user_id);
+static t_str *get_links_(Arena *arena, const t_entry *entry) {
+    if (entry->stat_unavailable) {
+        return str_arena_from_cstr(arena, "?");
+    }
+
+    return str_arena_from_uint(arena, (uint64_t)entry->st.st_nlink);
+}
+
+static t_str *get_user_(Arena *arena, const t_entry *entry) {
+    if (entry->stat_unavailable) {
+        return str_arena_from_cstr(arena, "?");
+    }
+
+    const uint64_t user_id = (uint64_t)entry->st.st_uid;
+    const char *name = cache_lookup_(user_cache, user_id);
     if (name) {
         return str_arena_from_cstr(arena, name);
     }
 
     errno = 0;
-    const struct passwd *pwd = getpwuid(user_id);
+    const struct passwd *pwd = getpwuid((uid_t)user_id);
     t_str *new_str = NULL;
     if (pwd) {
         new_str = str_arena_from_cstr(arena, pwd->pw_name);
         if (!new_str) {
             return NULL;
         }
-        cache_store_(user_cache, &user_index, (uint64_t)user_id, pwd->pw_name);
+        cache_store_(user_cache, &user_index, user_id, pwd->pw_name);
     } else {
         const int err = errno;
 
-        new_str = str_arena_from_uint(arena, (uint64_t)user_id);
+        new_str = str_arena_from_uint(arena, user_id);
         if (!new_str) {
             return NULL;
         }
 
         if (!err) {
-            cache_store_(user_cache, &user_index, (uint64_t)user_id,
-                         new_str->str);
+            cache_store_(user_cache, &user_index, user_id, new_str->str);
         }
     }
 
     return new_str;
 }
 
-static t_str *get_group_(Arena *arena, const gid_t group_id) {
-    const char *name = cache_lookup_(group_cache, (uint64_t)group_id);
+static t_str *get_group_(Arena *arena, const t_entry *entry) {
+    if (entry->stat_unavailable) {
+        return str_arena_from_cstr(arena, "?");
+    }
+
+    const uint64_t group_id = (uint64_t)entry->st.st_gid;
+    const char *name = cache_lookup_(group_cache, group_id);
     if (name) {
         return str_arena_from_cstr(arena, name);
     }
 
     errno = 0;
-    const struct group *grp = getgrgid(group_id);
+    const struct group *grp = getgrgid((gid_t)group_id);
     t_str *new_str = NULL;
     if (grp) {
         new_str = str_arena_from_cstr(arena, grp->gr_name);
@@ -287,33 +270,43 @@ static t_str *get_group_(Arena *arena, const gid_t group_id) {
             return NULL;
         }
 
-        cache_store_(group_cache, &group_index, (uint64_t)group_id,
-                     grp->gr_name);
+        cache_store_(group_cache, &group_index, group_id, grp->gr_name);
     } else {
         const int err = errno;
 
-        new_str = str_arena_from_uint(arena, (uint64_t)group_id);
+        new_str = str_arena_from_uint(arena, group_id);
         if (!new_str) {
             return NULL;
         }
 
         if (!err) {
-            cache_store_(group_cache, &group_index, (uint64_t)group_id,
-                         new_str->str);
+            cache_store_(group_cache, &group_index, group_id, new_str->str);
         }
     }
 
     return new_str;
 }
 
-static t_str *get_dt_(Arena *arena, const struct timespec *ctim,
-                      const time_t now) {
+static t_str *get_size_(Arena *arena, const t_entry *entry) {
+    if (entry->stat_unavailable) {
+        return str_arena_from_cstr(arena, "?");
+    }
+
+    return str_arena_from_uint(arena, (uint64_t)entry->st.st_size);
+}
+
+static t_str *get_dt_(Arena *arena, const time_t now, const t_entry *entry) {
+    if (entry->stat_unavailable) {
+        return str_arena_from_cstr(arena, "           ?");
+    }
+
     const Arena_Mark mark = arena_get_mark(arena);
     t_str *new_str = str_arena_new(arena, DT_LEN);
     if (!new_str) {
         return NULL;
     }
 
+    const struct timespec *ctim = &entry->st.st_mtim;
     const time_t stamp = ctim->tv_sec;
     const char *dt = ctime(&stamp);
     if (!dt) {
