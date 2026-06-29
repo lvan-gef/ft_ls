@@ -16,4 +16,4 @@ typedef struct s_args {
 
 bool parse_args(uint64_t argc, char **argv, t_args *args, t_array *inputs);
 
-#endif // !FT_PARSE_H
+#endif /* ifndef FT_PARSE_H */

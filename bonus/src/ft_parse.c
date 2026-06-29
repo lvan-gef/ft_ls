@@ -12,8 +12,6 @@
 #include "./ft_printer_helper.h"
 
 static bool append_input_(const char *arg, t_array *inputs);
-static bool clean_up_(t_array *inputs);
-static void del_str_(void *ptr);
 static void print_error_(const char *flag);
 
 bool parse_args(const uint64_t argc, char **argv, t_args *args,
@@ -22,15 +20,14 @@ bool parse_args(const uint64_t argc, char **argv, t_args *args,
 
     for (uint64_t index = 1; index < argc; ++index) {
         const size_t len = ft_strlen(argv[index]);
-        if (is_flag && argv[index][0] == '-' && argv[index][1] == '-' &&
-            argv[index][2] == '\0') {
+        if (is_flag && !ft_strncmp(argv[index], "--", 2)) {
             is_flag = false;
             continue;
         }
 
         if (!is_flag || *argv[index] != '-' || len == 1) {
             if (!append_input_(argv[index], inputs)) {
-                return clean_up_(inputs);
+                return false;
             }
 
             continue;
@@ -61,14 +58,14 @@ bool parse_args(const uint64_t argc, char **argv, t_args *args,
                     args->list = true;
                     break;
                 case 'G': args->color = true; break;
-                default: print_error_(argv[index]); return clean_up_(inputs);
+                default: print_error_(argv[index]); false;
             }
         }
     }
 
     if (!inputs->len) {
         if (!append_input_(".", inputs)) {
-            return clean_up_(inputs);
+            return false;
         }
     }
 
@@ -87,15 +84,6 @@ static bool append_input_(const char *arg, t_array *inputs) {
     }
 
     return true;
-}
-
-static bool clean_up_(t_array *inputs) {
-    array_clear_with(inputs, del_str_);
-    return false;
-}
-
-static void del_str_(void *ptr) {
-    str_free((t_str *)ptr);
 }
 
 static void print_error_(const char *flag) {
