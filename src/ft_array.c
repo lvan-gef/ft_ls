@@ -76,7 +76,7 @@ void array_clear(t_array *array) {
 
 void array_clear_with(t_array *array, const t_array_del del) {
     for (uint64_t index = 0; index < array->len; ++index) {
-        del(array->data[array->len]);
+        del(array->data[index]);
     }
 
     array->len = 0;
