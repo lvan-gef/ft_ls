@@ -6,4 +6,4 @@ typedef struct s_array t_array;
 
 int process(const t_args *args, const t_array *array);
 
-#endif // !FT_WALK_H
+#endif /* ifndef FT_WALK_H */

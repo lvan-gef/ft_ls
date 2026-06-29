@@ -31,7 +31,6 @@ typedef struct {
     t_array dir_queue;
     t_array operand_files;
     t_array current_entries;
-    char out_buf[OUTPUT_BUFFER_CAP];
     t_str out;
     bool output_failed;
     bool quote_padding;
@@ -68,10 +67,10 @@ static mode_t dtype_to_mode_(unsigned char dtype);
 int process(const t_args *args, const t_array *array) {
     t_params params = {0};
     int exit_code = 0;
+    char out_buf[OUTPUT_BUFFER_CAP];
 
     params.args = args;
-    params.out =
-        (t_str){.str = params.out_buf, .cap = sizeof(params.out_buf), .len = 0};
+    params.out = (t_str){.str = out_buf, .cap = sizeof(out_buf), .len = 0};
     params.out.str[0] = '\0';
     params.temp_arena = arena_alloc(ARENA_SIZE);
     if (!params.temp_arena) {
@@ -231,16 +230,16 @@ static bool collect_operands_(t_params *params, const t_array *array,
 
         const t_operand_state state =
             classify_operand_(params, str, &st, exit_code);
-        if (state == OPERAND_SKIP) {
-            t_shell_scan scan;
+        switch (state) {
+            case OPERAND_SKIP: {
+                t_shell_scan scan;
 
-            shell_scan_str(str, &scan);
-            params->quote_padding = params->quote_padding || scan.quote != '\0';
-            continue;
-        }
-
-        if (state == OPERAND_FATAL) {
-            goto failed;
+                shell_scan_str(str, &scan);
+                params->quote_padding = params->quote_padding || scan.quote;
+                continue;
+            }
+            case OPERAND_FATAL: goto failed;
+            case OPERAND_FILE: break;
         }
 
         if (S_ISDIR(st.st_mode)) {
@@ -255,9 +254,7 @@ static bool collect_operands_(t_params *params, const t_array *array,
             goto failed;
         }
 
-        params->quote_padding =
-            params->quote_padding || entry->name_scan.quote != '\0';
-
+        params->quote_padding = params->quote_padding || entry->name_scan.quote;
         if (!array_append(&params->operand_files, entry)) {
             entry_free(entry);
             goto failed;
@@ -282,7 +279,7 @@ static t_operand_state classify_operand_(t_params *params, const t_str *str,
     const Arena_Mark mark = arena_get_mark(params->temp_arena);
     t_operand_state state = OPERAND_FILE;
 
-    if (lstat(str->str, st) == -1) {
+    if (lstat(str->str, st) < 0) {
         e = errno;
         const char *prefix = "cannot access";
         if (!print_error_(&params->out, str, e, prefix,
@@ -298,7 +295,7 @@ static t_operand_state classify_operand_(t_params *params, const t_str *str,
     const struct stat *st_dir = st;
     struct stat st_target;
     if (S_ISLNK(st->st_mode)) {
-        if (stat(str->str, &st_target) == 0 && S_ISDIR(st_target.st_mode)) {
+        if (!stat(str->str, &st_target) && S_ISDIR(st_target.st_mode)) {
             is_dir_operand = true;
             st_dir = &st_target;
         }
@@ -308,7 +305,7 @@ static t_operand_state classify_operand_(t_params *params, const t_str *str,
             goto cleanup;
         }
 
-        if (e != 0) {
+        if (e) {
             *exit_code = 2;
             if (params->args->list) {
                 if (!print_error_(&params->out, str, e,
@@ -358,14 +355,13 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
 
     clear_directory_entries_(params);
     const struct dirent *dp;
-    while ((dp = readdir(d)) != NULL) {
+    while ((dp = readdir(d))) {
         const unsigned char dtype = dp->d_type;
         const mode_t mode = dtype_to_mode_(dtype);
         const bool need_lstat =
             params->args->list || params->args->time || mode == 0;
 
-        if (!params->args->all && dp->d_name[0] == '.' &&
-            dp->d_name[1] != '/') {
+        if (!params->args->all && dp->d_name[0] == '.') {
             continue;
         }
 
@@ -382,7 +378,7 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
                 goto cleanup;
             }
 
-            if (lstat(entry->path->str, &entry->st) == -1) {
+            if (lstat(entry->path->str, &entry->st) < 0) {
                 const int e = errno;
                 if (!print_error_(&params->out, entry->path, e, "cannot access",
                                   &params->output_failed)) {
@@ -429,18 +425,16 @@ static bool queue_recursive_dirs_(t_params *params, const t_str *parent_path) {
         while (index > 0) {
             --index;
             t_entry *entry = params->current_entries.data[index];
-            if (!entry || !entry->name || entry->stat_unavailable ||
-                !S_ISDIR(entry->st.st_mode)) {
+            if (entry->stat_unavailable || !S_ISDIR(entry->st.st_mode)) {
                 continue;
             }
 
-            if (ft_strncmp(entry->name->str, ".", entry->name->len) == 0 ||
-                ft_strncmp(entry->name->str, "..", entry->name->len) == 0) {
+            if (!ft_strncmp(entry->name->str, ".", entry->name->len) ||
+                !ft_strncmp(entry->name->str, "..", entry->name->len)) {
                 continue;
             }
 
-            if (!entry->path &&
-                !entry_build_path(params->temp_arena, entry, parent_path)) {
+            if (!entry_build_path(params->temp_arena, entry, parent_path)) {
                 return false;
             }
 
@@ -481,9 +475,7 @@ static bool queue_operand_dir_(t_params *params, const t_str *str,
         return false;
     }
 
-    params->quote_padding =
-        params->quote_padding || dir_entry->name_scan.quote != '\0';
-
+    params->quote_padding = params->quote_padding || dir_entry->name_scan.quote;
     if (!array_append(&params->dir_queue, dir_entry)) {
         entry_free(dir_entry);
         return false;
@@ -508,7 +500,7 @@ static bool print_error_(t_str *out, const t_str *path, const int e,
     t_shell_scan scan;
     shell_scan_str(path, &scan);
     const char *msg = strerror(e);
-    if (scan.quote != '\0') {
+    if (scan.quote) {
         t_str *escaped = shell_escape_str(path, scan.quote);
         if (escaped) {
             const bool ok =
