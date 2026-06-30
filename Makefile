@@ -14,28 +14,33 @@ LIBFT_DIR := libft
 LIBFT     := $(LIBFT_DIR)/libft.a
 LIBFT_D   := $(LIBFT_DIR)/libft_d.a
 
-CC         ?= cc
+CC          ?= cc
+ANALYZER_CC ?= gcc
+
 CPPFLAGS   := -DTERM_SIZE=$(TERM_SIZE) -I include -I $(LIBFT_DIR)/include
 B_CPPFLAGS := -I bonus/include -I bonus -I $(LIBFT_DIR)/include
 CFLAGS     := -std=c11 -D_DEFAULT_SOURCE                                       \
 			  -Wall -Wextra -Werror -Wshadow -Wpedantic                        \
-			  -Wconversion -Wsign-conversion -Wdouble-promotion                \
+			  -Wconversion -Wsign-conversion                                   \
 			  -Wformat=2 -Wformat-security                                     \
 			  -Wnull-dereference -Wcast-align -Wswitch-enum -Wundef            \
 			  -Wstrict-prototypes -Wmissing-prototypes                         \
 			  -Wredundant-decls -Wwrite-strings                                \
-			  -Wimplicit-fallthrough                                           \
-			  -Wcast-qual                                                      \
-			  -Wvla -Walloca -Wold-style-definition -Wframe-larger-than=4096
+			  -Wimplicit-fallthrough -Wlogical-op                              \
+			  -Wcast-qual -Wduplicated-cond -Wduplicated-branches              \
+			  -Wvla -Walloca -Wold-style-definition                            \
+			  -Wbad-function-cast -Wmissing-declarations -Wstrict-overflow=5   \
+		      -Wdate-time -Walloc-zero                                         \
+              -Wframe-larger-than=4096
 
 DEPSFLAGS := -MMD -MP
 
 R_CFLAGS  := -DNDEBUG -O3 -march=native -fomit-frame-pointer                   \
-			 -fPIE -fstack-clash-protection
-R_LDFLAGS := -pie -Wl,-z,relro,-z,now
+			 -fPIE -fstack-clash-protection -D_FORTIFY_SOURCE=3                \
+			 -fstack-protector-strong
+R_LDFLAGS := -pie -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack
 
-SANITIZERS := -fsanitize=address,undefined,null,leak,                          \
-			  integer-divide-by-zero,signed-integer-overflow
+SANITIZERS := -fsanitize=address,undefined,null,leak,integer-divide-by-zero,signed-integer-overflow,bounds,pointer-compare,pointer-subtract
 D_CFLAGS   := -g3 -fno-omit-frame-pointer -fstack-protector-strong $(SANITIZERS)
 D_LDFLAGS  := $(SANITIZERS) -rdynamic
 
@@ -108,6 +113,10 @@ tester-bonus: $(NAME_B_D)  ## Run bonus tester against debug binary
 .PHONY: tester-bonus-release
 tester-bonus-release: $(NAME_B)  ## Run bonus tester against release binary
 	$(TESTER) --bin ./$(NAME_B) --bonus-flags $(BONUS_FLAGS) $(TESTER_COLS)
+
+.PHONY: analyze
+analyze:  ## Run GCC static analyzer
+	$(ANALYZER_CC) $(CPPFLAGS) $(CFLAGS) -fanalyzer -fsyntax-only $(SRCS)
 
 .PHONY: clean
 clean:  ## Clean object files
