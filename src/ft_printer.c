@@ -55,8 +55,7 @@ static bool init_print_row_(const t_print_request *req) {
         return false;
     }
 
-    col_widths =
-        arena_push(req->arena, width_count * sizeof(*col_widths));
+    col_widths = arena_push(req->arena, width_count * sizeof(*col_widths));
     if (!col_widths) {
         return false;
     }

@@ -2,8 +2,8 @@
 #define FT_LS_H
 
 #include <stdbool.h>
-#include <sys/stat.h>
 #include <stdint.h>
+#include <sys/stat.h>
 
 typedef struct s_str t_str;
 
