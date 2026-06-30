@@ -73,7 +73,7 @@ static void print_error_(const char *flag) {
     t_str out;
 
     const char cmd[] = "ft_ls: invalid option -- ";
-    const char usage[] = "\nusage: ft_ls [-RalrtgufdoG] [file ...]\n";
+    const char usage[] = "\nusage: ft_ls [-Ralrt] [file ...]\n";
     str_init(&out, buf, sizeof(buf) - 1);
     (void)(put_mem_fd(&out, cmd, sizeof(cmd) - 1, STDERR_FILENO) &&
            put_mem_fd(&out, flag, (uint64_t)ft_strlen(flag), STDERR_FILENO) &&

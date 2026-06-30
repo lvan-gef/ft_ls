@@ -109,7 +109,6 @@ def main() -> None:
             if failure is not None:
                 print(format_failure(failure), file=sys.stderr)
                 sys.exit(1)
-            break
     except Exception as e:
         print(e, file=sys.stderr)
         sys.exit(1)

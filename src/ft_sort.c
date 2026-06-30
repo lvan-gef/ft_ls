@@ -6,7 +6,7 @@
 
 #include "../include/ft_str.h"
 
-#include "./ft_entry.h"
+#include "./ft_ls.h"
 #include "./ft_sort.h"
 
 struct timespec;
@@ -21,7 +21,7 @@ typedef int (*t_cmp_entry)(const t_entry *a, const t_entry *b);
 
 static bool ensure_sort_scratch_(t_sort_scratch *scratch, uint64_t need);
 static void merge_sort_(void **tmp, const t_array *array, t_cmp_entry cmp);
-static uint64_t add_capped_(uint64_t lhs, uint64_t rhs, uint64_t cap);
+static uint64_t get_cap_(uint64_t lhs, uint64_t rhs, uint64_t cap);
 static void merge_(void **data, void **tmp, const t_range *range,
                    t_cmp_entry cmp);
 static int cmp_name_entry_(const t_entry *a, const t_entry *b);
@@ -90,16 +90,16 @@ static void merge_sort_(void **tmp, const t_array *array,
     for (uint64_t width = 1; width < array->len;) {
         uint64_t left = 0;
         while (left < array->len) {
-            const uint64_t mid = add_capped_(left, width, array->len);
+            const uint64_t mid = get_cap_(left, width, array->len);
             t_range range = {.left = left,
                              .mid = mid,
-                             .right = add_capped_(mid, width, array->len)};
+                             .right = get_cap_(mid, width, array->len)};
             if (range.mid < range.right) {
                 merge_(array->data, tmp, &range, cmp);
             }
 
-            const uint64_t step = add_capped_(width, width, array->len);
-            left = add_capped_(left, step, array->len);
+            const uint64_t step = get_cap_(width, width, array->len);
+            left = get_cap_(left, step, array->len);
         }
 
         if (width >= array->len - width) {
@@ -110,8 +110,8 @@ static void merge_sort_(void **tmp, const t_array *array,
     }
 }
 
-static uint64_t add_capped_(const uint64_t lhs, const uint64_t rhs,
-                            const uint64_t cap) {
+static uint64_t get_cap_(const uint64_t lhs, const uint64_t rhs,
+                         const uint64_t cap) {
     if (lhs >= cap || rhs >= cap - lhs) {
         return cap;
     }

@@ -41,6 +41,5 @@ t_str *str_arena_from_uint(Arena *arena, const uint64_t value) {
     }
 
     str_copy_uint(str, value);
-
     return str;
 }

@@ -8,8 +8,8 @@
 #include "../libft/include/libft.h"
 
 #include "./ft_arena.h"
-#include "./ft_entry.h"
 #include "./ft_file_info.h"
+#include "./ft_ls.h"
 #include "./ft_printer.h"
 #include "./ft_printer_helper.h"
 
@@ -35,13 +35,13 @@ bool printer_list(const t_print_request *req) {
     t_file_info *infos = NULL;
     bool ok = false;
 
-    if (!prepare_list_infos(req->file_info_arena, req->entries, &infos)) {
+    if (!prepare_list_infos(req->arena, req->entries, &infos)) {
         goto cleanup;
     }
 
     ok = print_list_(req, infos);
 cleanup:
-    arena_clear(req->file_info_arena);
+    arena_clear(req->arena);
     return ok;
 }
 
@@ -61,6 +61,7 @@ static void apply_width_(const t_array *context, t_list_stats *sizes) {
         if (links_len > sizes->max_len_links) {
             sizes->max_len_links = links_len;
         }
+
         if (size_len > sizes->max_len_sizes) {
             sizes->max_len_sizes = size_len;
         }

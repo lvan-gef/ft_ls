@@ -1,5 +1,7 @@
 #! /usr/bin/env python3
 
+import argparse
+import argparse
 import statistics
 import subprocess
 import time
@@ -12,9 +14,10 @@ def time_batch(cmd: list[str], repeat: int) -> float:
     start = time.perf_counter()
 
     for _ in range(repeat):
-        subprocess.run(
-            cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False
-        )
+        subprocess.run(cmd,
+                       stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL,
+                       check=False)
 
     return (time.perf_counter() - start) / repeat
 
@@ -41,47 +44,55 @@ def print_stats(name: str, durations: list[float]) -> float:
     median = statistics.median(durations)
     fastest = min(durations)
     slowest = max(durations)
-    print(
-        f"{name}: median={median:.6f}s avg={average:.6f}s min={fastest:.6f}s max={slowest:.6f}s"
-    )
+    print(f'{name}: median={median:.6f}s avg={average:.6f}s min={fastest:.6f}s max={slowest:.6f}s')
     return median
 
 
-def run():
-    p = "/mnt/bulk2"
-
-    flags = ["R", "l"]
-    # flags = ["R", "a", "l", "r", "t"]
+def run(ft_bin: Path, paths: list[Path]):
+    flags = ['R', 'l']
+    # flags = ['R', 'a', 'l', 'r', 't']
     runs = 21
     batch_size = 5
-    ls_bin = which("ls")
-    ft_bin = str(Path("./ft_ls_bonus").resolve())
+    ls_bin = which('ls')
+    ft_bin = str(ft_bin.resolve())
 
     if ls_bin is None:
-        raise RuntimeError("could not find ls in PATH")
+        raise RuntimeError('could not find ls in PATH')
 
-    for size in range(1, len(flags) + 1):
-        for combo in combinations(flags, size):
-            flag = f"-{''.join(combo)}"
-            print("cache warmup")
-            bench(
-                ls_cmd=[ls_bin, flag, p], ft_cmd=[ft_bin, flag, p], runs=1, batch_size=1
-            )
+    for p in paths:
+        p = ''.join(p)
+        print(f'Path: {p}')
+        for size in range(1, len(flags) + 1):
+            for combo in combinations(flags, size):
+                flag = f'-{''.join(combo)}'
+                print('cache warmup')
+                bench(ls_cmd=[ls_bin, flag, p],
+                      ft_cmd=[ft_bin, flag, p],
+                      runs=1, batch_size=1
+                )
 
-            ls_results, ft_results = bench(
-                ls_cmd=[ls_bin, flag, p],
-                ft_cmd=[ft_bin, flag, p],
-                runs=runs,
-                batch_size=batch_size,
-            )
+                ls_results, ft_results = bench(
+                    ls_cmd=[ls_bin, flag, p],
+                    ft_cmd=[ft_bin, flag, p],
+                    runs=runs,
+                    batch_size=batch_size,
+                )
 
-            # - above 1.000x means ft_ls is slower
-            # - below 1.000x means ft_ls is faster
-            ls_median = print_stats("ls   ", ls_results)
-            own_median = print_stats("ft_ls", ft_results)
-            print(
-                f"ratio: ft_ls / ls {flag} = {own_median / ls_median:.3f}x (median)\n"
-            )
+                # - above 1.000x means ft_ls is slower
+                # - below 1.000x means ft_ls is faster
+                ls_median = print_stats('ls   ', ls_results)
+                own_median = print_stats('ft_ls', ft_results)
+                print(f'ratio: ft_ls / ls {flag} = {own_median / ls_median:.3f}x (median)\n')
 
 
-run()
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('filename', type=Path, help='Path to the bin of ft_ls')
+    parser.add_argument('paths', type=list[Path], nargs='+', help='Path(s) to run the timer agains')
+
+    args = parser.parse_args()
+    run(ft_bin=args.filename, paths=args.paths)
+
+
+if __name__ == '__main__':
+    main()

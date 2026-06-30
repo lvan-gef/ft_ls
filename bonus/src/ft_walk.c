@@ -16,11 +16,12 @@
 #include "../../libft/include/libft.h"
 
 #include "./ft_arena.h"
+#include "./ft_ls.h"
 #include "./ft_printer.h"
 #include "./ft_printer_helper.h"
 #include "./ft_shell_escape.h"
-#include "./ft_shell_scan.h"
 #include "./ft_sort.h"
+#include "./ft_str_arena.h"
 #include "./ft_symlink.h"
 #include "./ft_walk_entry.h"
 
@@ -67,11 +68,20 @@ static mode_t dtype_to_mode_(unsigned char dtype);
 int process(const t_args *args, const t_array *array) {
     t_params params = {0};
     int exit_code = 0;
-    char out_buf[OUTPUT_BUFFER_CAP];
+    Arena *print_arena = arena_alloc(OUTPUT_BUFFER_CAP + 1);
+    if (!print_arena) {
+        exit_code = 2;
+        goto cleanup;
+    }
+
+    t_str *out_buf = str_arena_new(print_arena, OUTPUT_BUFFER_CAP);
+    if (!out_buf) {
+        exit_code = 2;
+        goto cleanup;
+    }
 
     params.args = args;
-    params.out = (t_str){.str = out_buf, .cap = sizeof(out_buf), .len = 0};
-    params.out.str[0] = '\0';
+    params.out = *out_buf;
     params.temp_arena = arena_alloc(ARENA_SIZE);
     if (!params.temp_arena) {
         exit_code = 2;

@@ -6,8 +6,8 @@
 
 #include "../libft/include/libft.h"
 
+#include "./ft_ls.h"
 #include "./ft_shell_escape.h"
-#include "./ft_shell_scan.h"
 
 #define OCTAL_DIGIT_MASK 0x7
 #define BYTE_OCTAL_HIGH_SHIFT 6
@@ -56,14 +56,10 @@ static void analyze_shell_byte_(t_shell_analysis *analysis, unsigned char c,
 static char quote_from_analysis_(const t_shell_analysis *analysis);
 
 void shell_scan_str(const t_str *str, t_shell_scan *scan) {
-    t_shell_analysis analysis;
+    t_shell_analysis analysis = {0};
 
-    analysis.len = 0;
     analysis.quote = '\0';
-    analysis.needs_quote = false;
-    analysis.has_single = false;
     analysis.can_use_double = true;
-    analysis.has_non_print = false;
     analysis.len = str->len;
     for (uint64_t i = 0; i < str->len; ++i) {
         analyze_shell_byte_(&analysis, (unsigned char)str->str[i], i);
@@ -143,38 +139,17 @@ static void emit_ansi_byte_(t_shell_out *out, const unsigned char byte) {
     char repr[4];
     uint64_t len = 2;
 
+    repr[0] = '\\';
     switch (byte) {
-        case '\a':
-            repr[0] = '\\';
-            repr[1] = 'a';
-            break;
-        case '\b':
-            repr[0] = '\\';
-            repr[1] = 'b';
-            break;
-        case '\t':
-            repr[0] = '\\';
-            repr[1] = 't';
-            break;
-        case '\n':
-            repr[0] = '\\';
-            repr[1] = 'n';
-            break;
-        case '\v':
-            repr[0] = '\\';
-            repr[1] = 'v';
-            break;
-        case '\f':
-            repr[0] = '\\';
-            repr[1] = 'f';
-            break;
-        case '\r':
-            repr[0] = '\\';
-            repr[1] = 'r';
-            break;
+        case '\a': repr[1] = 'a'; break;
+        case '\b': repr[1] = 'b'; break;
+        case '\t': repr[1] = 't'; break;
+        case '\n': repr[1] = 'n'; break;
+        case '\v': repr[1] = 'v'; break;
+        case '\f': repr[1] = 'f'; break;
+        case '\r': repr[1] = 'r'; break;
         default:
             len = 4;
-            repr[0] = '\\';
             repr[1] = (char)('0' + ((byte >> BYTE_OCTAL_HIGH_SHIFT) &
                                     OCTAL_DIGIT_MASK));
             repr[2] = (char)('0' + ((byte >> BYTE_OCTAL_MID_SHIFT) &
@@ -260,7 +235,7 @@ static void escape_byte_(t_shell_out *out, t_escape_state *state,
 
 static uint64_t escaped_len_(const char *src, const uint64_t len,
                              const char quote, const bool pad_unquoted) {
-    if (quote == '\0') {
+    if (!quote) {
         return len + (pad_unquoted ? 1 : 0);
     }
 
@@ -282,8 +257,7 @@ static void fill_scan_(t_shell_scan *scan, const char *src,
     scan->len = analysis->len;
     scan->quote = analysis->quote;
     scan->display_len = display_len;
-    scan->padded_display_len =
-        analysis->quote == '\0' ? display_len + 1 : display_len;
+    scan->padded_display_len = !analysis->quote ? display_len + 1 : display_len;
 }
 
 static bool needs_raw_quote_(const unsigned char c, const uint64_t index) {

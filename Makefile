@@ -26,14 +26,16 @@ CFLAGS     := -std=c11 -D_DEFAULT_SOURCE                                       \
 			  -Wredundant-decls -Wwrite-strings                                \
 			  -Wimplicit-fallthrough                                           \
 			  -Wcast-qual                                                      \
-			  -Wvla -Walloca -Wold-style-definition
+			  -Wvla -Walloca -Wold-style-definition -Wframe-larger-than=4096
 
 DEPSFLAGS := -MMD -MP
 
-R_CFLAGS  := -DNDEBUG -O3 -march=native -fomit-frame-pointer -fPIE -fstack-clash-protection
+R_CFLAGS  := -DNDEBUG -O3 -march=native -fomit-frame-pointer                   \
+			 -fPIE -fstack-clash-protection
 R_LDFLAGS := -pie -Wl,-z,relro,-z,now
 
-SANITIZERS := -fsanitize=address,undefined,null,leak,integer-divide-by-zero,signed-integer-overflow
+SANITIZERS := -fsanitize=address,undefined,null,leak,                          \
+			  integer-divide-by-zero,signed-integer-overflow
 D_CFLAGS   := -g3 -fno-omit-frame-pointer -fstack-protector-strong $(SANITIZERS)
 D_LDFLAGS  := $(SANITIZERS) -rdynamic
 
@@ -72,8 +74,6 @@ NC := \033[0m
 TESTER          := python3 ./tester/main.py
 TEST_COLS_START ?= 80
 TEST_COLS_END   ?= 81
-# TEST_COLS_START ?= 1
-# TEST_COLS_END   ?= 250
 TEST_COLS_STEP  ?= 1
 BONUS_FLAGS     ?= g,u,f,d,o
 
@@ -198,7 +198,4 @@ $(BD_OBJ_DIR):
 
 -include $(R_DEPS) $(D_DEPS) $(B_DEPS) $(BD_DEPS)
 
-# ./compare_ls.py --bin ./ft_ls_bonus --runs 21
-# ./compare_ls.py --bin ./ft_ls_bonus --flags=-Ral
-# ./compare_ls.py --bin ./ft_ls_bonus --wide-dirs 2000 --deep-levels 150
-# ./compare_ls.py --bin ./ft_ls_bonus --wide-dirs 20000 --deep-levels 150 --runs 20 --warmup 10
+# segfault: make TERM_SIZE=1231231231321

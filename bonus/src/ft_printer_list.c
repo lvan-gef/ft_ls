@@ -8,8 +8,8 @@
 #include "../../libft/include/libft.h"
 
 #include "./ft_arena.h"
-#include "./ft_entry.h"
 #include "./ft_file_info.h"
+#include "./ft_ls.h"
 #include "./ft_printer.h"
 #include "./ft_printer_helper.h"
 
@@ -63,6 +63,7 @@ static void apply_width_(const t_array *context, t_list_stats *sizes) {
         if (links_len > sizes->max_len_links) {
             sizes->max_len_links = links_len;
         }
+
         if (size_len > sizes->max_len_sizes) {
             sizes->max_len_sizes = size_len;
         }

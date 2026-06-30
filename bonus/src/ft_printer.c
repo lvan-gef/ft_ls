@@ -3,7 +3,7 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-#include "./ft_entry.h"
+#include "./ft_ls.h"
 #include "./ft_printer.h"
 #include "./ft_printer_helper.h"
 
@@ -43,16 +43,26 @@ uint64_t get_terminal_width(void) {
 
 static bool init_print_row_(const t_print_request *req) {
     t_map map = {.cols = 1, .rows = req->entries->len};
+    uint64_t *col_widths = NULL;
     const uint64_t max_cols = (req->term_size + SPACE_GAP) / (1 + SPACE_GAP);
-    const bool quoted = req->quote_padding || entries_have_quote_(req->entries);
 
-    uint64_t *col_widths =
-        arena_push(req->arena, max_cols * sizeof(*col_widths));
+    uint64_t width_count =
+        req->entries->len < max_cols ? req->entries->len : max_cols;
+    if (!width_count) {
+        width_count = 1;
+    }
+
+    if (width_count > UINT64_MAX / sizeof(*col_widths)) {
+        return false;
+    }
+
+    col_widths = arena_push(req->arena, width_count * sizeof(*col_widths));
     if (!col_widths) {
         return false;
     }
 
-    calc_cols_(req->entries, &map, quoted, col_widths, max_cols,
+    const bool quoted = req->quote_padding || entries_have_quote_(req->entries);
+    calc_cols_(req->entries, &map, quoted, col_widths, width_count,
                req->term_size);
     if (!put_dir_header(req->buffer, req->dir_header)) {
         arena_clear(req->arena);

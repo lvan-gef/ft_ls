@@ -11,8 +11,8 @@
 #include "../libft/include/libft.h"
 
 #include "./ft_arena.h"
-#include "./ft_entry.h"
 #include "./ft_file_info.h"
+#include "./ft_ls.h"
 #include "./ft_str_arena.h"
 #include "./ft_symlink.h"
 

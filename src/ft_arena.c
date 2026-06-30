@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -124,6 +125,11 @@ void arena_clear(Arena *arena) {
 }
 
 static Arena_Block *new_block_(const uint64_t cap) {
+    if (cap > (uint64_t)SIZE_MAX - sizeof(Arena_Block)) {
+        errno = ENOMEM;
+        return NULL;
+    }
+
     Arena_Block *block = malloc(sizeof(*block) + cap);
     if (!block) {
         return NULL;

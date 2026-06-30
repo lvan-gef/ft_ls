@@ -16,11 +16,12 @@
 #include "../libft/include/libft.h"
 
 #include "./ft_arena.h"
+#include "./ft_ls.h"
 #include "./ft_printer.h"
 #include "./ft_printer_helper.h"
 #include "./ft_shell_escape.h"
-#include "./ft_shell_scan.h"
 #include "./ft_sort.h"
+#include "./ft_str_arena.h"
 #include "./ft_symlink.h"
 #include "./ft_walk_entry.h"
 
@@ -67,11 +68,20 @@ static mode_t dtype_to_mode_(unsigned char dtype);
 int process(const t_args *args, const t_array *array) {
     t_params params = {0};
     int exit_code = 0;
-    char out_buf[OUTPUT_BUFFER_CAP];
+    Arena *print_arena = arena_alloc(OUTPUT_BUFFER_CAP + 1);
+    if (!print_arena) {
+        exit_code = 2;
+        goto cleanup;
+    }
+
+    t_str *out_buf = str_arena_new(print_arena, OUTPUT_BUFFER_CAP);
+    if (!out_buf) {
+        exit_code = 2;
+        goto cleanup;
+    }
 
     params.args = args;
-    params.out = (t_str){.str = out_buf, .cap = sizeof(out_buf), .len = 0};
-    params.out.str[0] = '\0';
+    params.out = *out_buf;
     params.temp_arena = arena_alloc(ARENA_SIZE);
     if (!params.temp_arena) {
         exit_code = 2;
@@ -96,6 +106,9 @@ int process(const t_args *args, const t_array *array) {
 
 cleanup:
     cleanup_process_(&params);
+    if (print_arena) {
+        arena_release(print_arena);
+    }
     return exit_code;
 }
 
@@ -111,16 +124,14 @@ static bool run_listing_(t_params *params, const t_array *array,
                            .list_width_context = &params->dir_queue,
                            .dir_header = NULL,
                            .buffer = &params->out,
-                           .file_info_arena = NULL,
+                           .arena = NULL,
                            .quote_padding = params->quote_padding,
                            .list_mode = params->args->list,
                            .print_total = false};
 
-    if (params->args->list) {
-        req.file_info_arena = arena_alloc(ARENA_SIZE);
-        if (!req.file_info_arena) {
-            goto cleanup;
-        }
+    req.arena = arena_alloc(ARENA_SIZE);
+    if (!req.arena) {
+        goto cleanup;
     }
 
     if (!print_operand_files_(params, &req, &printed_files)) {
@@ -137,8 +148,8 @@ static bool run_listing_(t_params *params, const t_array *array,
     ok = true;
 cleanup:
     ok = flush_fd(&params->out, STDOUT_FILENO) && ok;
-    if (req.file_info_arena) {
-        arena_release(req.file_info_arena);
+    if (req.arena) {
+        arena_release(req.arena);
     }
 
     return ok;

@@ -9,11 +9,10 @@
 
 #include "../../libft/include/libft.h"
 
-#include "./ft_entry.h"
+#include "./ft_ls.h"
 #include "./ft_printer.h"
 #include "./ft_printer_helper.h"
 #include "./ft_shell_escape.h"
-#include "./ft_shell_scan.h"
 
 static const char *entry_color_(const t_entry *entry);
 static bool put_shell_escaped_scan_(t_str *out, const t_str *str,
@@ -158,7 +157,7 @@ static bool put_shell_escaped_scan_(t_str *out, const t_str *str,
         pad_unquoted ? scan->padded_display_len : scan->display_len;
 
     if (need > out->cap - 1) {
-        if (scan->quote == '\0') {
+        if (!scan->quote) {
             return (!pad_unquoted || put_mem(out, " ", 1)) &&
                    put_mem(out, str->str, str->len);
         }

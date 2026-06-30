@@ -6,7 +6,7 @@
 
 #include "../include/ft_array.h"
 
-#include "../libft/include/libft.h"
+#include "../../libft/include/libft.h"
 
 #ifndef MAX_ALLOC_SIZE
 #define MAX_ALLOC_SIZE ((uint64_t)(PTRDIFF_MAX / sizeof(void *)))

@@ -1,12 +1,18 @@
-#ifndef FT_ENTRY_H
-#define FT_ENTRY_H
+#ifndef FT_LS_H
+#define FT_LS_H
 
 #include <stdbool.h>
 #include <sys/stat.h>
-
-#include "./ft_shell_scan.h"
+#include <stdint.h>
 
 typedef struct s_str t_str;
+
+typedef struct s_shell_scan {
+    uint64_t len;
+    uint64_t display_len;
+    uint64_t padded_display_len;
+    char quote;
+} t_shell_scan;
 
 typedef struct s_entry {
     t_str *name;
@@ -17,4 +23,5 @@ typedef struct s_entry {
     bool is_operand;
 } t_entry;
 
-#endif /* ifndef FT_ENTRY_H */
+#endif /* ifndef FT_LS_H */
+

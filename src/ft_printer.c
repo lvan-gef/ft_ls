@@ -1,9 +1,11 @@
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 
-#include "./ft_entry.h"
+#include "./ft_ls.h"
 #include "./ft_printer.h"
 #include "./ft_printer_helper.h"
+#include "ft_arena.h"
 
 #ifndef TERM_SIZE
 #define TERM_SIZE 80
@@ -24,8 +26,8 @@ typedef struct {
 
 static bool init_print_row_(const t_print_request *req);
 static bool entries_have_quote_(const t_array *array);
-static void calc_cols_(const t_array *array, t_map *map, bool quoted,
-                       uint64_t *col_widths);
+static void calc_cols_(const t_array *array, t_map *map, const bool quoted,
+                       uint64_t *col_widths, const uint64_t max_cols);
 static bool calc_width_(const t_array *array, bool quoted, uint64_t num_cols,
                         uint64_t *col_widths);
 static bool create_row_(t_str *out, const t_array *array, const t_map *map,
@@ -42,10 +44,25 @@ bool printer(const t_print_request *req) {
 
 static bool init_print_row_(const t_print_request *req) {
     t_map map = {.cols = 1, .rows = req->entries->len};
+    uint64_t *col_widths = NULL;
+    uint64_t width_count =
+        req->entries->len < MAX_COLS ? req->entries->len : MAX_COLS;
+    if (!width_count) {
+        width_count = 1;
+    }
+
+    if (width_count > UINT64_MAX / sizeof(*col_widths)) {
+        return false;
+    }
+
+    col_widths =
+        arena_push(req->arena, width_count * sizeof(*col_widths));
+    if (!col_widths) {
+        return false;
+    }
 
     const bool quoted = req->quote_padding || entries_have_quote_(req->entries);
-    uint64_t col_widths[MAX_COLS];
-    calc_cols_(req->entries, &map, quoted, col_widths);
+    calc_cols_(req->entries, &map, quoted, col_widths, width_count);
 
     if (!put_dir_header(req->buffer, req->dir_header)) {
         return false;
@@ -66,8 +83,8 @@ static bool entries_have_quote_(const t_array *array) {
 }
 
 static void calc_cols_(const t_array *array, t_map *map, const bool quoted,
-                       uint64_t *col_widths) {
-    uint64_t width_count = array->len < MAX_COLS ? array->len : MAX_COLS;
+                       uint64_t *col_widths, const uint64_t max_cols) {
+    uint64_t width_count = array->len < max_cols ? array->len : max_cols;
     if (!width_count) {
         width_count = 1;
     }

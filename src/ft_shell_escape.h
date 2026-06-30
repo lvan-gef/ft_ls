@@ -6,7 +6,7 @@
 
 #include "../include/ft_str.h"
 
-#include "./ft_shell_scan.h"
+#include "./ft_ls.h"
 
 typedef struct s_str t_str;
 

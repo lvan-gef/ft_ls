@@ -61,7 +61,6 @@ t_entry *entry_new_path(const t_str *path, const struct stat *st,
     }
 
     shell_scan_str(entry->path, &entry->name_scan);
-
     return entry;
 }
 
@@ -92,6 +91,7 @@ bool entry_build_path(Arena *scratch, t_entry *entry,
     if (entry->path) {
         return true;
     }
+
     if (!parent_path || !entry->name) {
         return false;
     }
