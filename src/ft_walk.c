@@ -74,7 +74,7 @@ int process(const t_args *args, const t_array *array) {
         goto cleanup;
     }
 
-    t_str *out_buf = str_arena_new(print_arena, OUTPUT_BUFFER_CAP);
+    const t_str *out_buf = str_arena_new(print_arena, OUTPUT_BUFFER_CAP);
     if (!out_buf) {
         exit_code = 2;
         goto cleanup;
