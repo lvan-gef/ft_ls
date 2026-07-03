@@ -1,96 +1,123 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
-#include <unistd.h>
+#include <stdint.h>
+#include <stdlib.h>
 
 #include "../include/ft_array.h"
-#include "../include/ft_assert.h"
 
-#include "../include/ft_arena.h"
-#include "../libft/include/libft.h"
+#include "./ft_utils.h"
+
+#ifndef MAX_ALLOC_SIZE
+#define MAX_ALLOC_SIZE ((uint64_t)(PTRDIFF_MAX / sizeof(void *)))
+#endif /* ifndef MAX_ALLOC_SIZE */
 
 static bool realloc_arr_(t_array *array);
 
-t_array *init_array(Arena *arena, size_t size, t_array_type type) {
-    ASSERT_(size, "size must be more then 0");
-    ASSERT_(type == ARRAY_PATHS || type == ARRAY_FILES || type == ARRAY_ARRAY,
-            "type is not supported");
-
-    t_array *array = ArenaPush(arena, sizeof(*array));
-    if (!array) {
-        return NULL;
-    }
-
-    array->data = (void **)ArenaPush(arena, size * sizeof(*array->data));
-    if (!array->data) {
-        return NULL;
-    }
-
+bool array_init(t_array *array, const uint64_t initial_cap) {
     array->len = 0;
-    array->cap = size;
-    array->type = type;
-    array->arena = arena;
+    array->cap = 0;
+    array->data = NULL;
 
-    return array;
+    if (initial_cap == 0) {
+        return true;
+    }
+
+    if (initial_cap > MAX_ALLOC_SIZE) {
+        errno = ERANGE;
+        return false;
+    }
+
+    array->data = (void **)malloc((size_t)initial_cap * sizeof(*array->data));
+    if (!array->data) {
+        return false;
+    }
+
+    array->cap = initial_cap;
+    return true;
 }
 
-bool append_array(t_array *array, void *content) {
-    ASSERT_(array, "array can not be NULL");
-    ASSERT_(content, "content can not be NULL");
+void array_reverse(const t_array *array) {
+    uint64_t left = 0;
+    uint64_t right = array->len;
 
-    errno = 0;
+    while (left < right) {
+        --right;
+        void *tmp = array->data[left];
+        array->data[left] = array->data[right];
+        array->data[right] = tmp;
+        ++left;
+    }
+}
+
+void array_destroy(t_array *array) {
+    free((void *)array->data);
+    array->data = NULL;
+    array->len = 0;
+    array->cap = 0;
+}
+
+void array_destroy_with(t_array *array, const t_array_del del) {
+    for (uint64_t index = 0; index < array->len; ++index) {
+        del(array->data[index]);
+    }
+
+    array_destroy(array);
+}
+
+bool array_append(t_array *array, void *item) {
     if (array->len == array->cap) {
         if (!realloc_arr_(array)) {
             return false;
         }
     }
 
-    ((void **)array->data)[array->len] = content;
+    array->data[array->len] = item;
     ++array->len;
     return true;
 }
 
-void remove_elem_array(t_array *array, const void *content) {
-    ASSERT_(array, "array can not be NULL");
-    ASSERT_(content, "content can not be NULL");
+void *array_pop(t_array *array) {
+    --array->len;
+    void *item = array->data[array->len];
+    return item;
+}
 
-    size_t index = 0;
-    while (index < array->len) {
-        if (array->data[index] == content) {
-            size_t next_index = index + 1;
-            while (next_index < array->len) {
-                array->data[index] = array->data[next_index];
-                ++index;
-                ++next_index;
-            }
+void array_clear(t_array *array) {
+    array->len = 0;
+}
 
-            array->data[array->len - 1] = NULL;
-            --array->len;
-            return;
-        }
-        ++index;
+void array_clear_with(t_array *array, const t_array_del del) {
+    for (uint64_t index = 0; index < array->len; ++index) {
+        del(array->data[index]);
     }
+
+    array->len = 0;
 }
 
 static bool realloc_arr_(t_array *array) {
-    ASSERT_(array, "array can not be NULL");
-
-    errno = 0;
-    size_t new_cap = array->cap * 2;
-    if (new_cap < array->cap) {
+    if (array->cap > MAX_ALLOC_SIZE) {
         errno = ERANGE;
         return false;
     }
 
+    uint64_t new_cap = array->cap ? array->cap * 2 : 1;
+    if (new_cap < array->cap || new_cap > MAX_ALLOC_SIZE) {
+        new_cap = MAX_ALLOC_SIZE;
+    }
+
     void **old_data = array->data;
-    void **new_data =
-        (void **)ArenaPush(array->arena, new_cap * sizeof(*new_data));
+    void **new_data = (void **)malloc((size_t)new_cap * sizeof(*new_data));
     if (!new_data) {
         return false;
     }
 
-    ft_memcpy((void *)new_data, (void *)old_data,
-              array->len * sizeof(*array->data));
+    if (array->len) {
+        ft_memcpy((void *)new_data, (void *)old_data,
+                  array->len * sizeof(*array->data));
+    }
+
+    free((void *)old_data);
     array->data = new_data;
     array->cap = new_cap;
 

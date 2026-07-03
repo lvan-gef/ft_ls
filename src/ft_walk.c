@@ -1,430 +1,597 @@
 #include <dirent.h>
 #include <errno.h>
-#include <grp.h>
-#include <pwd.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <time.h>
+#include <sys/types.h>
 #include <unistd.h>
 
-#if defined(__linux__)
-#include <linux/limits.h>
-#elif defined(__APPLE__)
-#include <sys/syslimits.h>
-#endif
-
-#include "../include/ft_arena.h"
 #include "../include/ft_array.h"
-#include "../include/ft_assert.h"
-#include "../include/ft_helpers.h"
-#include "../include/ft_ls.h"
-
+#include "../include/ft_parse.h"
+#include "../include/ft_str.h"
 #include "../include/ft_walk.h"
-#include "../libft/include/ft_fprintf.h"
-#include "../libft/include/libft.h"
 
-static char *walk_files_(Arena *arena, t_args *args, DIR *dir, t_path *path);
-static char *parse_file_(Arena *arena, const struct dirent *dirent,
-                         struct stat *sb, t_path *path, t_array *paths, const char *fullpath);
-static bool create_path_node_(t_args *args, const t_path *path,
-                              const char *pathname);
-static void set_fullpath_(char *fullpath, const char *filename,
-                          const char *dir_name);
-static void get_user_group_(Arena *arena, t_file *file, unsigned int group_id,
-                            unsigned int user_id);
-static void get_permission_(t_file *file, const struct stat *sb);
-static bool get_dt_(char *buffer, const struct stat *sb);
-static struct timespec get_time_spec_(const struct stat *sb);
-static void set_filename(t_file *file, const char *filename, t_path *path);
-static bool get_symlink_(char *buffer, const char *filename, struct stat *sb);
+#include "./ft_arena.h"
+#include "./ft_ls.h"
+#include "./ft_printer.h"
+#include "./ft_printer_helper.h"
+#include "./ft_shell_escape.h"
+#include "./ft_sort.h"
+#include "./ft_str_arena.h"
+#include "./ft_symlink.h"
+#include "./ft_utils.h"
+#include "./ft_walk_entry.h"
 
-static uid_t cached_uid = (uid_t)-1;
-static gid_t cached_gid = (gid_t)-1;
-static char cached_user[USER_SIZE] = "";
-static char cached_group[USER_SIZE] = "";
+typedef struct {
+    const t_args *args;
+    Arena *temp_arena;
+    t_sort_scratch sort_scratch;
+    t_array dir_queue;
+    t_array operand_files;
+    t_array current_entries;
+    t_str out;
+    bool output_failed;
+    bool quote_padding;
+} t_params;
 
-bool walk(t_args *args) {
-    ASSERT_(args, "args can not be NULL");
-    ASSERT_(args->paths, "args->paths can not be NULL");
+typedef enum {
+    OPERAND_SKIP,
+    OPERAND_FILE,
+    OPERAND_FATAL,
+} t_operand_state;
 
-    DIR *dir = NULL;
-    char *err_msg = NULL;
-    size_t index = 0;
-    Arena *arena = ArenaAlloc((USER_SIZE * 2) + 1);
-    if (!arena) {
-        // TODO: print error
-        return false;
+static bool run_listing_(t_params *params, const t_array *array,
+                         int *exit_code);
+static bool print_operand_files_(t_params *params, const t_print_request *req,
+                                 bool *printed_files);
+static bool process_queue_(t_params *params, const t_array *array,
+                           t_print_request *req, int *exit_code,
+                           bool printed_files);
+static bool load_directory_entries_(t_params *params, const t_entry *path,
+                                    int *exit_code);
+static bool queue_recursive_dirs_(t_params *params, const t_str *parent_path);
+static bool collect_operands_(t_params *params, const t_array *array,
+                              int *exit_code);
+static void clear_directory_entries_(t_params *params);
+static t_operand_state classify_operand_(t_params *params, const t_str *str,
+                                         struct stat *st, int *exit_code);
+static void cleanup_process_(t_params *params);
+static bool queue_operand_dir_(t_params *params, const t_str *str,
+                               const struct stat *st);
+static bool print_error_(t_str *out, const t_str *path, int e,
+                         const char *prefix, bool *output_failed);
+static mode_t dtype_to_mode_(unsigned char dtype);
+
+int process(const t_args *args, const t_array *array) {
+    t_params params = {0};
+    int exit_code = 0;
+    Arena *print_arena = arena_alloc(OUTPUT_BUFFER_CAP + 1);
+    if (!print_arena) {
+        exit_code = 2;
+        goto cleanup;
     }
 
-    while (index < args->paths->len) {
-        errno = 0;
-        t_path *path = args->paths->data[index];
-        dir = opendir(path->name);
-        if (!dir) {
-            if (errno == EACCES) {
-                ft_fprintf(STDERR_FILENO, "ft_ls: cannot access: '%s': %s\n",
-                           path->name, strerror(errno));
-                errno = 0;
-                ++index;
-                continue;
-            }
-
-            if (errno == ENOENT) {
-                errno = 0;
-                ++index;
-                continue;
-            }
-
-            err_msg = strerror(errno);
-            goto failed;
-        }
-
-        err_msg = walk_files_(arena, args, dir, path);
-        if (err_msg || errno) {
-            goto failed;
-        }
-
-        closedir(dir);
-        ++index;
+    const t_str *out_buf = str_arena_new(print_arena, OUTPUT_BUFFER_CAP);
+    if (!out_buf) {
+        exit_code = 2;
+        goto cleanup;
     }
 
-    ArenaRelease(arena);
-    return true;
-failed:
-    ft_fprintf(STDERR_FILENO, "errno: %d, %s\n", errno, err_msg);
-    if (dir) {
-        closedir(dir);
+    params.args = args;
+    params.out = *out_buf;
+    params.temp_arena = arena_alloc(ARENA_SIZE);
+    if (!params.temp_arena) {
+        exit_code = 2;
+        goto cleanup;
     }
 
-    ArenaRelease(arena);
-    return false;
+    if (!array_init(&params.dir_queue, ARRAY_SIZE) ||
+        !array_init(&params.operand_files, ARRAY_SIZE) ||
+        !array_init(&params.current_entries, ARRAY_SIZE)) {
+        exit_code = 2;
+        goto cleanup;
+    }
+
+    if (!collect_operands_(&params, array, &exit_code)) {
+        exit_code = 2;
+        goto cleanup;
+    }
+
+    if (!run_listing_(&params, array, &exit_code)) {
+        exit_code = 2;
+    }
+
+cleanup:
+    cleanup_process_(&params);
+    if (print_arena) {
+        arena_release(print_arena);
+    }
+    return exit_code;
 }
 
-static char *walk_files_(Arena *arena, t_args *args, DIR *dir, t_path *path) {
-    ASSERT_(args, "args can not be NULL");
-    ASSERT_(dir, "dir can not be NULL");
-    ASSERT_(path, "path can not be NULL");
+static bool run_listing_(t_params *params, const t_array *array,
+                         int *exit_code) {
+    bool printed_files = false;
+    params->out.len = 0;
+    params->out.str[0] = '\0';
+    params->output_failed = false;
+    bool ok = false;
 
-    errno = 0;
-    const struct dirent *dirent = readdir(dir);
+    t_print_request req = {.entries = &params->operand_files,
+                           .list_width_context = &params->dir_queue,
+                           .dir_header = NULL,
+                           .buffer = &params->out,
+                           .arena = arena_alloc(ARENA_SIZE),
+                           .quote_padding = params->quote_padding,
+                           .list_mode = params->args->list,
+                           .print_total = false,
+                           .no_owner = params->args->no_owner,
+                           .access_time = params->args->access_time,
+                           .no_group = params->args->no_group,
+                           .color = params->args->color,
+                           .term_size = get_terminal_width()};
 
-    while (dirent) {
-        errno = 0;
+    if (!req.arena) {
+        goto cleanup;
+    }
 
-        if (*dirent->d_name == '.' && !args->all) {
-            dirent = readdir(dir);
+    if (!print_operand_files_(params, &req, &printed_files)) {
+        goto cleanup;
+    }
+
+    if (params->args->directory) {
+        ok = true;
+        goto cleanup;
+    }
+
+    req.print_total = true;
+    req.quote_padding = false;
+    req.list_width_context = NULL;
+    if (!process_queue_(params, array, &req, exit_code, printed_files)) {
+        goto cleanup;
+    }
+
+    ok = true;
+cleanup:
+    ok = flush_fd(&params->out, STDOUT_FILENO) && ok;
+    if (req.arena) {
+        arena_release(req.arena);
+    }
+
+    return ok;
+}
+
+static bool print_operand_files_(t_params *params, const t_print_request *req,
+                                 bool *printed_files) {
+    if (!params->operand_files.len) {
+        return true;
+    }
+
+    bool ok = false;
+    const bool sort_time = !params->args->unsort &&
+                           (params->args->time ||
+                            (params->args->access_time && !params->args->list));
+    if (!params->args->unsort) {
+        ok = sort(&params->sort_scratch, &params->operand_files,
+                  params->args->reverse, sort_time, params->args->access_time);
+        if (!ok) {
+            goto cleanup;
+        }
+    }
+
+    ok = printer(req);
+    if (ok) {
+        *printed_files = true;
+    }
+
+cleanup:
+    array_clear_with(&params->operand_files, entry_del);
+    return ok;
+}
+
+static bool process_queue_(t_params *params, const t_array *array,
+                           t_print_request *req, int *exit_code,
+                           const bool printed_files) {
+    bool printed_dir = false;
+    bool inserted_files_dirs_gap = false;
+    const bool print_dir_path = params->args->recursive || array->len > 1;
+    const bool sort_time = !params->args->unsort &&
+                           (params->args->time ||
+                            (params->args->access_time && !params->args->list));
+    t_entry *dir_path = NULL;
+
+    if (params->args->unsort) {
+        array_reverse(&params->dir_queue);
+    }
+
+    while (params->dir_queue.len) {
+        dir_path = array_pop(&params->dir_queue);
+
+        if (!inserted_files_dirs_gap && printed_files && dir_path->is_operand) {
+            if (!put_mem(req->buffer, "\n", 1)) {
+                goto error;
+            }
+            inserted_files_dirs_gap = true;
+        }
+
+        if (!load_directory_entries_(params, dir_path, exit_code)) {
+            clear_directory_entries_(params);
+            if (params->output_failed) {
+                goto error;
+            }
+            entry_free(dir_path);
+            dir_path = NULL;
             continue;
         }
 
-        char fullpath[PATH_MAX] = {0};
-        set_fullpath_(fullpath, path->name, dirent->d_name);
+        if (!params->args->unsort &&
+            !sort(&params->sort_scratch, &params->current_entries,
+                  params->args->reverse, sort_time,
+                  params->args->access_time)) {
+            goto error;
+        }
 
-        struct stat sb;
-        if (lstat(fullpath, &sb) == -1) {
-            ft_fprintf(STDERR_FILENO, "ft_ls: cannot access: '%s': %s\n",
-                       fullpath, strerror(errno));
-            errno = 0;
-        } else {
-            if (S_ISDIR(sb.st_mode) && args->recursive) {
-                if (!create_path_node_(args, path, dirent->d_name)) {
-                    return strerror(errno);
-                }
-            }
+        if (!queue_recursive_dirs_(params, dir_path->path)) {
+            goto error;
+        }
 
-            char *parse_error =
-                parse_file_(arena, dirent, &sb, path, args->paths, fullpath);
-            if (parse_error) {
-                return parse_error;
+        if (printed_dir) {
+            if (!put_mem(req->buffer, "\n", 1)) {
+                goto error;
             }
         }
 
-        dirent = readdir(dir);
+        req->dir_header = print_dir_path ? dir_path->path : NULL;
+        req->entries = &params->current_entries;
+        if (!printer(req)) {
+            goto error;
+        }
+
+        printed_dir = true;
+        clear_directory_entries_(params);
+        entry_free(dir_path);
+        dir_path = NULL;
     }
 
-    errno = 0;
-    return NULL;
+    return true;
+error:
+    entry_free(dir_path);
+    return false;
 }
 
-static char *parse_file_(Arena *arena, const struct dirent *dirent,
-                         struct stat *sb, t_path *path, t_array *paths, const char *fullpath) {
-    ASSERT_(dirent, "dirent can not be NULL");
-    ASSERT_(sb, "sb can not be NULL");
-    ASSERT_(path, "path can not be NULL");
+static bool collect_operands_(t_params *params, const t_array *array,
+                              int *exit_code) {
+    for (uint64_t index = 0; index < array->len; ++index) {
+        struct stat st = {0};
+        const t_str *str = array->data[index];
 
-    const size_t len = ft_strlen(dirent->d_name);
-    if (len > path->max_len) {
-        path->max_len = len;
+        const t_operand_state state =
+            classify_operand_(params, str, &st, exit_code);
+
+        switch (state) {
+            case OPERAND_SKIP: {
+                t_shell_scan scan;
+
+                shell_scan_str(str, &scan);
+                params->quote_padding = params->quote_padding || scan.quote;
+                continue;
+            }
+            case OPERAND_FATAL: goto failed;
+            case OPERAND_FILE: break;
+        }
+
+        if (S_ISDIR(st.st_mode) && !params->args->directory) {
+            if (!queue_operand_dir_(params, str, &st)) {
+                goto failed;
+            }
+            continue;
+        }
+
+        t_entry *entry = entry_new_file_operand(str, &st);
+        if (!entry) {
+            goto failed;
+        }
+
+        params->quote_padding = params->quote_padding || entry->name_scan.quote;
+        if (!array_append(&params->operand_files, entry)) {
+            entry_free(entry);
+            goto failed;
+        }
     }
 
-    t_file *file = ArenaPush(paths->arena, sizeof(*file));
-    if (!file) {
-        return strerror(errno);
-    }
-
-    if (!get_dt_(file->date_fmt, sb)) {
-        return strerror(errno);
-    }
-
-    if (!get_symlink_(file->linkedname, fullpath, sb)) {
-        return strerror(errno);
-    }
-
-    file->mtime = get_time_spec_(sb);
-    get_permission_(file, sb);
-    get_user_group_(arena, file, sb->st_gid, sb->st_uid);
-    file->size = sb->st_size;
-    file->blocks = (unsigned long)sb->st_blocks;
-    file->hardlink = sb->st_nlink;
-    file->filename_len = len;
-    set_filename(file, dirent->d_name, path);
-
-
-    if (!append_array(path->files, (void *)file)) {
-        return strerror(errno);
-    }
-
-    return NULL;
-}
-
-static bool create_path_node_(t_args *args, const t_path *path,
-                              const char *pathname) {
-    ASSERT_(args, "args can not be NULL");
-    ASSERT_(path, "path can not be NULL");
-    ASSERT_(pathname, "pathname can not be NULL");
-    ASSERT_(*pathname, "*pathname can not be '\\0'");
-
-    if (*pathname == '.') {
-        return true;
-    }
-
-    if (ft_strncmp(pathname, "..", ft_strlen(pathname)) == 0) {
-        return true;
-    }
-
-    t_path *sub_path = ArenaPush(args->paths->arena, sizeof(*path));
-    if (!sub_path) {
-        return false;
-    }
-
-    sub_path->files = init_array(args->paths->arena, DEFAULT_SIZE, ARRAY_FILES);
-    if (!sub_path->files) {
-        goto failed;
-    }
-
-    set_fullpath_(sub_path->name, path->name, pathname);
-    struct stat sb;
-    if (lstat(sub_path->name, &sb) == -1) {
-        ft_fprintf(STDERR_FILENO, "ft_ls: cannot access: '%s': %s\n",
-                   sub_path->name, strerror(errno));
-        errno = 0;
-        return true;
-    }
-
-    sub_path->mtime = get_time_spec_(&sb);
-    if (!append_array(args->paths, (void *)sub_path)) {
+    const bool sort_time = !params->args->unsort &&
+                           (params->args->time ||
+                            (params->args->access_time && !params->args->list));
+    if (params->dir_queue.len && !params->args->unsort &&
+        !sort(&params->sort_scratch, &params->dir_queue, !params->args->reverse,
+              sort_time, params->args->access_time)) {
         goto failed;
     }
 
     return true;
 failed:
+    *exit_code = 2;
     return false;
 }
 
-static void set_fullpath_(char *fullpath, const char *filename,
-                          const char *dir_name) {
-    ASSERT_(fullpath, "fullpath can not be NULL");
-    ASSERT_(!*fullpath, "*fullpath must be '\\0'");
-    ASSERT_(filename, "filename can not be NULL");
-    ASSERT_(*filename, "*filename can not be '\\0'");
-    ASSERT_(dir_name, "dir_name can not be NULL");
-    ASSERT_(*dir_name, "*dir_name can not be '\\0'");
+static t_operand_state classify_operand_(t_params *params, const t_str *str,
+                                         struct stat *st, int *exit_code) {
+    int e = 0;
+    const Arena_Mark mark = arena_get_mark(params->temp_arena);
+    t_operand_state state = OPERAND_FILE;
 
-    const size_t len = ft_strlen(filename);
-
-    size_t cpy_len = ft_strlcpy(fullpath, filename, PATH_MAX);
-    if (filename[len - 1] != '/') {
-        cpy_len += ft_strlcpy(fullpath + cpy_len, "/", PATH_MAX);
-    }
-
-    ft_strlcpy(fullpath + cpy_len, dir_name, PATH_MAX);
-}
-
-static void get_user_group_(Arena *arena, t_file *file, gid_t group_id,
-                            uid_t user_id) {
-    ASSERT_(file, "file can not be NULL");
-
-    char *id = ArenaPush(arena, (U64)USER_SIZE * 2);
-    if (!id) {
-        // TODO: handle error
-        return;
-    }
-
-    size_t len = 0;
-    if (user_id != cached_uid) {
-        const struct passwd *pwd = getpwuid(user_id);
-        if (pwd) {
-            ft_strlcpy(cached_user, pwd->pw_name, sizeof(cached_user));
-        } else {
-            len = uitoa(id, USER_SIZE, user_id);
-            ft_strlcpy(cached_user, id, sizeof(cached_user));
+    if (lstat(str->str, st) < 0) {
+        e = errno;
+        const char *prefix = "cannot access";
+        if (!print_error_(&params->out, str, e, prefix,
+                          &params->output_failed)) {
+            return OPERAND_FATAL;
         }
-        cached_uid = user_id;
-    }
-    ft_strlcpy(file->user, cached_user, USER_SIZE);
 
-    if (group_id != cached_gid) {
-        const struct group *grp = getgrgid(group_id);
-        if (grp) {
-            ft_strlcpy(cached_group, grp->gr_name, sizeof(cached_group));
-        } else {
-            uitoa(id, USER_SIZE, group_id);
-            ft_strlcpy(cached_group, id + len, sizeof(cached_group));
+        *exit_code = 2;
+        return OPERAND_SKIP;
+    }
+
+    bool is_dir_operand = S_ISDIR(st->st_mode);
+    const struct stat *st_dir = st;
+    struct stat st_target;
+    if (params->args->directory && !params->args->list) {
+        goto cleanup;
+    }
+
+    if (S_ISLNK(st->st_mode)) {
+        if (!stat(str->str, &st_target) && S_ISDIR(st_target.st_mode)) {
+            is_dir_operand = true;
+            st_dir = &st_target;
         }
-        cached_gid = group_id;
-    }
-    ft_strlcpy(file->group, cached_group, USER_SIZE);
-    ArenaClear(arena);
-}
 
-static void get_permission_(t_file *file, const struct stat *sb) {
-    ASSERT_(file, "file can not be NULL");
-    ASSERT_(sb, "sb can not be NULL");
+        if (!read_symlink(params->temp_arena, str, (uint64_t)st->st_size, &e)) {
+            state = OPERAND_FATAL;
+            goto cleanup;
+        }
 
-    size_t len = 0;
-    switch (sb->st_mode & S_IFMT) {
-        case S_IFLNK:
-            len += ft_strlcpy(file->permission + len, "l", PERMISSION_SIZE);
-            break;
-        case S_IFREG:
-            len += ft_strlcpy(file->permission + len, "-", PERMISSION_SIZE);
-            break;
-        case S_IFDIR:
-            len += ft_strlcpy(file->permission + len, "d", PERMISSION_SIZE);
-            break;
-        default:
-            break;
-    }
-
-    len += ft_strlcpy(file->permission + len,
-                      (sb->st_mode & S_IRUSR) ? "r" : "-", PERMISSION_SIZE);
-    len += ft_strlcpy(file->permission + len,
-                      (sb->st_mode & S_IWUSR) ? "w" : "-", PERMISSION_SIZE);
-    len += ft_strlcpy(file->permission + len,
-                      (sb->st_mode & S_IXUSR) ? "x" : "-", PERMISSION_SIZE);
-    len += ft_strlcpy(file->permission + len,
-                      (sb->st_mode & S_IRGRP) ? "r" : "-", PERMISSION_SIZE);
-    len += ft_strlcpy(file->permission + len,
-                      (sb->st_mode & S_IWGRP) ? "w" : "-", PERMISSION_SIZE);
-    len += ft_strlcpy(file->permission + len,
-                      (sb->st_mode & S_IXGRP) ? "x" : "-", PERMISSION_SIZE);
-    len += ft_strlcpy(file->permission + len,
-                      (sb->st_mode & S_IROTH) ? "r" : "-", PERMISSION_SIZE);
-    len += ft_strlcpy(file->permission + len,
-                      (sb->st_mode & S_IWOTH) ? "w" : "-", PERMISSION_SIZE);
-    len += ft_strlcpy(file->permission + len,
-                      (sb->st_mode & S_IXOTH) ? "x" : "-", PERMISSION_SIZE);
-}
-
-static bool get_dt_(char *buffer, const struct stat *sb) {
-    ASSERT_(sb, "sb cannot be NULL");
-
-#if defined(__linux__)
-    char *dt = ctime(&sb->st_mtim.tv_sec);
-#elif defined(__APPLE__)
-    char *dt = ctime(&sb->st_mtimespec.tv_sec);
-#else
-    ft_fprintf(STDERR_FILENO, "OS is not supported\n");
-    return false;
-#endif
-    if (!dt) {
-        return false;
-    }
-
-    // TODO: dont want to use malloc
-    char **splitter = ft_split(dt, ' ');
-    if (!splitter) {
-        // TODO: print error
-        return false;
-    }
-
-    size_t len = ft_strlcpy(buffer, splitter[2], DT_LEN);
-    len += ft_strlcpy(buffer + len, " ", DT_LEN);
-    len += ft_strlcpy(buffer + len, splitter[1], DT_LEN);
-    len += ft_strlcpy(buffer + len, " ", DT_LEN);
-    len += ft_strlcpy(buffer + len, splitter[3], DT_LEN);
-    buffer[len - 3] = '\0'; // remove seconds
-    ft_str_to_lower(buffer);
-
-    size_t index = 0;
-    while (splitter[index]) {
-        free(splitter[index]);
-        ++index;
-    }
-    free((void *)splitter);
-
-    return true;
-}
-
-static struct timespec get_time_spec_(const struct stat *sb) {
-    ASSERT_(sb, "sb cannot be NULL");
-
-#if defined(__linux__)
-    return sb->st_mtim;
-#elif defined(__APPLE__)
-    return sb->st_mtimespec;
-#else
-    ft_fprintf(STDERR_FILENO, "OS is not supported\n");
-    return NULL;
-#endif
-}
-
-static void set_filename(t_file *file, const char *filename, t_path *path) {
-    ASSERT_(file, "file can not be NULL");
-    ASSERT_(file->filename_len, "file->len must be more then 0");
-    ASSERT_(filename, "filename can not be NULL");
-    ASSERT_(*filename, "*filename can not be '\\0'");
-    ASSERT_(path, "path can not be NULL");
-
-    const char targets[4] = " '\"";
-    const char *c = NULL;
-    char quote[2] = "'";
-    size_t index = 0;
-
-    while (targets[index]) {
-        c = ft_memchr(filename, targets[index], file->filename_len);
-        if (c) {
-            if (*c == '\'') {
-                *quote = '"';
+        if (e) {
+            *exit_code = 2;
+            if (params->args->list) {
+                if (!print_error_(&params->out, str, e,
+                                  "cannot read symbolic link",
+                                  &params->output_failed)) {
+                    state = OPERAND_FATAL;
+                    goto cleanup;
+                }
+            } else {
+                if (!print_error_(&params->out, str, e, "cannot access",
+                                  &params->output_failed)) {
+                    state = OPERAND_FATAL;
+                    goto cleanup;
+                }
+                state = OPERAND_SKIP;
+                goto cleanup;
             }
-            break;
+        }
+    }
+
+    if (is_dir_operand && !params->args->list && !params->args->directory) {
+        if (!queue_operand_dir_(params, str, st_dir)) {
+            state = OPERAND_FATAL;
+            goto cleanup;
         }
 
-        ++index;
+        state = OPERAND_SKIP;
     }
-
-#if defined(__linux__)
-    if (c) {
-        size_t len = 0;
-        len += ft_strlcpy(file->filename, quote, NAME_MAX);
-        len += ft_strlcpy(file->filename + len, filename, NAME_MAX);
-        len += ft_strlcpy(file->filename + len, quote, NAME_MAX);
-
-        ASSERT_(len == ft_strlen(file->filename), "len is not == to strlen()");
-        file->filename_len = len;
-        path->quoted = true;
-        return;
-    }
-#endif
-    (void)ft_strlcpy(file->filename, filename, NAME_MAX);
+cleanup:
+    arena_pop_to_mark(params->temp_arena, mark);
+    return state;
 }
 
-static bool get_symlink_(char *buffer, const char *filename, struct stat *sb) {
-    if (S_ISLNK(sb->st_mode)) {
-        ssize_t len = readlink(filename, buffer, NAME_MAX - 1);
-        if (len < 0) {
-            return false;
+static bool load_directory_entries_(t_params *params, const t_entry *path,
+                                    int *exit_code) {
+    errno = 0;
+    bool ok = false;
+    bool hard_failure = false;
+    DIR *d = opendir(path->path->str);
+    if (!d) {
+        const int e = errno;
+        (void)print_error_(&params->out, path->path, e, "cannot open directory",
+                           &params->output_failed);
+        *exit_code = path->is_operand ? 2 : 1;
+        return false;
+    }
+
+    clear_directory_entries_(params);
+    const struct dirent *dp;
+    const bool sort_time = !params->args->unsort &&
+                           (params->args->time ||
+                            (params->args->access_time && !params->args->list));
+    while ((dp = readdir(d))) {
+        const unsigned char dtype = dp->d_type;
+        const mode_t mode = dtype_to_mode_(dtype);
+        const bool need_lstat =
+            params->args->list || sort_time || params->args->color || mode == 0;
+
+        if (!params->args->all && dp->d_name[0] == '.') {
+            continue;
+        }
+
+        t_entry *entry = entry_new_dirent(params->temp_arena, dp);
+        if (!entry) {
+            hard_failure = true;
+            goto cleanup;
+        }
+
+        entry->st.st_mode = mode;
+        if (need_lstat) {
+            if (!entry_build_path(params->temp_arena, entry, path->path)) {
+                hard_failure = true;
+                goto cleanup;
+            }
+
+            if (lstat(entry->path->str, &entry->st) < 0) {
+                const int e = errno;
+                if (!print_error_(&params->out, entry->path, e, "cannot access",
+                                  &params->output_failed)) {
+                    goto cleanup;
+                }
+
+                entry->stat_unavailable = true;
+                if (*exit_code != 2) {
+                    *exit_code = 1;
+                }
+            }
+        }
+
+        if (!array_append(&params->current_entries, entry)) {
+            hard_failure = true;
+            goto cleanup;
+        }
+    }
+
+    ok = true;
+cleanup:
+    closedir(d);
+
+    if (!ok) {
+        if (hard_failure) {
+            params->output_failed = true;
+        }
+        *exit_code = 2;
+    }
+
+    return ok;
+}
+
+static void clear_directory_entries_(t_params *params) {
+    array_clear(&params->current_entries);
+    if (params->temp_arena) {
+        arena_clear(params->temp_arena);
+    }
+}
+
+static bool queue_recursive_dirs_(t_params *params, const t_str *parent_path) {
+    if (params->args->recursive && params->current_entries.len) {
+        uint64_t index = params->current_entries.len;
+        while (index > 0) {
+            --index;
+            t_entry *entry = params->current_entries.data[index];
+            if (entry->stat_unavailable || !S_ISDIR(entry->st.st_mode)) {
+                continue;
+            }
+
+            if (!ft_strncmp(entry->name->str, ".", entry->name->len) ||
+                !ft_strncmp(entry->name->str, "..", entry->name->len)) {
+                continue;
+            }
+
+            if (!entry_build_path(params->temp_arena, entry, parent_path)) {
+                return false;
+            }
+
+            t_entry *dir_entry = entry_new_path(entry->path, &entry->st, false);
+            if (!dir_entry) {
+                return false;
+            }
+
+            if (!array_append(&params->dir_queue, dir_entry)) {
+                entry_free(dir_entry);
+                return false;
+            }
         }
     }
 
     return true;
+}
+
+static void cleanup_process_(t_params *params) {
+    clear_directory_entries_(params);
+    array_clear_with(&params->operand_files, entry_del);
+    array_clear_with(&params->dir_queue, entry_del);
+    array_destroy(&params->current_entries);
+    array_destroy(&params->operand_files);
+    array_destroy(&params->dir_queue);
+
+    if (params->temp_arena) {
+        arena_release(params->temp_arena);
+    }
+
+    free((void *)params->sort_scratch.data);
+}
+
+static bool queue_operand_dir_(t_params *params, const t_str *str,
+                               const struct stat *st) {
+    t_entry *dir_entry = entry_new_path(str, st, true);
+    if (!dir_entry) {
+        return false;
+    }
+
+    params->quote_padding = params->quote_padding || dir_entry->name_scan.quote;
+    if (!array_append(&params->dir_queue, dir_entry)) {
+        entry_free(dir_entry);
+        return false;
+    }
+
+    return true;
+}
+
+static bool print_error_(t_str *out, const t_str *path, const int e,
+                         const char *prefix, bool *output_failed) {
+    if (!flush_fd(out, STDOUT_FILENO)) {
+        if (output_failed) {
+            *output_failed = true;
+        }
+        return false;
+    }
+
+    char err_buf[1024];
+    t_str err_out;
+    str_init(&err_out, err_buf, sizeof(err_buf) - 1);
+
+    t_shell_scan scan;
+    shell_scan_str(path, &scan);
+    const char *msg = strerror(e);
+    if (scan.quote) {
+        t_str *escaped = shell_escape_str(path, scan.quote);
+        if (escaped) {
+            const bool ok =
+                put_mem_fd(&err_out, "ft_ls: ", sizeof("ft_ls: ") - 1,
+                           STDERR_FILENO) &&
+                put_mem_fd(&err_out, prefix, (uint64_t)ft_strlen(prefix),
+                           STDERR_FILENO) &&
+                put_mem_fd(&err_out, " ", 1, STDERR_FILENO) &&
+                put_mem_fd(&err_out, escaped->str, escaped->len,
+                           STDERR_FILENO) &&
+                put_mem_fd(&err_out, ": ", 2, STDERR_FILENO) &&
+                put_mem_fd(&err_out, msg, (uint64_t)ft_strlen(msg),
+                           STDERR_FILENO) &&
+                put_mem_fd(&err_out, "\n", 1, STDERR_FILENO) &&
+                flush_fd(&err_out, STDERR_FILENO);
+            str_free(escaped);
+            return ok;
+        }
+    }
+
+    return put_mem_fd(&err_out, "ft_ls: ", sizeof("ft_ls: ") - 1,
+                      STDERR_FILENO) &&
+           put_mem_fd(&err_out, prefix, (uint64_t)ft_strlen(prefix),
+                      STDERR_FILENO) &&
+           put_mem_fd(&err_out, " '", 2, STDERR_FILENO) &&
+           put_mem_fd(&err_out, path->str, path->len, STDERR_FILENO) &&
+           put_mem_fd(&err_out, "': ", 3, STDERR_FILENO) &&
+           put_mem_fd(&err_out, msg, (uint64_t)ft_strlen(msg), STDERR_FILENO) &&
+           put_mem_fd(&err_out, "\n", 1, STDERR_FILENO) &&
+           flush_fd(&err_out, STDERR_FILENO);
+}
+
+static mode_t dtype_to_mode_(const unsigned char dtype) {
+    switch (dtype) {
+        case DT_BLK: return S_IFBLK;
+        case DT_CHR: return S_IFCHR;
+        case DT_DIR: return S_IFDIR;
+        case DT_FIFO: return S_IFIFO;
+        case DT_LNK: return S_IFLNK;
+        case DT_REG: return S_IFREG;
+        case DT_SOCK: return S_IFSOCK;
+        default: return 0;
+    }
 }

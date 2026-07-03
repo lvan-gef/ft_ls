@@ -1,10 +1,9 @@
 #ifndef FT_WALK_H
 #define FT_WALK_H
 
-#include <stdbool.h>
+typedef struct s_args t_args;
+typedef struct s_array t_array;
 
-#include "./ft_ls.h"
+int process(const t_args *args, const t_array *array);
 
-bool walk(t_args *args);
-
-#endif // !FT_WALK_H
+#endif /* ifndef FT_WALK_H */

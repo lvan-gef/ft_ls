@@ -2,26 +2,27 @@
 #define FT_ARRAY_H
 
 #include <stdbool.h>
-#include <stddef.h>
+#include <stdint.h>
 
-#include "./ft_arena.h"
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE UINT64_C(64)
+#endif /* ifndef ARRAY_SIZE */
 
-typedef enum e_array_type {
-    ARRAY_PATHS,
-    ARRAY_FILES,
-    ARRAY_ARRAY
-} t_array_type;
+typedef void (*t_array_del)(void *ptr);
 
 typedef struct s_array {
-    t_array_type type;
-    size_t len;
-    size_t cap;
+    uint64_t len;
+    uint64_t cap;
     void **data;
-    Arena *arena;
 } t_array;
 
-t_array *init_array(Arena *arena, size_t size, t_array_type type);
-bool append_array(t_array *array, void *content);
-void remove_elem_array(t_array *array, const void *content);
+bool array_init(t_array *array, uint64_t initial_cap);
+void array_reverse(const t_array *array);
+void array_destroy(t_array *array);
+void array_destroy_with(t_array *array, t_array_del del);
+bool array_append(t_array *array, void *item);
+void *array_pop(t_array *array);
+void array_clear(t_array *array);
+void array_clear_with(t_array *array, t_array_del del);
 
-#endif // !FT_ARRAY_H
+#endif /* ifndef FT_ARRAY_H */

@@ -1,132 +1,76 @@
-NAME   := ft_ls
-NAME_D := ft_ls_d
-MAKEFLAGS += -j
+NAME := ft_ls
 
-TERM_SIZE ?= 80
+CC       = gcc
+CPPFLAGS := -DNDEBUG -D_FORTIFY_SOURCE=3 -I include
+CFLAGS   := -std=c11 -D_DEFAULT_SOURCE -O3 -march=native                       \
+			-fomit-frame-pointer -fPIE -fstack-clash-protection                \
+			-fstack-protector-strong                                           \
+			-Wall -Wextra -Werror -Wshadow -Wpedantic                          \
+			-Wconversion -Wsign-conversion                                     \
+			-Wformat=2 -Wformat-security                                       \
+			-Wnull-dereference -Wcast-align -Wswitch-enum -Wundef              \
+			-Wstrict-prototypes -Wmissing-prototypes                           \
+			-Wredundant-decls -Wwrite-strings                                  \
+			-Wimplicit-fallthrough -Wlogical-op                                \
+			-Wcast-qual -Wduplicated-cond -Wduplicated-branches                \
+			-Wvla -Walloca -Wold-style-definition                              \
+			-Wbad-function-cast -Wmissing-declarations -Wstrict-overflow=5     \
+		    -Wdate-time -Walloc-zero                                           \
+            -Wframe-larger-than=4096
 
-CC        := cc
-CFLAGS    := -std=c11 -D_DEFAULT_SOURCE \
-			 -Wall -Wextra -Werror -Wshadow -Wpedantic \
-			 -Wconversion -Wsign-conversion -Wdouble-promotion \
-			 -Wformat=2 -Wformat-security \
-			 -Wnull-dereference -Wcast-align -Wswitch-enum -Wundef \
-			 -Wstrict-prototypes -Wmissing-prototypes \
-			 -Wredundant-decls -Wwrite-strings \
-			 -Wimplicit-fallthrough -Wlogical-op \
-			 -Wduplicated-cond -Wduplicated-branches \
-			 -Wstack-usage=8192 \
-			 -DTERM_SIZE=$(TERM_SIZE)
+DEPFLAGS := -MMD -MP
+LDFLAGS  := -pie -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack -s
 
-DEPSFLAGS := -MMD -MP
+SRCDIR   := src
+SRCFILES := ft_arena.c ft_array.c ft_file_info.c ft_parse.c ft_printer.c       \
+            ft_printer_helper.c ft_printer_list.c ft_shell_escape.c            \
+			ft_sort.c ft_str.c ft_str_arena.c ft_symlink.c ft_utils.c          \
+			ft_walk.c ft_walk_entry.c main.c
 
-# Release flags (with hardening)
-R_CFLAGS  := -DNDEBUG -D_FORTIFY_SOURCE=2 -O3 -march=native -fomit-frame-pointer -fPIE
-R_LDFLAGS := -pie -Wl,-z,relro,-z,now
-
-# Debug flags
-SANITIZERS := -fsanitize=address,undefined,null,leak,integer-divide-by-zero,signed-integer-overflow
-# SANITIZERS :=
-D_CFLAGS   := -g3 -fno-omit-frame-pointer -fstack-protector-strong $(SANITIZERS)
-D_LDFLAGS  := $(SANITIZERS)
-
-SRC_DIR := src
-
-SRC_FILES := main.c ft_parser.c ft_assert.c ft_walk.c ft_print.c ft_sort.c ft_array.c ft_arena.c ft_helpers.c
-
-SRCS := $(addprefix $(SRC_DIR)/, $(SRC_FILES))
-
-# Release objects
-R_OBJ_DIR := obj
-R_OBJECTS := $(SRCS:$(SRC_DIR)/%.c=$(R_OBJ_DIR)/%.o)
-R_DEPS    := $(R_OBJECTS:.o=.d)
-
-# Debug objects
-D_OBJ_DIR := obj_debug
-D_OBJECTS := $(SRCS:$(SRC_DIR)/%.c=$(D_OBJ_DIR)/%.o)
-D_DEPS    := $(D_OBJECTS:.o=.d)
+SRCS   := $(addprefix $(SRCDIR)/, $(SRCFILES))
+OBJDIR := obj
+OBJS   := $(SRCS:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
+DEPS   := $(OBJS:.o=.d)
 
 BLUE := \033[36m
-MARGENTA := \033[35m
-NC := \033[0m
+NC   := \033[0m
 
-LIBFT_DIR := libft
-LIBFT     := $(LIBFT_DIR)/libft.a
-LIBFT_D   := $(LIBFT_DIR)/libft_d.a
-
-HEADERS := -I include -I $(LIBFT_DIR)/include
-
-# Build rules
 .PHONY: all
 all: $(NAME)  ## Build release version (default)
 
-.PHONY: debug
-debug: $(NAME_D)  ## Build debug version with ASAN
-
-.PHONY: tester
-tester:  ## run the tester
-	python3 ./tester/main.py
-
 .PHONY: clean
 clean:  ## Clean object files
-	@$(MAKE) -C $(LIBFT_DIR) clean
-	@rm -rf $(R_OBJ_DIR) $(D_OBJ_DIR)
+	@$(RM) -r $(OBJDIR)
 
 .PHONY: fclean
 fclean:  ## Clean object, bin
 	@$(MAKE) clean
-	@$(MAKE) -C $(LIBFT_DIR) fclean
-	@rm -f $(NAME) $(NAME_D)
+	@$(RM) $(NAME)
 
 .PHONY: re
 re:  ## Clean all and recompile
 	@$(MAKE) fclean
 	@$(MAKE) all
 
-.PHONY: re-debug
-re-debug:  ## Clean all and rebuild debug
-	@$(MAKE) fclean
-	@$(MAKE) debug
-
 .PHONY: fmt
 fmt:  ## Format code via clang-format
-	@echo "Format code"
-	@find . -type f -name "*.c" -print0 | xargs -0 clang-format -i
-	@find . -type f -name "*.h" -print0 | xargs -0 clang-format -i
+	@printf 'Format code\n'
+	@find src include -type f \( -name "*.c" -o -name "*.h" \) -exec clang-format -i {} +
 
 .PHONY: help
 help:  ## Get help
-	@echo -e 'Usage: make ${BLUE}<target>${NC}'
-	@echo -e 'Available targets:'
-	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  ${BLUE}%-15s${NC} %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@printf 'Usage: make ${BLUE}<target>${NC}\n'
+	@printf 'Available targets:\n'
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  ${BLUE}%-15s${NC} %s\n", $$1, $$2}' Makefile
 
-# Release build
-$(NAME): $(LIBFT) $(R_OBJECTS)
-	$(CC) $(R_OBJECTS) $(R_LDFLAGS) -s $(LIBFT) -o $@
-	@echo "Build complete: $(NAME) (release)"
+$(NAME): $(OBJS)
+	$(CC) $(LDFLAGS) $(OBJS) -o $@
+	@printf 'Build complete: %s (release)\n' '$(NAME)'
 
-# Debug build
-$(NAME_D): $(LIBFT_D) $(D_OBJECTS)
-	$(CC) $(D_OBJECTS) $(D_LDFLAGS) $(LIBFT_D) -o $@
-	@echo "Build complete: $(NAME_D) (debug)"
+$(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+	$(CC) $(DEPFLAGS) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
-# Release pattern rule
-$(R_OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(R_OBJ_DIR)
-	$(CC) $(CFLAGS) $(R_CFLAGS) $(DEPSFLAGS) $(HEADERS) -c $< -o $@
-
-# Debug pattern rule
-$(D_OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(D_OBJ_DIR)
-	$(CC) $(CFLAGS) $(D_CFLAGS) $(DEPSFLAGS) $(HEADERS) -c $< -o $@
-
-$(LIBFT):
-	@$(MAKE) -C $(LIBFT_DIR)
-
-$(LIBFT_D):
-	@$(MAKE) -C $(LIBFT_DIR) debug
-
-$(R_OBJ_DIR):
+$(OBJDIR):
 	@mkdir -p $@
 
-$(D_OBJ_DIR):
-	@mkdir -p $@
-
--include $(R_DEPS) $(D_DEPS)
+-include $(DEPS)

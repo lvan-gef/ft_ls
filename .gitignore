@@ -12,6 +12,9 @@
 *.map
 *.exp
 
+# Build directories
+obj/
+
 # Precompiled Headers
 *.gch
 *.pch
@@ -35,6 +38,7 @@
 *.i*86
 *.x86_64
 *.hex
+ft_ls
 
 # Debug files
 *.dSYM/
@@ -55,7 +59,3 @@ dkms.conf
 *.dwo
 
 compile_commands.json
-.cache/
-ft_ls
-ft_ls_d
-__pycache__

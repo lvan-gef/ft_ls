@@ -1,51 +1,41 @@
-#include "../include/ft_arena.h"
+#include <stdint.h>
+#include <stdlib.h>
+#include <time.h>
+
 #include "../include/ft_array.h"
-#include "../include/ft_assert.h"
-#include "../include/ft_ls.h"
-#include "../include/ft_parser.h"
-#include "../include/ft_print.h"
+#include "../include/ft_parse.h"
+#include "../include/ft_str.h"
 #include "../include/ft_walk.h"
 
-static void clean_program(Arena *arena);
+static void del_str_(void *ptr);
+static void init_timezone_(void);
 
-int main(int argc, char **argv) {
+int main(const int argc, char *argv[]) {
     t_args args = {0};
-    Arena *arena = ArenaAlloc((U64)4096 * 2);
-    if (!arena) {
+    t_array inputs = {0};
+    if (!array_init(&inputs, (uint64_t)argc)) {
         return 1;
     }
 
-    args.paths = init_array(arena, DEFAULT_SIZE, ARRAY_PATHS);
-    if (!args.paths) {
-        clean_program(arena);
+    if (!parse_args((uint64_t)argc, argv, &args, &inputs)) {
+        array_destroy_with(&inputs, del_str_);
         return 1;
     }
 
-    if (argc > 1) {
-        if (!parse_args(argc, argv, &args)) {
-            clean_program(arena);
-            return 1;
-        }
-    } else {
-        if (!default_arg(&args)) {
-            clean_program(arena);
-            return 1;
-        }
-    }
-
-    if (!walk(&args)) {
-        clean_program(arena);
-        return 5;
-    }
-
-    print_ls(&args);
-
-    clean_program(arena);
-    return 0;
+    init_timezone_();
+    const int exit_code = process(&args, &inputs);
+    array_destroy_with(&inputs, del_str_);
+    return exit_code;
 }
 
-static void clean_program(Arena *arena) {
-    ASSERT_(arena, "arena can not be NULL");
+static void del_str_(void *ptr) {
+    str_free((t_str *)ptr);
+}
 
-    ArenaRelease(arena);
+static void init_timezone_(void) {
+    if (!getenv("TZ")) {
+        (void)setenv("TZ", ":/etc/localtime", 0);
+    }
+
+    tzset();
 }

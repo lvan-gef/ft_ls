@@ -1,304 +1,218 @@
 #include <stdbool.h>
-#include <stddef.h>
-#include <unistd.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <time.h>
 
-#include "../include/ft_array.h"
-#include "../include/ft_assert.h"
-#include "../include/ft_ls.h"
-#include "../include/ft_sort.h"
+#include "../include/ft_str.h"
 
-#if defined(__linux__)
-#include "../libft/include/libft.h"
-#endif
+#include "./ft_ls.h"
+#include "./ft_sort.h"
 
-static int compare_time(const struct timespec *a, const struct timespec *b);
-static void reverse_(t_array *files);
-static int compare_(const char *a, const char *b);
-#if defined(__APPLE__)
-static int compare_bsd_(const char *a, const char *b);
-#else
-static int compare_gnu_(const char *a, const char *b);
-#endif
+struct timespec;
 
-void sort_alpha_files(t_array *files, bool reverse) {
-    ASSERT_(files, "files can not be NULL");
-    ASSERT_(files->len, "files->len must be more then 0");
-    ASSERT_(files->data, "files->data can not be NULL");
-    ASSERT_(files->data[0], "files->data[0] can not be NULL");
+typedef struct {
+    uint64_t left;
+    uint64_t mid;
+    uint64_t right;
+} t_range;
 
-    size_t index = 0;
-    while (index < files->len) {
-        size_t sub_index = index + 1;
-        while (sub_index < files->len) {
-            t_file *file_a = (t_file *)files->data[index];
-            t_file *file_b = (t_file *)files->data[sub_index];
-            int result = compare_(file_a->filename, file_b->filename);
-            if (result > 0) {
-                files->data[sub_index] = file_a;
-                files->data[index] = file_b;
-            }
-            ++sub_index;
-        }
-        ++index;
+typedef int (*t_cmp_entry)(const t_entry *a, const t_entry *b);
+
+static bool ensure_sort_scratch_(t_sort_scratch *scratch, uint64_t need);
+static void merge_sort_(void **tmp, const t_array *array, t_cmp_entry cmp);
+static uint64_t get_cap_(uint64_t lhs, uint64_t rhs, uint64_t cap);
+static void merge_(void **data, void **tmp, const t_range *range,
+                   t_cmp_entry cmp);
+static int cmp_name_entry_(const t_entry *a, const t_entry *b);
+static int cmp_name_entry_rev_(const t_entry *a, const t_entry *b);
+static int cmp_time_entry_(const t_entry *a, const t_entry *b);
+static int cmp_time_entry_rev_(const t_entry *a, const t_entry *b);
+static int cmp_atime_entry_(const t_entry *a, const t_entry *b);
+static int cmp_atime_entry_rev_(const t_entry *a, const t_entry *b);
+static t_str *entry_name_(const t_entry *entry);
+static int compare_(const t_str *lhs, const t_str *rhs);
+static int compare_time_(const struct timespec *a, const struct timespec *b);
+
+bool sort(t_sort_scratch *scratch, const t_array *array, const bool reverse,
+          const bool sort_time, const bool access_time) {
+    if (array->len <= 1) {
+        return true;
     }
 
-    if (reverse) {
-        reverse_(files);
+    t_cmp_entry cmp;
+
+    if (sort_time && access_time) {
+        cmp = reverse ? cmp_atime_entry_rev_ : cmp_atime_entry_;
+    } else if (sort_time) {
+        cmp = reverse ? cmp_time_entry_rev_ : cmp_time_entry_;
+    } else {
+        cmp = reverse ? cmp_name_entry_rev_ : cmp_name_entry_;
     }
+
+    if (!ensure_sort_scratch_(scratch, array->len)) {
+        return false;
+    }
+
+    merge_sort_(scratch->data, array, cmp);
+    return true;
 }
 
-void sort_time_files(t_array *files, bool reverse) {
-    ASSERT_(files, "files can not be NULL");
-    ASSERT_(files->len, "files->len must be more then 0");
-    ASSERT_(files->data, "files->data can not be NULL");
-    ASSERT_(files->data[0], "files->data[0] can not be NULL");
+static bool ensure_sort_scratch_(t_sort_scratch *scratch, const uint64_t need) {
+    const uint64_t max_len = (uint64_t)(SIZE_MAX / sizeof(void *));
+    if (need > max_len) {
+        return false;
+    }
 
-    size_t size = files->len - 1;
-    ASSERT_(size < files->len, "size should be less then files->len");
+    if (scratch->cap >= need) {
+        return true;
+    }
 
-    while (true) {
-        bool changed = false;
-        size_t index = 0;
-
-        while (index < size) {
-            t_file *file_a = files->data[index];
-            t_file *file_b = files->data[index + 1];
-
-            int cmp = compare_time(&file_a->mtime, &file_b->mtime);
-            bool should_swap = false;
-            if (cmp == 0) {
-                should_swap = compare_(file_a->filename, file_b->filename) > 0;
-            } else {
-                should_swap = cmp < 0;
-            }
-
-            if (should_swap) {
-                files->data[index] = file_b;
-                files->data[index + 1] = file_a;
-                changed = true;
-            }
-
-            ++index;
-        }
-
-        if (!changed) {
+    uint64_t new_cap = scratch->cap ? scratch->cap : 1;
+    while (new_cap < need) {
+        if (new_cap > max_len / 2) {
+            new_cap = need;
             break;
         }
 
-        --size;
+        new_cap *= 2;
     }
 
-    if (reverse) {
-        reverse_(files);
+    void **new_data = (void **)malloc((size_t)new_cap * sizeof(*new_data));
+    if (!new_data) {
+        return false;
     }
+
+    free((void *)scratch->data);
+    scratch->data = new_data;
+    scratch->cap = new_cap;
+    return true;
 }
 
-void sort_alpha_paths(t_array *paths, bool reverse) {
-    ASSERT_(paths, "paths can not be NULL");
-    ASSERT_(paths->len, "paths->len must be more then 0");
-    ASSERT_(paths->data, "paths->data can not be NULL");
-    ASSERT_(paths->data[0], "paths->data[0] can not be NULL");
-
-    size_t index = 0;
-    while (index < paths->len) {
-        size_t sub_index = index + 1;
-        while (sub_index < paths->len) {
-            t_path *path_a = (t_path *)paths->data[index];
-            t_path *path_b = (t_path *)paths->data[sub_index];
-            int result = compare_(path_a->name, path_b->name);
-            if (result > 0) {
-                paths->data[sub_index] = path_a;
-                paths->data[index] = path_b;
-            }
-            ++sub_index;
-        }
-        ++index;
-    }
-
-    if (reverse) {
-        reverse_(paths);
-    }
-
-}
-
-void sort_time_paths(t_array *paths, bool reverse) {
-    ASSERT_(paths, "paths can not be NULL");
-    ASSERT_(paths->len, "paths->len must be more then 0");
-    ASSERT_(paths->data, "paths->data can not be NULL");
-    ASSERT_(paths->data[0], "paths->data[0] can not be NULL");
-
-    size_t size = paths->len - 1;
-    ASSERT_(size < paths->len, "size should be less then paths->len");
-
-    while (true) {
-        bool changed = false;
-        size_t index = 0;
-
-        while (index < size) {
-            t_path *path_a = paths->data[index];
-            t_path *path_b = paths->data[index + 1];
-
-            int cmp = compare_time(&path_a->mtime, &path_b->mtime);
-            bool should_swap = false;
-            if (cmp == 0) {
-                should_swap = compare_(path_a->name, path_b->name) > 0;
-            } else {
-                should_swap = cmp < 0;
+static void merge_sort_(void **tmp, const t_array *array,
+                        const t_cmp_entry cmp) {
+    for (uint64_t width = 1; width < array->len;) {
+        uint64_t left = 0;
+        while (left < array->len) {
+            const uint64_t mid = get_cap_(left, width, array->len);
+            t_range range = {.left = left,
+                             .mid = mid,
+                             .right = get_cap_(mid, width, array->len)};
+            if (range.mid < range.right) {
+                merge_(array->data, tmp, &range, cmp);
             }
 
-            if (should_swap) {
-                paths->data[index] = path_b;
-                paths->data[index + 1] = path_a;
-                changed = true;
-            }
-
-            ++index;
+            const uint64_t step = get_cap_(width, width, array->len);
+            left = get_cap_(left, step, array->len);
         }
 
-        if (!changed) {
+        if (width >= array->len - width) {
             break;
         }
 
-        --size;
-    }
-
-    if (reverse) {
-        reverse_(paths);
+        width += width;
     }
 }
 
-static int compare_time(const struct timespec *a, const struct timespec *b) {
-    ASSERT_(a, "a can not be NULL");
-    ASSERT_(b, "b can not be NULL");
+static uint64_t get_cap_(const uint64_t lhs, const uint64_t rhs,
+                         const uint64_t cap) {
+    if (lhs >= cap || rhs >= cap - lhs) {
+        return cap;
+    }
 
+    return lhs + rhs;
+}
+
+static void merge_(void **data, void **tmp, const t_range *range,
+                   const t_cmp_entry cmp) {
+    uint64_t i = range->left;
+    uint64_t j = range->mid;
+    uint64_t out = range->left;
+
+    while (i < range->mid && j < range->right) {
+        const t_entry *a = data[i];
+        const t_entry *b = data[j];
+
+        if (cmp(a, b) <= 0) {
+            tmp[out++] = data[i++];
+        } else {
+            tmp[out++] = data[j++];
+        }
+    }
+
+    while (i < range->mid) {
+        tmp[out++] = data[i++];
+    }
+
+    while (j < range->right) {
+        tmp[out++] = data[j++];
+    }
+
+    for (uint64_t idx = range->left; idx < range->right; ++idx) {
+        data[idx] = tmp[idx];
+    }
+}
+
+static int cmp_name_entry_(const t_entry *a, const t_entry *b) {
+    return compare_(entry_name_(a), entry_name_(b));
+}
+
+static int cmp_name_entry_rev_(const t_entry *a, const t_entry *b) {
+    return cmp_name_entry_(b, a);
+}
+
+static int cmp_time_entry_(const t_entry *a, const t_entry *b) {
+    const int cmp = compare_time_(&a->st.st_mtim, &b->st.st_mtim);
+    if (cmp != 0) {
+        return -cmp;
+    }
+
+    return compare_(entry_name_(a), entry_name_(b));
+}
+
+static int cmp_time_entry_rev_(const t_entry *a, const t_entry *b) {
+    return cmp_time_entry_(b, a);
+}
+
+static int cmp_atime_entry_(const t_entry *a, const t_entry *b) {
+    const int cmp = compare_time_(&a->st.st_atim, &b->st.st_atim);
+    if (cmp != 0) {
+        return -cmp;
+    }
+
+    return compare_(entry_name_(a), entry_name_(b));
+}
+
+static int cmp_atime_entry_rev_(const t_entry *a, const t_entry *b) {
+    return cmp_atime_entry_(b, a);
+}
+
+static t_str *entry_name_(const t_entry *entry) {
+    return entry->name ? entry->name : entry->path;
+}
+
+static int compare_(const t_str *lhs, const t_str *rhs) {
+    const unsigned char *a = (const unsigned char *)lhs->str;
+    const unsigned char *b = (const unsigned char *)rhs->str;
+    const uint64_t limit = lhs->len < rhs->len ? lhs->len : rhs->len;
+
+    for (uint64_t index = 0; index < limit; ++index) {
+        if (a[index] != b[index]) {
+            return (int)a[index] - (int)b[index];
+        }
+    }
+
+    if (lhs->len == rhs->len) {
+        return 0;
+    }
+
+    return lhs->len < rhs->len ? -1 : 1;
+}
+
+static int compare_time_(const struct timespec *a, const struct timespec *b) {
     if (a->tv_sec != b->tv_sec) {
         return (a->tv_sec > b->tv_sec) - (a->tv_sec < b->tv_sec);
     }
 
     return (a->tv_nsec > b->tv_nsec) - (a->tv_nsec < b->tv_nsec);
 }
-
-static void reverse_(t_array *files) {
-    ASSERT_(files, "files can not be NULL");
-    ASSERT_(files->len, "files->len must be more then 0");
-
-    size_t index = 0;
-    size_t end = files->len - 1;
-
-    while (index < end) {
-        t_file *tmp = files->data[index];
-        files->data[index] = files->data[end];
-        files->data[end] = tmp;
-        ++index;
-        --end;
-        // ASSERT_(index <= end, "index crossed end");  need to chage it on even it triggert
-    }
-}
-
-static int compare_(const char *a, const char *b) {
-#if defined(__APPLE__)
-    int result = compare_bsd_(a, b);
-#else
-    int result = compare_gnu_(a, b);
-#endif
-    return result;
-}
-
-#if defined(__APPLE__)
-static int compare_bsd_(const char *a, const char *b) {
-    ASSERT_(a, "a can not be NULL");
-    ASSERT_(*a, "*a can not be '\\0'");
-    ASSERT_(b, "b can not be NULL");
-    ASSERT_(*b, "*b can not be '\\0'");
-
-    if (*a == '\'' || *a == '"') {
-        ++a;
-    }
-    if (*b == '\'' || *b == '"') {
-        ++b;
-    }
-
-    while (*a && *b && *a == *b) {
-        ++a;
-        ++b;
-    }
-
-    return (unsigned char)*a - (unsigned char)*b;
-}
-#else
-static int compare_gnu_(const char *a, const char *b) {
-    ASSERT_(a, "a can not be NULL");
-    ASSERT_(b, "b can not be NULL");
-
-    if (*a == '\'' || *a == '"') {
-        ++a;
-    }
-
-    if (*b == '\'' || *b == '"') {
-        ++b;
-    }
-
-    const char *a_start = a;
-    const char *b_start = b;
-    while (*a || *b) {
-        while (*a && !ft_isalpha(*a) && !ft_isdigit(*a)) {
-            ++a;
-        }
-        while (*b && !ft_isalpha(*b) && !ft_isdigit(*b)) {
-            ++b;
-        }
-
-        if (!*a || !*b) {
-            break;
-        }
-
-        int va;
-        int vb;
-        if (ft_isdigit(*a)) {
-            va = *a - '0';
-        } else {
-            va = ft_tolower(*a) - 'a' + 10;
-        }
-        if (ft_isdigit(*b)) {
-            vb = *b - '0';
-        } else {
-            vb = ft_tolower(*b) - 'a' + 10;
-        }
-
-        if (va != vb) {
-            return va - vb;
-        }
-
-        ++a;
-        ++b;
-    }
-
-    while (*a && !ft_isalpha(*a) && !ft_isdigit(*a)) {
-        ++a;
-    }
-    while (*b && !ft_isalpha(*b) && !ft_isdigit(*b)) {
-        ++b;
-    }
-
-    if (*a || *b) {
-        return *a ? 1 : -1;
-    }
-
-    a = a_start;
-    b = b_start;
-    while (*a && *b) {
-        if (*a != *b) {
-            if (ft_isalpha(*a) && ft_isalpha(*b) &&
-                ft_tolower(*a) == ft_tolower(*b)) {
-                int a_lower = (*a >= 'a' && *a <= 'z');
-                int b_lower = (*b >= 'a' && *b <= 'z');
-                return b_lower - a_lower;
-            }
-            return (unsigned char)*a - (unsigned char)*b;
-        }
-        ++a;
-        ++b;
-    }
-    return (unsigned char)*a - (unsigned char)*b;
-}
-#endif
