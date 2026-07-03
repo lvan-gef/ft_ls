@@ -461,7 +461,7 @@ static char classify_xattrs_(const char *names, const ssize_t size) {
 }
 
 static char xattr_error_marker_(const int e) {
-    if (e == ENOTSUP || e == EOPNOTSUPP) {
+    if (e == ENOTSUP) {
         return ' ';
     }
 
