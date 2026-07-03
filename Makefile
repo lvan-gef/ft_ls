@@ -15,11 +15,12 @@ CFLAGS   := -std=c11 -O3 -march=native                                         \
 			-Wcast-qual -Wduplicated-cond -Wduplicated-branches                \
 			-Wvla -Walloca -Wold-style-definition                              \
 			-Wbad-function-cast -Wmissing-declarations -Wstrict-overflow=5     \
-		    -Wdate-time -Walloc-zero                                           \
-            -Wframe-larger-than=4096
+			-Wdate-time -Walloc-zero                                           \
+			-Wframe-larger-than=4096
 
 DEPFLAGS := -MMD -MP
 LDFLAGS  := -pie -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack -s
+LDLIBS   :=
 
 SRCDIR   := src
 SRCFILES := ft_arena.c ft_array.c ft_file_info.c ft_parse.c ft_printer.c       \
@@ -61,13 +62,13 @@ fmt:  ## Format code via clang-format
 help:  ## Get help
 	@printf 'Usage: make ${BLUE}<target>${NC}\n'
 	@printf 'Available targets:\n'
-	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  ${BLUE}%-15s${NC} %s\n", $$1, $$2}' Makefile
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  ${BLUE}%-15s${NC} %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 $(NAME): $(OBJS)
-	$(CC) $(LDFLAGS) $(OBJS) -o $@
+	$(CC) $(LDFLAGS) $(OBJS) $(LDLIBS) -o $@
 	@printf 'Build complete: %s (release)\n' '$(NAME)'
 
-$(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)
+$(OBJDIR)/%.o: $(SRCDIR)/%.c Makefile | $(OBJDIR)
 	$(CC) $(DEPFLAGS) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
 $(OBJDIR):
