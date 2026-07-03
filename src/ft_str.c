@@ -58,7 +58,7 @@ t_str *str_from_cstr(const char *src) {
 }
 
 t_str *str_dup(const t_str *src) {
-    t_str *new_str = str_new(src->cap - 1);
+    t_str *new_str = str_new(src->len);
     if (!new_str) {
         return NULL;
     }
