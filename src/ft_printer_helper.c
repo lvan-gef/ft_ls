@@ -28,7 +28,7 @@ bool put_mem_fd(t_str *out, const char *src, uint64_t len, const int fd) {
             return false;
         }
 
-        const uint64_t avail = (out->cap - 1) - out->len;
+        const uint64_t avail = out->cap - 1 - out->len;
         const uint64_t to_copy = len < avail ? len : avail;
         ft_memcpy(out->str + out->len, src, (size_t)to_copy);
         out->len += to_copy;
@@ -87,7 +87,7 @@ static const char *entry_color_(const t_entry *entry) {
         return BLOCKCHAR;
     }
 
-    if (S_ISREG(mode) && (mode & (S_IXUSR | S_IXGRP | S_IXOTH))) {
+    if (S_ISREG(mode) && mode & (S_IXUSR | S_IXGRP | S_IXOTH)) {
         return EXECUTABLE;
     }
 

@@ -13,7 +13,7 @@ static void init_timezone_(void);
 int main(const int argc, char *argv[]) {
     t_args args = {0};
     t_array inputs = {0};
-    if (!array_init(&inputs, (uint64_t)(argc))) {
+    if (!array_init(&inputs, (uint64_t)argc)) {
         return 1;
     }
 

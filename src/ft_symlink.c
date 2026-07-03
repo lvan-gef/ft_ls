@@ -25,7 +25,7 @@ t_str *read_symlink(Arena *scratch, const t_str *path,
         return NULL;
     }
 
-    uint64_t cap = (target_size > 0) ? target_size + 1 : PATH_MAX;
+    uint64_t cap = target_size > 0 ? target_size + 1 : PATH_MAX;
     while (true) {
         const Arena_Mark mark = arena_get_mark(scratch);
         t_str *str = str_arena_new(scratch, cap);
@@ -33,7 +33,7 @@ t_str *read_symlink(Arena *scratch, const t_str *path,
             return NULL;
         }
 
-        const size_t read_size = (cap > (size_t)-1) ? (size_t)-1 : (size_t)cap;
+        const size_t read_size = cap > (size_t)-1 ? (size_t)-1 : (size_t)cap;
         const ssize_t len = readlink(path->str, str->str, read_size);
         if (len < 0) {
             const int err = errno;

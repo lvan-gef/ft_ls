@@ -2,7 +2,7 @@
 Language:        Cpp
 BasedOnStyle:  LLVM
 AccessModifierOffset: -2
-AlignAfterOpenBracket: Align
+AlignAfterOpenBracket: true
 AlignArrayOfStructures: None
 AlignConsecutiveAssignments:
   Enabled:         false
@@ -165,7 +165,7 @@ PointerAlignment: Right
 PPIndentWidth:   -1
 QualifierAlignment: Leave
 ReferenceAlignment: Pointer
-ReflowComments:  true
+ReflowComments: Always
 RemoveBracesLLVM: false
 RemoveSemicolon: false
 RequiresClausePosition: OwnLine

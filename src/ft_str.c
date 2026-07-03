@@ -26,7 +26,7 @@ void str_copy_uint(t_str *str, uint64_t value) {
     str->str[len] = '\0';
     for (uint64_t pos = len; pos > 0;) {
         --pos;
-        str->str[pos] = (char)((value % 10) + '0');
+        str->str[pos] = (char)(value % 10 + '0');
         value /= 10;
     }
 }

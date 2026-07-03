@@ -127,7 +127,7 @@ static bool left_pad_(t_str *out, const uint64_t src_len,
             return false;
         }
 
-        const uint64_t avail = (out->cap - 1) - out->len;
+        const uint64_t avail = out->cap - 1 - out->len;
         const uint64_t to_fill = count < avail ? count : avail;
         ft_memset(out->str + out->len, ' ', (size_t)to_fill);
         out->len += to_fill;

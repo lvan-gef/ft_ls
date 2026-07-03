@@ -396,7 +396,7 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
         const int e = errno;
         (void)print_error_(&params->out, path->path, e, "cannot open directory",
                            &params->output_failed);
-        *exit_code = (path->is_operand ? 2 : 1);
+        *exit_code = path->is_operand ? 2 : 1;
         return false;
     }
 

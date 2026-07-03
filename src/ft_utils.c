@@ -3,11 +3,9 @@
 #include "./ft_utils.h"
 
 void *ft_memcpy(void *dst, const void *src, size_t len) {
-    unsigned char *dst_bytes;
-    const unsigned char *src_bytes;
+    unsigned char *dst_bytes = (unsigned char *)dst;
+    const unsigned char *src_bytes = (const unsigned char *)src;
 
-    dst_bytes = (unsigned char *)dst;
-    src_bytes = (const unsigned char *)src;
     while (len >= 8) {
         dst_bytes[0] = src_bytes[0];
         dst_bytes[1] = src_bytes[1];
@@ -30,26 +28,40 @@ void *ft_memcpy(void *dst, const void *src, size_t len) {
     return dst;
 }
 
-const void *ft_memchr(const void *s, int c, size_t n) {
+const void *ft_memchr(const void *s, const int c, size_t n) {
     const unsigned char *ptr = (const unsigned char *)s;
-    unsigned char byte = (unsigned char)c;
+    const unsigned char byte = (unsigned char)c;
 
     while (n >= 8) {
         if (ptr[0] == byte) {
             return ptr + 0;
-        } else if (ptr[1] == byte) {
+        }
+
+        if (ptr[1] == byte) {
             return ptr + 1;
-        } else if (ptr[2] == byte) {
+        }
+
+        if (ptr[2] == byte) {
             return ptr + 2;
-        } else if (ptr[3] == byte) {
+        }
+
+        if (ptr[3] == byte) {
             return ptr + 3;
-        } else if (ptr[4] == byte) {
+        }
+
+        if (ptr[4] == byte) {
             return ptr + 4;
-        } else if (ptr[5] == byte) {
+        }
+
+        if (ptr[5] == byte) {
             return ptr + 5;
-        } else if (ptr[6] == byte) {
+        }
+
+        if (ptr[6] == byte) {
             return ptr + 6;
-        } else if (ptr[7] == byte) {
+        }
+
+        if (ptr[7] == byte) {
             return ptr + 7;
         }
 
@@ -69,9 +81,9 @@ const void *ft_memchr(const void *s, int c, size_t n) {
     return NULL;
 }
 
-void *ft_memset(void *dest, int val, size_t len) {
+void *ft_memset(void *dest, const int val, size_t len) {
     unsigned char *ptr = (unsigned char *)dest;
-    unsigned char byte = (unsigned char)val;
+    const unsigned char byte = (unsigned char)val;
 
     while (len >= 8) {
         ptr[0] = byte;
@@ -93,7 +105,7 @@ void *ft_memset(void *dest, int val, size_t len) {
     return dest;
 }
 
-int ft_strncmp(const char *s1, const char *s2, size_t n) {
+int ft_strncmp(const char *s1, const char *s2, const size_t n) {
     const unsigned char *s1_ = (const unsigned char *)s1;
     const unsigned char *s2_ = (const unsigned char *)s2;
     size_t index = 0;
@@ -113,10 +125,10 @@ int ft_strncmp(const char *s1, const char *s2, size_t n) {
     return 0;
 }
 
-size_t ft_strlcpy(char *dst, const char *src, size_t dstsize) {
-    size_t src_len = ft_strlen(src);
+size_t ft_strlcpy(char *dst, const char *src, const size_t dstsize) {
+    const size_t src_len = ft_strlen(src);
     if (!dstsize) {
-        return (src_len);
+        return src_len;
     }
 
     size_t copy_len = src_len;
@@ -126,7 +138,7 @@ size_t ft_strlcpy(char *dst, const char *src, size_t dstsize) {
 
     ft_memcpy(dst, src, copy_len);
     dst[copy_len] = '\0';
-    return (src_len);
+    return src_len;
 }
 
 size_t ft_strlen(const char *s) {
@@ -138,15 +150,15 @@ size_t ft_strlen(const char *s) {
     return index;
 }
 
-int ft_isprint(int c) {
-    if ((c >= 32) && (c <= 126)) {
+int ft_isprint(const int c) {
+    if (c >= 32 && c <= 126) {
         return 1;
     }
 
     return 0;
 }
 
-int ft_isalpha(int c) {
+int ft_isalpha(const int c) {
     if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
         return 1;
     }
@@ -154,7 +166,7 @@ int ft_isalpha(int c) {
     return 0;
 }
 
-int ft_isdigit(int c) {
+int ft_isdigit(const int c) {
     if (c >= 48 && c <= 57) {
         return 1;
     }

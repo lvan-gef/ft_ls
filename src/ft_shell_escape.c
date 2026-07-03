@@ -149,10 +149,10 @@ static void emit_ansi_byte_(t_shell_out *out, const unsigned char byte) {
         case '\r': repr[1] = 'r'; break;
         default:
             len = 4;
-            repr[1] = (char)('0' + ((byte >> BYTE_OCTAL_HIGH_SHIFT) &
-                                    OCTAL_DIGIT_MASK));
-            repr[2] = (char)('0' + ((byte >> BYTE_OCTAL_MID_SHIFT) &
-                                    OCTAL_DIGIT_MASK));
+            repr[1] = (char)('0' + (byte >> BYTE_OCTAL_HIGH_SHIFT) &
+                             OCTAL_DIGIT_MASK);
+            repr[2] =
+                (char)('0' + (byte >> BYTE_OCTAL_MID_SHIFT) & OCTAL_DIGIT_MASK);
             repr[3] = (char)('0' + (byte & OCTAL_DIGIT_MASK));
             break;
     }
