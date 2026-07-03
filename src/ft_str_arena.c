@@ -3,10 +3,9 @@
 
 #include "../include/ft_str.h"
 
-#include "../libft/include/libft.h"
-
 #include "./ft_arena.h"
 #include "./ft_str_arena.h"
+#include "./ft_utils.h"
 
 t_str *str_arena_new(Arena *arena, const uint64_t cap) {
     if (cap > UINT64_MAX - (uint64_t)sizeof(t_str) - 1) {

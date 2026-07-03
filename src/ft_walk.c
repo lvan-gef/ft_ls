@@ -13,8 +13,6 @@
 #include "../include/ft_str.h"
 #include "../include/ft_walk.h"
 
-#include "../libft/include/libft.h"
-
 #include "./ft_arena.h"
 #include "./ft_ls.h"
 #include "./ft_printer.h"
@@ -23,6 +21,7 @@
 #include "./ft_sort.h"
 #include "./ft_str_arena.h"
 #include "./ft_symlink.h"
+#include "./ft_utils.h"
 #include "./ft_walk_entry.h"
 
 typedef struct {
@@ -124,17 +123,26 @@ static bool run_listing_(t_params *params, const t_array *array,
                            .list_width_context = &params->dir_queue,
                            .dir_header = NULL,
                            .buffer = &params->out,
-                           .arena = NULL,
+                           .arena = arena_alloc(ARENA_SIZE),
                            .quote_padding = params->quote_padding,
                            .list_mode = params->args->list,
-                           .print_total = false};
+                           .print_total = false,
+                           .no_owner = params->args->no_owner,
+                           .access_time = params->args->access_time,
+                           .no_group = params->args->no_group,
+                           .color = params->args->color,
+                           .term_size = get_terminal_width()};
 
-    req.arena = arena_alloc(ARENA_SIZE);
     if (!req.arena) {
         goto cleanup;
     }
 
     if (!print_operand_files_(params, &req, &printed_files)) {
+        goto cleanup;
+    }
+
+    if (params->args->directory) {
+        ok = true;
         goto cleanup;
     }
 
@@ -161,13 +169,24 @@ static bool print_operand_files_(t_params *params, const t_print_request *req,
         return true;
     }
 
-    const bool ok = sort(&params->sort_scratch, &params->operand_files,
-                         params->args->reverse, params->args->time) &&
-                    printer(req);
+    bool ok = false;
+    const bool sort_time = !params->args->unsort &&
+                           (params->args->time ||
+                            (params->args->access_time && !params->args->list));
+    if (!params->args->unsort) {
+        ok = sort(&params->sort_scratch, &params->operand_files,
+                  params->args->reverse, sort_time, params->args->access_time);
+        if (!ok) {
+            goto cleanup;
+        }
+    }
+
+    ok = printer(req);
     if (ok) {
         *printed_files = true;
     }
 
+cleanup:
     array_clear_with(&params->operand_files, entry_del);
     return ok;
 }
@@ -178,7 +197,14 @@ static bool process_queue_(t_params *params, const t_array *array,
     bool printed_dir = false;
     bool inserted_files_dirs_gap = false;
     const bool print_dir_path = params->args->recursive || array->len > 1;
+    const bool sort_time = !params->args->unsort &&
+                           (params->args->time ||
+                            (params->args->access_time && !params->args->list));
     t_entry *dir_path = NULL;
+
+    if (params->args->unsort) {
+        array_reverse(&params->dir_queue);
+    }
 
     while (params->dir_queue.len) {
         dir_path = array_pop(&params->dir_queue);
@@ -200,8 +226,10 @@ static bool process_queue_(t_params *params, const t_array *array,
             continue;
         }
 
-        if (!sort(&params->sort_scratch, &params->current_entries,
-                  params->args->reverse, params->args->time)) {
+        if (!params->args->unsort &&
+            !sort(&params->sort_scratch, &params->current_entries,
+                  params->args->reverse, sort_time,
+                  params->args->access_time)) {
             goto error;
         }
 
@@ -241,6 +269,7 @@ static bool collect_operands_(t_params *params, const t_array *array,
 
         const t_operand_state state =
             classify_operand_(params, str, &st, exit_code);
+
         switch (state) {
             case OPERAND_SKIP: {
                 t_shell_scan scan;
@@ -253,7 +282,7 @@ static bool collect_operands_(t_params *params, const t_array *array,
             case OPERAND_FILE: break;
         }
 
-        if (S_ISDIR(st.st_mode)) {
+        if (S_ISDIR(st.st_mode) && !params->args->directory) {
             if (!queue_operand_dir_(params, str, &st)) {
                 goto failed;
             }
@@ -272,9 +301,12 @@ static bool collect_operands_(t_params *params, const t_array *array,
         }
     }
 
-    if (params->dir_queue.len &&
+    const bool sort_time = !params->args->unsort &&
+                           (params->args->time ||
+                            (params->args->access_time && !params->args->list));
+    if (params->dir_queue.len && !params->args->unsort &&
         !sort(&params->sort_scratch, &params->dir_queue, !params->args->reverse,
-              params->args->time)) {
+              sort_time, params->args->access_time)) {
         goto failed;
     }
 
@@ -305,6 +337,10 @@ static t_operand_state classify_operand_(t_params *params, const t_str *str,
     bool is_dir_operand = S_ISDIR(st->st_mode);
     const struct stat *st_dir = st;
     struct stat st_target;
+    if (params->args->directory && !params->args->list) {
+        goto cleanup;
+    }
+
     if (S_ISLNK(st->st_mode)) {
         if (!stat(str->str, &st_target) && S_ISDIR(st_target.st_mode)) {
             is_dir_operand = true;
@@ -337,7 +373,7 @@ static t_operand_state classify_operand_(t_params *params, const t_str *str,
         }
     }
 
-    if (is_dir_operand && !params->args->list) {
+    if (is_dir_operand && !params->args->list && !params->args->directory) {
         if (!queue_operand_dir_(params, str, st_dir)) {
             state = OPERAND_FATAL;
             goto cleanup;
@@ -366,11 +402,14 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
 
     clear_directory_entries_(params);
     const struct dirent *dp;
+    const bool sort_time = !params->args->unsort &&
+                           (params->args->time ||
+                            (params->args->access_time && !params->args->list));
     while ((dp = readdir(d))) {
         const unsigned char dtype = dp->d_type;
         const mode_t mode = dtype_to_mode_(dtype);
         const bool need_lstat =
-            params->args->list || params->args->time || mode == 0;
+            params->args->list || sort_time || params->args->color || mode == 0;
 
         if (!params->args->all && dp->d_name[0] == '.') {
             continue;

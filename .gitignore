@@ -1,20 +1,61 @@
-ft_ls_tester/
-README.md
-compile_commands.json
-ft_ls_d
-ft_ls
+# Prerequisites
+*.d
+
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+
+# Linker output
+*.ilk
+*.map
+*.exp
+
+# Build directories
 obj/
-obj_debug/
-libft_d.a
-tester/__pycache__/
 
-ft_ls_bonus
-ft_ls_bonus_d
+# Precompiled Headers
+*.gch
+*.pch
 
-obj_bonus/
-obj_bonus_debug/
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
 
-libft/libft.a
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
 
-ft_ls_compare_tree/
-ft_ls_compare_results/
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+ft_ls
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Kernel Module Compile Results
+*.mod*
+*.cmd
+.tmp_versions/
+modules.order
+Module.symvers
+Mkfile.old
+dkms.conf
+
+# debug information files
+*.dwo
+
+compile_commands.json

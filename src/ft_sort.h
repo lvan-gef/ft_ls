@@ -14,6 +14,6 @@ typedef struct {
 } t_sort_scratch;
 
 bool sort(t_sort_scratch *scratch, const t_array *array, bool reverse,
-          bool sort_time);
+          bool sort_time, bool access_time);
 
 #endif /* ifndef FT_SORT_H */

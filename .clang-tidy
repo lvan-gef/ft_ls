@@ -14,10 +14,17 @@ Checks: >
   readability-redundant-control-flow,
   readability-redundant-declaration,
   readability-suspicious-call-argument,
+  -misc-include-cleaner,
   -cert-dcl37-c,
-  -cert-dcl51-c,
+  -cert-dcl51-cpp,
+  -bugprone-reserved-identifier,
+  -portability-restrict-system-includes,
 
 CheckOptions:
-  - key: 'Language'
-    value: 'C11'
+  - key: bugprone-easily-swappable-parameters.MinimumLength
+    value: '4'
+
 ExtraArgs: ['-std=c11']
+HeaderFilterRegex: '(^|.*/)(src|include)/.*'
+ExcludeHeaderFilterRegex: '(^|.*/)libft/.*'
+FormatStyle: file

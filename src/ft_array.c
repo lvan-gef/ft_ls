@@ -6,7 +6,7 @@
 
 #include "../include/ft_array.h"
 
-#include "../libft/include/libft.h"
+#include "./ft_utils.h"
 
 #ifndef MAX_ALLOC_SIZE
 #define MAX_ALLOC_SIZE ((uint64_t)(PTRDIFF_MAX / sizeof(void *)))
@@ -35,6 +35,19 @@ bool array_init(t_array *array, const uint64_t initial_cap) {
 
     array->cap = initial_cap;
     return true;
+}
+
+void array_reverse(const t_array *array) {
+    uint64_t left = 0;
+    uint64_t right = array->len;
+
+    while (left < right) {
+        --right;
+        void *tmp = array->data[left];
+        array->data[left] = array->data[right];
+        array->data[right] = tmp;
+        ++left;
+    }
 }
 
 void array_destroy(t_array *array) {

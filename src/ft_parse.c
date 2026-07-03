@@ -7,9 +7,8 @@
 #include "../include/ft_parse.h"
 #include "../include/ft_str.h"
 
-#include "../libft/include/libft.h"
-
 #include "./ft_printer_helper.h"
+#include "./ft_utils.h"
 
 static bool append_input_(const char *arg, t_array *inputs);
 static void print_error_(const char *flag);
@@ -39,7 +38,25 @@ bool parse_args(const uint64_t argc, char **argv, t_args *args,
                 case 'a': args->all = true; break;
                 case 'l': args->list = true; break;
                 case 'r': args->reverse = true; break;
-                case 't': args->time = true; break;
+                case 't':
+                    args->time = true;
+                    args->unsort = false;
+                    break;
+                case 'g':
+                    args->no_owner = true;
+                    args->list = true;
+                    break;
+                case 'u': args->access_time = true; break;
+                case 'f':
+                    args->unsort = true;
+                    args->all = true;
+                    break;
+                case 'd': args->directory = true; break;
+                case 'o':
+                    args->no_group = true;
+                    args->list = true;
+                    break;
+                case 'G': args->color = true; break;
                 default: print_error_(argv[index]); return false;
             }
         }
@@ -73,7 +90,7 @@ static void print_error_(const char *flag) {
     t_str out;
 
     const char cmd[] = "ft_ls: invalid option -- ";
-    const char usage[] = "\nusage: ft_ls [-Ralrt] [file ...]\n";
+    const char usage[] = "\nusage: ft_ls [-RalrtgufdoG] [file ...]\n";
     str_init(&out, buf, sizeof(buf) - 1);
     (void)(put_mem_fd(&out, cmd, sizeof(cmd) - 1, STDERR_FILENO) &&
            put_mem_fd(&out, flag, (uint64_t)ft_strlen(flag), STDERR_FILENO) &&
