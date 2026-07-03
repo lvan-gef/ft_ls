@@ -1,8 +1,8 @@
-NAME := ft_ls
+NAME     := ft_ls
 
-CC       = gcc
-CPPFLAGS := -DNDEBUG -D_FORTIFY_SOURCE=3 -I include
-CFLAGS   := -std=c11 -D_DEFAULT_SOURCE -O3 -march=native                       \
+CC       := gcc
+CPPFLAGS := -DNDEBUG -D_FORTIFY_SOURCE=3 -I include -D_DEFAULT_SOURCE
+CFLAGS   := -std=c11 -O3 -march=native                                         \
 			-fomit-frame-pointer -fPIE -fstack-clash-protection                \
 			-fstack-protector-strong                                           \
 			-Wall -Wextra -Werror -Wshadow -Wpedantic                          \
@@ -27,13 +27,13 @@ SRCFILES := ft_arena.c ft_array.c ft_file_info.c ft_parse.c ft_printer.c       \
 			ft_sort.c ft_str.c ft_str_arena.c ft_symlink.c ft_utils.c          \
 			ft_walk.c ft_walk_entry.c main.c
 
-SRCS   := $(addprefix $(SRCDIR)/, $(SRCFILES))
-OBJDIR := obj
-OBJS   := $(SRCS:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
-DEPS   := $(OBJS:.o=.d)
+SRCS     := $(addprefix $(SRCDIR)/, $(SRCFILES))
+OBJDIR   := obj
+OBJS     := $(SRCS:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
+DEPS     := $(OBJS:.o=.d)
 
-BLUE := \033[36m
-NC   := \033[0m
+BLUE     := \033[36m
+NC       := \033[0m
 
 .PHONY: all
 all: $(NAME)  ## Build release version (default)
