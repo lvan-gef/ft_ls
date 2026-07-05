@@ -7,7 +7,7 @@
 #include "../include/ft_parse.h"
 #include "../include/ft_str.h"
 
-#include "../libft/include/libft.h"
+#include "./ft_utils.h"
 
 #include "./ft_printer_helper.h"
 

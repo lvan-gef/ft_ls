@@ -13,7 +13,7 @@
 #include "../include/ft_str.h"
 #include "../include/ft_walk.h"
 
-#include "../libft/include/libft.h"
+#include "./ft_utils.h"
 
 #include "./ft_arena.h"
 #include "./ft_ls.h"

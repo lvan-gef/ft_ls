@@ -7,7 +7,7 @@
 
 #include "../include/ft_str.h"
 
-#include "../../libft/include/libft.h"
+#include "./ft_utils.h"
 
 #include "./ft_ls.h"
 #include "./ft_printer.h"
@@ -116,7 +116,7 @@ bool flush_fd(t_str *out, const int fd) {
 
         if (written_total > 0) {
             const uint64_t remaining = out->len - written_total;
-            ft_memmove(out->str, out->str + written_total, (size_t)remaining);
+            ft_memcpy(out->str, out->str + written_total, (size_t)remaining);
             out->len = remaining;
             out->str[remaining] = '\0';
         }

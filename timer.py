@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 
+import sys
 import argparse
 import argparse
 import statistics
@@ -49,8 +50,7 @@ def print_stats(name: str, durations: list[float]) -> float:
 
 
 def run(ft_bin: Path, paths: list[Path]):
-    flags = ['R', 'l']
-    # flags = ['R', 'a', 'l', 'r', 't']
+    flags = ['R', 'a', 'l', 'r', 't', 'g', 'u', 'f', 'd', 'o', 'G']
     runs = 21
     batch_size = 5
     ls_bin = which('ls')
@@ -61,11 +61,11 @@ def run(ft_bin: Path, paths: list[Path]):
 
     for p in paths:
         p = ''.join(p)
-        print(f'Path: {p}')
         for size in range(1, len(flags) + 1):
             for combo in combinations(flags, size):
                 flag = f'-{''.join(combo)}'
-                print('cache warmup')
+                print(f'Path: ft_ls {flag} {p}', file=sys.stderr)
+                print('cache warmup', file=sys.stderr)
                 bench(ls_cmd=[ls_bin, flag, p],
                       ft_cmd=[ft_bin, flag, p],
                       runs=1, batch_size=1

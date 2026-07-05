@@ -19,7 +19,7 @@ def gen_data(
     yield ["--", ""]
     yield ["--", "." , "--"]
 
-    yield ["-R", "/mnt/bulk2/"]
+    yield ["-R", "/mnt/bulk2/code_projects/ft_ls/"]
     for size in range(1, len(allowed_flags) + 1):
         for combo in combinations(allowed_flags, size):
             flags = "-" + "".join(combo)

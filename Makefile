@@ -10,10 +10,6 @@ ifeq ($(shell test "$(TERM_SIZE)" -gt 0 2>/dev/null && printf valid || printf in
 $(error TERM_SIZE must be a positive integer, got '$(TERM_SIZE)')
 endif
 
-LIBFT_DIR := libft
-LIBFT     := $(LIBFT_DIR)/libft.a
-LIBFT_D   := $(LIBFT_DIR)/libft_d.a
-
 CC          ?= cc
 ANALYZER_CC ?= gcc
 
@@ -46,12 +42,10 @@ D_LDFLAGS  := $(SANITIZERS) -rdynamic
 
 SRC_DIR       := src
 BONUS_SRC_DIR := bonus/src
-SRC_FILES     := ft_arena.c ft_array.c ft_file_info.c ft_parse.c ft_symlink.c  \
-				 ft_printer.c ft_printer_helper.c ft_printer_list.c            \
-			     ft_shell_escape.c ft_sort.c                                   \
-			     ft_str_arena.c ft_str.c                                       \
-			     ft_walk.c ft_walk_entry.c                                     \
-			     main.c
+SRC_FILES := ft_arena.c ft_array.c ft_file_info.c ft_parse.c ft_printer.c      \
+             ft_printer_helper.c ft_printer_list.c ft_shell_escape.c           \
+			 ft_sort.c ft_str.c ft_str_arena.c ft_symlink.c ft_utils.c         \
+			 ft_walk.c ft_walk_entry.c main.c
 
 SRCS   := $(addprefix $(SRC_DIR)/, $(SRC_FILES))
 B_SRCS := $(addprefix $(BONUS_SRC_DIR)/, $(SRC_FILES))
@@ -120,13 +114,11 @@ analyze:  ## Run GCC static analyzer
 
 .PHONY: clean
 clean:  ## Clean object files
-	@$(MAKE) -C $(LIBFT_DIR) clean
 	@rm -rf $(R_OBJ_DIR) $(D_OBJ_DIR) $(B_OBJ_DIR) $(BD_OBJ_DIR)
 
 .PHONY: fclean
 fclean:  ## Clean object, bin
 	@$(MAKE) clean
-	@$(MAKE) -C $(LIBFT_DIR) fclean
 	@rm -f $(NAME) $(NAME_D) $(NAME_B) $(NAME_B_D)
 
 .PHONY: re
@@ -158,17 +150,17 @@ $(NAME): $(LIBFT) $(R_OBJECTS)
 
 # Debug build
 $(NAME_D): $(LIBFT_D) $(D_OBJECTS)
-	$(CC) $(D_OBJECTS) $(D_LDFLAGS) $(LIBFT_D) -o $@
+	$(CC) $(D_OBJECTS) $(D_LDFLAGS) -o $@
 	@echo "Build complete: $(NAME_D) (debug)"
 
 # Bonus release build
 $(NAME_B): $(LIBFT) $(B_OBJECTS)
-	$(CC) $(B_OBJECTS) $(R_LDFLAGS) -s $(LIBFT) -o $@
+	$(CC) $(B_OBJECTS) $(R_LDFLAGS) -s -o $@
 	@echo "Build complete: $(NAME_B) (bonus release)"
 
 # Bonus debug build
 $(NAME_B_D): $(LIBFT_D) $(BD_OBJECTS)
-	$(CC) $(BD_OBJECTS) $(D_LDFLAGS) $(LIBFT_D) -o $@
+	$(CC) $(BD_OBJECTS) $(D_LDFLAGS) -o $@
 	@echo "Build complete: $(NAME_B_D) (bonus debug)"
 
 # Release pattern rule
@@ -186,12 +178,6 @@ $(B_OBJ_DIR)/%.o: $(BONUS_SRC_DIR)/%.c | $(B_OBJ_DIR)
 # Bonus debug pattern rule
 $(BD_OBJ_DIR)/%.o: $(BONUS_SRC_DIR)/%.c | $(BD_OBJ_DIR)
 	$(CC) $(B_CPPFLAGS) $(CFLAGS) $(D_CFLAGS) $(DEPSFLAGS) -c $< -o $@
-
-$(LIBFT):
-	@$(MAKE) -C $(LIBFT_DIR)
-
-$(LIBFT_D):
-	@$(MAKE) -C $(LIBFT_DIR) debug
 
 $(R_OBJ_DIR):
 	@mkdir -p $@

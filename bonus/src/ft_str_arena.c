@@ -3,7 +3,7 @@
 
 #include "../include/ft_str.h"
 
-#include "../../libft/include/libft.h"
+#include "./ft_utils.h"
 
 #include "./ft_arena.h"
 #include "./ft_str_arena.h"
