@@ -7,12 +7,11 @@
 
 #include "../include/ft_str.h"
 
-#include "./ft_utils.h"
-
 #include "./ft_ls.h"
 #include "./ft_printer.h"
 #include "./ft_printer_helper.h"
 #include "./ft_shell_escape.h"
+#include "./ft_utils.h"
 
 static const char *entry_color_(const t_entry *entry);
 static bool put_shell_escaped_scan_(t_str *out, const t_str *str,
@@ -61,38 +60,10 @@ bool put_entry_name(t_str *out, const t_entry *entry, const bool pad_unquoted,
     return !start || put_mem(out, RESET, sizeof(RESET) - 1);
 }
 
-static const char *entry_color_(const t_entry *entry) {
-    const mode_t mode = entry->st.st_mode;
+bool put_entry_name_raw(t_str *out, const t_entry *entry) {
+    const t_str *name = entry->name ? entry->name : entry->path;
 
-    if (entry->stat_unavailable) {
-        return NULL;
-    }
-
-    if (S_ISDIR(mode)) {
-        return DIRECTORY;
-    }
-
-    if (S_ISLNK(mode)) {
-        return SYMLINK;
-    }
-
-    if (S_ISSOCK(mode)) {
-        return SOCKET;
-    }
-
-    if (S_ISFIFO(mode)) {
-        return FIFO;
-    }
-
-    if (S_ISBLK(mode) || S_ISCHR(mode)) {
-        return BLOCKCHAR;
-    }
-
-    if (S_ISREG(mode) && (mode & (S_IXUSR | S_IXGRP | S_IXOTH))) {
-        return EXECUTABLE;
-    }
-
-    return NULL;
+    return put_mem(out, name->str, name->len);
 }
 
 bool flush_fd(t_str *out, const int fd) {
@@ -150,6 +121,15 @@ bool put_dir_header(t_str *out, const t_str *dir_header) {
            put_mem(out, ":\n", 2);
 }
 
+bool put_dir_header_raw(t_str *out, const t_str *dir_header) {
+    if (!dir_header) {
+        return true;
+    }
+
+    return put_mem(out, dir_header->str, dir_header->len) &&
+           put_mem(out, ":\n", 2);
+}
+
 static bool put_shell_escaped_scan_(t_str *out, const t_str *str,
                                     const t_shell_scan *scan,
                                     const bool pad_unquoted) {
@@ -177,4 +157,38 @@ static bool put_shell_escaped_scan_(t_str *out, const t_str *str,
     }
 
     return shell_escape_append_len(out, str, scan->quote, pad_unquoted, need);
+}
+
+static const char *entry_color_(const t_entry *entry) {
+    const mode_t mode = entry->st.st_mode;
+
+    if (entry->stat_unavailable) {
+        return NULL;
+    }
+
+    if (S_ISDIR(mode)) {
+        return DIRECTORY;
+    }
+
+    if (S_ISLNK(mode)) {
+        return SYMLINK;
+    }
+
+    if (S_ISSOCK(mode)) {
+        return SOCKET;
+    }
+
+    if (S_ISFIFO(mode)) {
+        return FIFO;
+    }
+
+    if (S_ISBLK(mode) || S_ISCHR(mode)) {
+        return BLOCKCHAR;
+    }
+
+    if (S_ISREG(mode) && (mode & (S_IXUSR | S_IXGRP | S_IXOTH))) {
+        return EXECUTABLE;
+    }
+
+    return NULL;
 }

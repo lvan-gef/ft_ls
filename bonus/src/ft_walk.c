@@ -13,8 +13,6 @@
 #include "../include/ft_str.h"
 #include "../include/ft_walk.h"
 
-#include "./ft_utils.h"
-
 #include "./ft_arena.h"
 #include "./ft_ls.h"
 #include "./ft_printer.h"
@@ -23,6 +21,7 @@
 #include "./ft_sort.h"
 #include "./ft_str_arena.h"
 #include "./ft_symlink.h"
+#include "./ft_utils.h"
 #include "./ft_walk_entry.h"
 
 typedef struct {
@@ -132,10 +131,15 @@ static bool run_listing_(t_params *params, const t_array *array,
                            .access_time = params->args->access_time,
                            .no_group = params->args->no_group,
                            .color = params->args->color,
-                           .term_size = get_terminal_width()};
+                           .term_size = get_terminal_width(),
+                           .is_stdout = true};
 
     if (!req.arena) {
         goto cleanup;
+    }
+
+    if (!isatty(STDOUT_FILENO)) {
+        req.is_stdout = false;
     }
 
     if (!print_operand_files_(params, &req, &printed_files)) {

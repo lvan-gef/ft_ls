@@ -29,7 +29,9 @@ bool put_mem(t_str *out, const char *src, uint64_t len);
 bool put_mem_fd(t_str *out, const char *src, uint64_t len, int fd);
 bool put_entry_name(t_str *out, const t_entry *entry, bool pad_unquoted,
                     bool color);
+bool put_entry_name_raw(t_str *out, const t_entry *entry);
 bool flush_fd(t_str *out, int fd);
 bool put_dir_header(t_str *out, const t_str *dir_header);
+bool put_dir_header_raw(t_str *out, const t_str *dir_header);
 
 #endif /* ifndef FT_PRINTER_HELPER_H */

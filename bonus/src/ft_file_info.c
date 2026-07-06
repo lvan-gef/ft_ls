@@ -9,13 +9,12 @@
 #include <sys/xattr.h>
 #include <time.h>
 
-#include "./ft_utils.h"
-
 #include "./ft_arena.h"
 #include "./ft_file_info.h"
 #include "./ft_ls.h"
 #include "./ft_str_arena.h"
 #include "./ft_symlink.h"
+#include "./ft_utils.h"
 
 struct timespec;
 

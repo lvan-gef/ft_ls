@@ -7,9 +7,8 @@
 #include "../include/ft_parse.h"
 #include "../include/ft_str.h"
 
-#include "./ft_utils.h"
-
 #include "./ft_printer_helper.h"
+#include "./ft_utils.h"
 
 static bool append_input_(const char *arg, t_array *inputs);
 static void print_error_(const char *flag);

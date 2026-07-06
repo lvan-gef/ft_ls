@@ -13,6 +13,7 @@ typedef struct {
 } t_map;
 
 static bool init_print_row_(const t_print_request *req);
+static bool init_print_lines_(const t_print_request *req);
 static bool entries_have_quote_(const t_array *array);
 static void calc_cols_(const t_array *array, t_map *map, bool quoted,
                        uint64_t *col_widths, uint64_t max_cols,
@@ -26,6 +27,10 @@ static bool indent_(t_str *out, uint64_t from, uint64_t to);
 bool printer(const t_print_request *req) {
     if (req->list_mode) {
         return printer_list(req);
+    }
+
+    if (!req->is_stdout) {
+        return init_print_lines_(req);
     }
 
     return init_print_row_(req);
@@ -73,6 +78,23 @@ static bool init_print_row_(const t_print_request *req) {
                                 quoted, req->color);
     arena_clear(req->arena);
     return ok;
+}
+
+static bool init_print_lines_(const t_print_request *req) {
+    if (!put_dir_header_raw(req->buffer, req->dir_header)) {
+        return false;
+    }
+
+    for (uint64_t index = 0; index < req->entries->len; ++index) {
+        const t_entry *entry = req->entries->data[index];
+
+        if (!put_entry_name_raw(req->buffer, entry) ||
+            !put_mem(req->buffer, "\n", 1)) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 static bool entries_have_quote_(const t_array *array) {

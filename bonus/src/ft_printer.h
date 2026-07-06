@@ -33,6 +33,7 @@ typedef struct s_print_request {
     bool no_group;
     bool access_time;
     bool color;
+    bool is_stdout;
     uint64_t term_size;
 } t_print_request;
 

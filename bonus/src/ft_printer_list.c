@@ -5,13 +5,12 @@
 
 #include "../include/ft_str.h"
 
-#include "./ft_utils.h"
-
 #include "./ft_arena.h"
 #include "./ft_file_info.h"
 #include "./ft_ls.h"
 #include "./ft_printer.h"
 #include "./ft_printer_helper.h"
+#include "./ft_utils.h"
 
 typedef struct {
     uint64_t total;
@@ -27,10 +26,9 @@ static void update_stats_(t_list_stats *stats, const t_entry *entry,
 static bool print_list_(const t_print_request *req, const t_file_info *infos);
 static bool left_pad_(t_str *out, uint64_t src_len, uint64_t max_size);
 static bool put_uint_(t_str *out, uint64_t value);
-static bool print_list_rows_(t_str *out, const t_array *array,
+static bool print_list_rows_(const t_print_request *req,
                              const t_file_info *infos,
-                             const t_list_stats *sizes, bool no_owner,
-                             bool no_group, bool color);
+                             const t_list_stats *sizes);
 
 bool printer_list(const t_print_request *req) {
     t_file_info *infos = NULL;
@@ -103,8 +101,15 @@ static bool print_list_(const t_print_request *req, const t_file_info *infos) {
         sizes.have_quote = req->quote_padding;
     }
 
-    if (!put_dir_header(req->buffer, req->dir_header)) {
-        return false;
+    bool ok = false;
+    if (!req->is_stdout) {
+        ok = put_dir_header_raw(req->buffer, req->dir_header);
+    } else {
+        ok = put_dir_header(req->buffer, req->dir_header);
+    }
+
+    if (!ok) {
+        return ok;
     }
 
     if (req->print_total) {
@@ -115,8 +120,7 @@ static bool print_list_(const t_print_request *req, const t_file_info *infos) {
         }
     }
 
-    return print_list_rows_(req->buffer, req->entries, infos, &sizes,
-                            req->no_owner, req->no_group, req->color);
+    return print_list_rows_(req, infos, &sizes);
 }
 
 static bool left_pad_(t_str *out, const uint64_t src_len,
@@ -149,52 +153,62 @@ static bool put_uint_(t_str *out, const uint64_t value) {
     return put_mem(out, str.str, str.len);
 }
 
-static bool print_list_rows_(t_str *out, const t_array *array,
+static bool print_list_rows_(const t_print_request *req,
                              const t_file_info *infos,
-                             const t_list_stats *sizes, const bool no_owner,
-                             const bool no_group, const bool color) {
-    for (uint64_t index = 0; index < array->len; ++index) {
-        const t_entry *entry = array->data[index];
+                             const t_list_stats *sizes) {
+    for (uint64_t index = 0; index < req->entries->len; ++index) {
+        const t_entry *entry = req->entries->data[index];
         const t_file_info *info = &infos[index];
 
-        if (!put_mem(out, info->perm->str, info->perm->len) ||
-            !left_pad_(out, info->perm->len, sizes->max_len_perm) ||
-            !put_mem(out, " ", 1) ||
-            !left_pad_(out, info->links->len, sizes->max_len_links) ||
-            !put_mem(out, info->links->str, info->links->len) ||
-            !put_mem(out, " ", 1)) {
+        if (!put_mem(req->buffer, info->perm->str, info->perm->len) ||
+            !left_pad_(req->buffer, info->perm->len, sizes->max_len_perm) ||
+            !put_mem(req->buffer, " ", 1) ||
+            !left_pad_(req->buffer, info->links->len, sizes->max_len_links) ||
+            !put_mem(req->buffer, info->links->str, info->links->len) ||
+            !put_mem(req->buffer, " ", 1)) {
             return false;
         }
 
-        if (!no_owner &&
-            (!put_mem(out, info->username->str, info->username->len) ||
-             !put_mem(out, " ", 1))) {
+        if (!req->no_owner &&
+            (!put_mem(req->buffer, info->username->str, info->username->len) ||
+             !put_mem(req->buffer, " ", 1))) {
             return false;
         }
 
-        if (!no_group &&
-            (!put_mem(out, info->groupname->str, info->groupname->len) ||
-             !put_mem(out, " ", 1))) {
+        if (!req->no_group && (!put_mem(req->buffer, info->groupname->str,
+                                        info->groupname->len) ||
+                               !put_mem(req->buffer, " ", 1))) {
             return false;
         }
 
-        if (!left_pad_(out, info->size->len, sizes->max_len_sizes) ||
-            !put_mem(out, info->size->str, info->size->len) ||
-            !put_mem(out, " ", 1) ||
-            !put_mem(out, info->dt->str, info->dt->len) ||
-            !put_mem(out, " ", 1) ||
-            !put_entry_name(out, entry, sizes->have_quote, color)) {
+        if (!left_pad_(req->buffer, info->size->len, sizes->max_len_sizes) ||
+            !put_mem(req->buffer, info->size->str, info->size->len) ||
+            !put_mem(req->buffer, " ", 1) ||
+            !put_mem(req->buffer, info->dt->str, info->dt->len) ||
+            !put_mem(req->buffer, " ", 1)) {
             return false;
+        }
+
+        bool ok = false;
+        if (!req->is_stdout) {
+            ok = put_entry_name_raw(req->buffer, entry);
+        } else {
+            ok = put_entry_name(req->buffer, entry, sizes->have_quote,
+                                req->color);
+        }
+
+        if (!ok) {
+            return ok;
         }
 
         if (info->symlink && info->symlink->len > 0) {
-            if (!put_mem(out, " -> ", 4) ||
-                !put_mem(out, info->symlink->str, info->symlink->len)) {
+            if (!put_mem(req->buffer, " -> ", 4) ||
+                !put_mem(req->buffer, info->symlink->str, info->symlink->len)) {
                 return false;
             }
         }
 
-        if (!put_mem(out, "\n", 1)) {
+        if (!put_mem(req->buffer, "\n", 1)) {
             return false;
         }
     }
