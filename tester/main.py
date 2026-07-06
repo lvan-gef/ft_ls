@@ -12,6 +12,7 @@ import string
 import struct
 import subprocess
 import sys
+import tempfile
 import termios
 from itertools import islice
 from multiprocessing import get_context
@@ -25,6 +26,7 @@ from gen_data import (
     KNOWN_BONUS_FLAGS,
     NON_COMPARABLE_BONUS_FLAGS,
     gen_data,
+    gen_non_tty_data,
 )
 
 
@@ -41,10 +43,11 @@ class TestBatch(NamedTuple):
 
 
 class TestFailure(NamedTuple):
-    term_size: int
+    term_size: int | None
     cmd: list[str]
     kind: str
     diff: str
+    mode: str = "pty"
 
 
 DEBUG = True
@@ -76,7 +79,13 @@ def main() -> None:
                 bonus_flags=args.bonus_flags,
             )
         )
+        non_tty_cases = (
+            list(gen_non_tty_data(paths=data, bonus_flags=args.bonus_flags))
+            if bonus_mode
+            else []
+        )
         checked_invalid_flags = False
+        checked_non_tty = False
         for term_size in range(args.cols_start, args.cols_end, args.cols_step):
             print("=" * 60)
             if bonus_mode:
@@ -109,6 +118,22 @@ def main() -> None:
             if failure is not None:
                 print(format_failure(failure), file=sys.stderr)
                 sys.exit(1)
+
+            if bonus_mode and not checked_non_tty:
+                print("=" * 60)
+                print(
+                    "Non-TTY Redirect/Pipe Tests",
+                    f"(bin={args.bin})",
+                    f"(cases={len(non_tty_cases)})",
+                )
+                print("=" * 60)
+                failure = run_non_tty_cases(cases=non_tty_cases, ft_bin=args.bin)
+
+                if failure is not None:
+                    print(format_failure(failure), file=sys.stderr)
+                    sys.exit(1)
+
+                checked_non_tty = True
     except Exception as e:
         print(e, file=sys.stderr)
         sys.exit(1)
@@ -392,6 +417,52 @@ def compare_case(term_size: int, ft_bin: str, args: list[str]) -> TestFailure | 
     return None
 
 
+def run_non_tty_cases(cases: list[list[str]], ft_bin: str) -> TestFailure | None:
+    for mode in ("redirect", "pipe"):
+        print(f"  {mode}: {len(cases)} cases")
+        for args in cases:
+            failure = compare_non_tty_case(ft_bin=ft_bin, args=args, mode=mode)
+            if failure is not None:
+                return failure
+
+    return None
+
+
+def compare_non_tty_case(
+    ft_bin: str, args: list[str], mode: str
+) -> TestFailure | None:
+    ft_cmd = [ft_bin, *args]
+    ls_cmd = ["ls", *args]
+
+    if mode == "redirect":
+        ft = run_with_redirect(ft_cmd)
+        ls = run_with_redirect(ls_cmd)
+    elif mode == "pipe":
+        ft = run_with_pipe(ft_cmd)
+        ls = run_with_pipe(ls_cmd)
+    else:
+        raise ValueError(f"unknown non-TTY mode: {mode}")
+
+    diff = diff_output(ft.stdout, ls.stdout)
+    if diff is not None:
+        return TestFailure(None, ft_cmd, "stdout", diff, mode)
+
+    diff = diff_output(ft.stderr, ls.stderr, normalize_program=True)
+    if diff is not None:
+        return TestFailure(None, ft_cmd, "stderr", diff, mode)
+
+    if ft.returncode != ls.returncode:
+        return TestFailure(
+            None,
+            ft_cmd,
+            "returncode",
+            f"ft_ls returncode: {ft.returncode}\nls returncode: {ls.returncode}",
+            mode,
+        )
+
+    return None
+
+
 def normalize_program_name(output: str) -> str:
     lines: list[str] = []
 
@@ -431,18 +502,66 @@ def diff_output(
 
 
 def format_failure(failure: TestFailure) -> str:
+    cmd = shlex.join(failure.cmd)
+    if failure.mode == "redirect":
+        cmd = f"{cmd} > <tmpfile>"
+    elif failure.mode == "pipe":
+        cmd = f"{cmd} | <pipe>"
+
     lines = [
         "=" * 60,
         "Test failed",
-        f"TERM_SIZE: {failure.term_size}",
-        f"CMD: {shlex.join(failure.cmd)}",
-        f"KIND: {failure.kind}",
-        "DIFF:",
-        failure.diff.rstrip("\n"),
-        "=" * 60,
+        f"MODE: {failure.mode}",
     ]
+    if failure.term_size is not None:
+        lines.append(f"TERM_SIZE: {failure.term_size}")
+
+    lines.extend(
+        [
+            f"CMD: {cmd}",
+            f"KIND: {failure.kind}",
+            "DIFF:",
+            failure.diff.rstrip("\n"),
+            "=" * 60,
+        ]
+    )
 
     return "\n".join(lines)
+
+
+def run_with_redirect(cmd: list[str]) -> PtyResult:
+    with tempfile.TemporaryFile() as stdout_file:
+        result = subprocess.run(
+            cmd,
+            stdout=stdout_file,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.DEVNULL,
+            env=test_env(pty_mode=False),
+        )
+        stdout_file.seek(0)
+        stdout = decode_bytes(stdout_file.read())
+
+    return PtyResult(
+        stdout=stdout,
+        stderr=decode_bytes(result.stderr),
+        returncode=result.returncode,
+    )
+
+
+def run_with_pipe(cmd: list[str]) -> PtyResult:
+    result = subprocess.run(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        stdin=subprocess.DEVNULL,
+        env=test_env(pty_mode=False),
+    )
+
+    return PtyResult(
+        stdout=decode_bytes(result.stdout),
+        stderr=decode_bytes(result.stderr),
+        returncode=result.returncode,
+    )
 
 
 def run_with_pty(cmd: list[str], cols: int = 80) -> PtyResult:
@@ -453,11 +572,7 @@ def run_with_pty(cmd: list[str], cols: int = 80) -> PtyResult:
     winsize = struct.pack("HHHH", 24, cols, 0, 0)
     fcntl.ioctl(stdout_slave, termios.TIOCSWINSZ, winsize)
     fcntl.ioctl(stderr_slave, termios.TIOCSWINSZ, winsize)
-    env = os.environ.copy()
-    env["LC_ALL"] = "C"
-    env["LANG"] = "C"
-    env.pop("COLUMNS", None)
-    env["TERM"] = "screen-256color"
+    env = test_env(pty_mode=True)
 
     proc = subprocess.Popen(
         cmd,
@@ -498,6 +613,21 @@ def run_with_pty(cmd: list[str], cols: int = 80) -> PtyResult:
         stderr="".join(chunks["stderr"]).replace("\r", ""),
         returncode=returncode,
     )
+
+
+def test_env(pty_mode: bool) -> dict[str, str]:
+    env = os.environ.copy()
+    env["LC_ALL"] = "C"
+    env["LANG"] = "C"
+    env.pop("COLUMNS", None)
+    if pty_mode:
+        env["TERM"] = "screen-256color"
+
+    return env
+
+
+def decode_bytes(data: bytes) -> str:
+    return data.decode(errors="surrogateescape")
 
 
 if __name__ == "__main__":
