@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <sys/stat.h>
 
-typedef struct s_str t_str;
+#include "./ft_str.h"
 
 typedef struct s_shell_scan {
     uint64_t len;

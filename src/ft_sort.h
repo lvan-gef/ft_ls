@@ -6,8 +6,6 @@
 
 #include "../include/ft_array.h"
 
-typedef struct s_array t_array;
-
 typedef struct {
     void **data;
     uint64_t cap;

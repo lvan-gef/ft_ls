@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-typedef struct s_array t_array;
+#include "./ft_array.h"
 
 typedef struct s_args {
     bool list;

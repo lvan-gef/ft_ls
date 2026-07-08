@@ -6,8 +6,7 @@
 
 #include "../include/ft_str.h"
 
-typedef struct s_str t_str;
-typedef struct s_entry t_entry;
+#include "./ft_ls.h"
 
 #ifndef TABSIZE
 #define TABSIZE UINT64_C(8)

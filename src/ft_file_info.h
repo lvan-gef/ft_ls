@@ -9,10 +9,6 @@
 
 #include "./ft_arena.h"
 
-typedef struct s_arena Arena;
-typedef struct s_array t_array;
-typedef struct s_str t_str;
-
 typedef struct s_file_info {
     t_str *perm;
     t_str *links;
