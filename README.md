@@ -12,10 +12,11 @@ This implementation targets Linux only.
 - Reimplementation of the core `ls` behavior.
 - Long-format listing with permissions, links, owner, group, size, date, and symlink targets.
 - Recursive directory traversal.
-- Name, time, and reverse sorting.
+- Name, time, access-time, and reverse sorting.
 - Hidden file handling.
 - Multi-column output when `-l` is not used.
-- Terminal-width aware column layout.
+- Terminal-width aware column layout for terminal output.
+- One-entry-per-line output when stdout is piped or redirected.
 - ACL and extended-attribute markers in long-format permissions.
 - ANSI color output through `-G`.
 - Buffered output and iterative merge sort for large listings.
@@ -94,4 +95,6 @@ Examples:
 - This is not a complete GNU `ls` clone.
 - The implementation is intended for Linux systems.
 - `-G` is color output in this project and does not match GNU/Linux `ls -G`.
-- Locale-specific behavior is not supported.
+- Name sorting is bytewise lexicographic and does not implement locale-aware,
+  natural, or case-insensitive ordering.
+- Other locale-specific behavior is not supported.
