@@ -41,10 +41,14 @@ bool put_mem_fd(t_str *out, const char *src, uint64_t len, const int fd) {
 }
 
 bool put_entry_name(t_str *out, const t_entry *entry, const bool pad_unquoted,
-                    const bool color) {
-    const char *start = NULL;
+                    const bool color, const bool is_stdout) {
     const t_str *name = entry->name ? entry->name : entry->path;
 
+    if (!is_stdout) {
+        return put_mem(out, name->str, name->len);
+    }
+
+    const char *start = NULL;
     if (color) {
         start = entry_color_(entry);
     }
@@ -127,9 +131,14 @@ bool flush_fd(t_str *out, const int fd) {
     return true;
 }
 
-bool put_dir_header(t_str *out, const t_str *dir_header) {
+bool put_dir_header(t_str *out, const t_str *dir_header, const bool is_stdout) {
     if (!dir_header) {
         return true;
+    }
+
+    if (!is_stdout) {
+        return put_mem(out, dir_header->str, dir_header->len) &&
+               put_mem(out, ":\n", 2);
     }
 
     t_shell_scan scan;

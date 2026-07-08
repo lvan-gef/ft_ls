@@ -131,10 +131,15 @@ static bool run_listing_(t_params *params, const t_array *array,
                            .access_time = params->args->access_time,
                            .no_group = params->args->no_group,
                            .color = params->args->color,
+                           .is_stdout = true,
                            .term_size = get_terminal_width()};
 
     if (!req.arena) {
         goto cleanup;
+    }
+
+    if (!isatty(STDOUT_FILENO)) {
+        req.is_stdout = false;
     }
 
     if (!print_operand_files_(params, &req, &printed_files)) {

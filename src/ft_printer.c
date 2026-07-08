@@ -17,19 +17,24 @@ typedef struct {
 } t_map;
 
 static bool init_print_row_(const t_print_request *req);
+static bool init_print_lines_(const t_print_request *req);
 static bool entries_have_quote_(const t_array *array);
 static void calc_cols_(const t_array *array, t_map *map, bool quoted,
                        uint64_t *col_widths, uint64_t max_cols,
                        uint64_t term_size);
 static bool calc_width_(const t_array *array, bool quoted, uint64_t num_cols,
                         uint64_t *col_widths, uint64_t term_size);
-static bool create_row_(t_str *out, const t_array *array, const t_map *map,
-                        const uint64_t *col_widths, bool quoted, bool color);
+static bool create_row_(const t_print_request *reg, const t_map *map,
+                        const uint64_t *col_widths, bool quoted);
 static bool indent_(t_str *out, uint64_t from, uint64_t to);
 
 bool printer(const t_print_request *req) {
     if (req->list_mode) {
         return printer_list(req);
+    }
+
+    if (!req->is_stdout) {
+        return init_print_lines_(req);
     }
 
     return init_print_row_(req);
@@ -68,15 +73,32 @@ static bool init_print_row_(const t_print_request *req) {
     const bool quoted = req->quote_padding || entries_have_quote_(req->entries);
     calc_cols_(req->entries, &map, quoted, col_widths, width_count,
                req->term_size);
-    if (!put_dir_header(req->buffer, req->dir_header)) {
+    if (!put_dir_header(req->buffer, req->dir_header, req->is_stdout)) {
         arena_clear(req->arena);
         return false;
     }
 
-    const bool ok = create_row_(req->buffer, req->entries, &map, col_widths,
-                                quoted, req->color);
+    const bool ok = create_row_(req, &map, col_widths, quoted);
     arena_clear(req->arena);
     return ok;
+}
+
+static bool init_print_lines_(const t_print_request *req) {
+    if (!put_dir_header(req->buffer, req->dir_header, req->is_stdout)) {
+        return false;
+    }
+
+    for (uint64_t index = 0; index < req->entries->len; ++index) {
+        const t_entry *entry = req->entries->data[index];
+
+        if (!put_entry_name(req->buffer, entry, false, req->color,
+                            req->is_stdout) ||
+            !put_mem(req->buffer, "\n", 1)) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 static bool entries_have_quote_(const t_array *array) {
@@ -144,10 +166,9 @@ static bool calc_width_(const t_array *array, const bool quoted,
     return true;
 }
 
-static bool create_row_(t_str *out, const t_array *array, const t_map *map,
-                        const uint64_t *col_widths, const bool quoted,
-                        const bool color) {
-    const uint64_t files_len = array->len;
+static bool create_row_(const t_print_request *req, const t_map *map,
+                        const uint64_t *col_widths, const bool quoted) {
+    const uint64_t files_len = req->entries->len;
 
     for (uint64_t row = 0; row < map->rows; ++row) {
         uint64_t col = 0;
@@ -155,13 +176,13 @@ static bool create_row_(t_str *out, const t_array *array, const t_map *map,
         uint64_t pos = 0;
 
         while (true) {
-            const t_entry *entry = array->data[filesno];
+            const t_entry *entry = req->entries->data[filesno];
             const uint64_t name_length =
                 quoted ? entry->name_scan.padded_display_len
                        : entry->name_scan.display_len;
             const uint64_t max_name_length = col_widths[col++];
 
-            if (!put_entry_name(out, entry, quoted, color)) {
+            if (!put_entry_name(req->buffer, entry, quoted, req->color, true)) {
                 return false;
             }
 
@@ -170,14 +191,15 @@ static bool create_row_(t_str *out, const t_array *array, const t_map *map,
             }
 
             filesno += map->rows;
-            if (!indent_(out, pos + name_length, pos + max_name_length)) {
+            if (!indent_(req->buffer, pos + name_length,
+                         pos + max_name_length)) {
                 return false;
             }
 
             pos += max_name_length;
         }
 
-        if (!put_mem(out, "\n", 1)) {
+        if (!put_mem(req->buffer, "\n", 1)) {
             return false;
         }
     }
