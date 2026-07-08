@@ -24,7 +24,7 @@ static void calc_cols_(const t_array *array, t_map *map, bool quoted,
                        uint64_t term_size);
 static bool calc_width_(const t_array *array, bool quoted, uint64_t num_cols,
                         uint64_t *col_widths, uint64_t term_size);
-static bool create_row_(const t_print_request *reg, const t_map *map,
+static bool create_row_(const t_print_request *req, const t_map *map,
                         const uint64_t *col_widths, bool quoted);
 static bool indent_(t_str *out, uint64_t from, uint64_t to);
 
