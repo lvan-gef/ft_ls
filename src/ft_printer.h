@@ -17,9 +17,6 @@
 #define BLOCKCHAR "\033[01;33m"
 #define RESET "\033[0m"
 
-typedef struct s_array t_array;
-typedef struct s_str t_str;
-
 typedef struct s_print_request {
     const t_array *entries;
     const t_array *list_width_context;
