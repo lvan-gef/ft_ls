@@ -173,4 +173,3 @@ int ft_isdigit(const int c) {
 
     return 0;
 }
-
