@@ -7,6 +7,10 @@
 #include "./ft_printer.h"
 #include "./ft_printer_helper.h"
 
+#ifndef DEFAULT_TERM_SIZE
+#define DEFAULT_TERM_SIZE UINT64_C(80)
+#endif /* ifndef DEFAULT_TERM_SIZE */
+
 typedef struct {
     uint64_t rows;
     uint64_t cols;
@@ -38,7 +42,7 @@ uint64_t get_terminal_width(void) {
         return (uint64_t)ws.ws_col;
     }
 
-    return 80;
+    return DEFAULT_TERM_SIZE;
 }
 
 static bool init_print_row_(const t_print_request *req) {
