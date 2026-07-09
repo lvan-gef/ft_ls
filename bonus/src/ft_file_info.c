@@ -54,7 +54,7 @@ static uint64_t group_index = 0;
 static t_id_cache_entry group_cache[CACHE_SIZE] = {0};
 
 static bool fill_file_info_(Arena *arena, t_file_info *info,
-                            const t_entry *entry, time_t now, bool acces_time);
+                            const t_entry *entry, time_t now, bool access_time);
 static t_str *get_perm_(Arena *arena, const t_entry *entry);
 static char file_type_char_(mode_t mode);
 static t_str *get_links_(Arena *arena, const t_entry *entry);
@@ -75,7 +75,7 @@ static bool is_security_context_(const char *name);
 static char xattr_error_marker_(int e);
 
 bool prepare_list_infos(Arena *arena, const t_array *entries,
-                        t_file_info **infos, const bool acces_time) {
+                        t_file_info **infos, const bool access_time) {
     if (!entries || !entries->len) {
         *infos = NULL;
         return true;
@@ -94,7 +94,8 @@ bool prepare_list_infos(Arena *arena, const t_array *entries,
     for (uint64_t index = 0; index < entries->len; ++index) {
         const t_entry *entry = entries->data[index];
 
-        if (!fill_file_info_(arena, &(*infos)[index], entry, now, acces_time)) {
+        if (!fill_file_info_(arena, &(*infos)[index], entry, now,
+                             access_time)) {
             return false;
         }
     }
@@ -104,7 +105,7 @@ bool prepare_list_infos(Arena *arena, const t_array *entries,
 
 static bool fill_file_info_(Arena *arena, t_file_info *info,
                             const t_entry *entry, const time_t now,
-                            const bool acces_time) {
+                            const bool access_time) {
     info->perm = get_perm_(arena, entry);
     if (!info->perm) {
         return false;
@@ -130,7 +131,7 @@ static bool fill_file_info_(Arena *arena, t_file_info *info,
         return false;
     }
 
-    info->dt = get_dt_(arena, now, entry, acces_time);
+    info->dt = get_dt_(arena, now, entry, access_time);
     if (!info->dt) {
         return false;
     }
@@ -311,7 +312,7 @@ static t_str *get_size_(Arena *arena, const t_entry *entry) {
     return str_arena_from_uint(arena, (uint64_t)entry->st.st_size);
 }
 
-static t_str *get_dt_(Arena *arena, time_t now, const t_entry *entry,
+static t_str *get_dt_(Arena *arena, const time_t now, const t_entry *entry,
                       const bool acces_time) {
     if (entry->stat_unavailable) {
         return str_arena_from_cstr(arena, "           ?");
@@ -338,7 +339,7 @@ static t_str *get_dt_(Arena *arena, time_t now, const t_entry *entry,
 
     bool recent = false;
     if (stamp <= now) {
-        recent = (now - stamp) < LS_RECENT_SECS;
+        recent = now - stamp < LS_RECENT_SECS;
     }
 
     if (recent) {
