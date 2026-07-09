@@ -22,11 +22,11 @@ CFLAGS     := -std=c11 -D_DEFAULT_SOURCE                                       \
 			  -Wnull-dereference -Wcast-align -Wswitch-enum -Wundef            \
 			  -Wstrict-prototypes -Wmissing-prototypes                         \
 			  -Wredundant-decls -Wwrite-strings                                \
-			  -Wimplicit-fallthrough -Wlogical-op                              \
-			  -Wcast-qual -Wduplicated-cond -Wduplicated-branches              \
+			  -Wimplicit-fallthrough                                           \
+			  -Wcast-qual                                                      \
 			  -Wvla -Walloca -Wold-style-definition                            \
 			  -Wbad-function-cast -Wmissing-declarations -Wstrict-overflow=5   \
-		      -Wdate-time -Walloc-zero                                         \
+		      -Wdate-time                                                      \
               -Wframe-larger-than=4096
 
 DEPSFLAGS := -MMD -MP
@@ -76,8 +76,8 @@ TEST_COLS_END   ?= 81
 TEST_COLS_STEP  ?= 1
 BONUS_FLAGS     ?= g,u,f,d,o
 
-TESTER_COLS := --cols-start $(TEST_COLS_START) \
-			   --cols-end $(TEST_COLS_END) \
+TESTER_COLS := --cols-start $(TEST_COLS_START)                                 \
+			   --cols-end $(TEST_COLS_END)                                     \
 			   --cols-step $(TEST_COLS_STEP)
 
 .PHONY: all
