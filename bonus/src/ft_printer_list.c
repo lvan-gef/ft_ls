@@ -101,15 +101,8 @@ static bool print_list_(const t_print_request *req, const t_file_info *infos) {
         sizes.have_quote = req->quote_padding;
     }
 
-    bool ok = false;
-    if (!req->is_stdout) {
-        ok = put_dir_header_raw(req->buffer, req->dir_header);
-    } else {
-        ok = put_dir_header(req->buffer, req->dir_header);
-    }
-
-    if (!ok) {
-        return ok;
+    if (!put_dir_header(req->buffer, req->dir_header, req->is_stdout)) {
+        return false;
     }
 
     if (req->print_total) {
@@ -132,7 +125,7 @@ static bool left_pad_(t_str *out, const uint64_t src_len,
             return false;
         }
 
-        const uint64_t avail = (out->cap - 1) - out->len;
+        const uint64_t avail = out->cap - 1 - out->len;
         const uint64_t to_fill = count < avail ? count : avail;
         ft_memset(out->str + out->len, ' ', (size_t)to_fill);
         out->len += to_fill;
@@ -185,20 +178,10 @@ static bool print_list_rows_(const t_print_request *req,
             !put_mem(req->buffer, info->size->str, info->size->len) ||
             !put_mem(req->buffer, " ", 1) ||
             !put_mem(req->buffer, info->dt->str, info->dt->len) ||
-            !put_mem(req->buffer, " ", 1)) {
+            !put_mem(req->buffer, " ", 1) ||
+            !put_entry_name(req->buffer, entry, sizes->have_quote, req->color,
+                            req->is_stdout)) {
             return false;
-        }
-
-        bool ok = false;
-        if (!req->is_stdout) {
-            ok = put_entry_name_raw(req->buffer, entry);
-        } else {
-            ok = put_entry_name(req->buffer, entry, sizes->have_quote,
-                                req->color);
-        }
-
-        if (!ok) {
-            return ok;
         }
 
         if (info->symlink && info->symlink->len > 0) {

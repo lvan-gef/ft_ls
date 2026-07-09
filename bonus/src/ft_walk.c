@@ -131,8 +131,8 @@ static bool run_listing_(t_params *params, const t_array *array,
                            .access_time = params->args->access_time,
                            .no_group = params->args->no_group,
                            .color = params->args->color,
-                           .term_size = get_terminal_width(),
-                           .is_stdout = true};
+                           .is_stdout = true,
+                           .term_size = get_terminal_width()};
 
     if (!req.arena) {
         goto cleanup;
@@ -401,7 +401,7 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
         const int e = errno;
         (void)print_error_(&params->out, path->path, e, "cannot open directory",
                            &params->output_failed);
-        *exit_code = (path->is_operand ? 2 : 1);
+        *exit_code = path->is_operand ? 2 : 1;
         return false;
     }
 

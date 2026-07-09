@@ -28,7 +28,7 @@ bool put_mem_fd(t_str *out, const char *src, uint64_t len, const int fd) {
             return false;
         }
 
-        const uint64_t avail = (out->cap - 1) - out->len;
+        const uint64_t avail = out->cap - 1 - out->len;
         const uint64_t to_copy = len < avail ? len : avail;
         ft_memcpy(out->str + out->len, src, (size_t)to_copy);
         out->len += to_copy;
@@ -41,10 +41,14 @@ bool put_mem_fd(t_str *out, const char *src, uint64_t len, const int fd) {
 }
 
 bool put_entry_name(t_str *out, const t_entry *entry, const bool pad_unquoted,
-                    const bool color) {
-    const char *start = NULL;
+                    const bool color, const bool is_stdout) {
     const t_str *name = entry->name ? entry->name : entry->path;
 
+    if (!is_stdout) {
+        return put_mem(out, name->str, name->len);
+    }
+
+    const char *start = NULL;
     if (color) {
         start = entry_color_(entry);
     }
@@ -60,10 +64,38 @@ bool put_entry_name(t_str *out, const t_entry *entry, const bool pad_unquoted,
     return !start || put_mem(out, RESET, sizeof(RESET) - 1);
 }
 
-bool put_entry_name_raw(t_str *out, const t_entry *entry) {
-    const t_str *name = entry->name ? entry->name : entry->path;
+static const char *entry_color_(const t_entry *entry) {
+    const mode_t mode = entry->st.st_mode;
 
-    return put_mem(out, name->str, name->len);
+    if (entry->stat_unavailable) {
+        return NULL;
+    }
+
+    if (S_ISDIR(mode)) {
+        return DIRECTORY;
+    }
+
+    if (S_ISLNK(mode)) {
+        return SYMLINK;
+    }
+
+    if (S_ISSOCK(mode)) {
+        return SOCKET;
+    }
+
+    if (S_ISFIFO(mode)) {
+        return FIFO;
+    }
+
+    if (S_ISBLK(mode) || S_ISCHR(mode)) {
+        return BLOCKCHAR;
+    }
+
+    if (S_ISREG(mode) && mode & (S_IXUSR | S_IXGRP | S_IXOTH)) {
+        return EXECUTABLE;
+    }
+
+    return NULL;
 }
 
 bool flush_fd(t_str *out, const int fd) {
@@ -99,9 +131,14 @@ bool flush_fd(t_str *out, const int fd) {
     return true;
 }
 
-bool put_dir_header(t_str *out, const t_str *dir_header) {
+bool put_dir_header(t_str *out, const t_str *dir_header, const bool is_stdout) {
     if (!dir_header) {
         return true;
+    }
+
+    if (!is_stdout) {
+        return put_mem(out, dir_header->str, dir_header->len) &&
+               put_mem(out, ":\n", 2);
     }
 
     t_shell_scan scan;
@@ -118,15 +155,6 @@ bool put_dir_header(t_str *out, const t_str *dir_header) {
                                                    .padded_display_len = need,
                                                    .quote = scan.quote},
                                    false) &&
-           put_mem(out, ":\n", 2);
-}
-
-bool put_dir_header_raw(t_str *out, const t_str *dir_header) {
-    if (!dir_header) {
-        return true;
-    }
-
-    return put_mem(out, dir_header->str, dir_header->len) &&
            put_mem(out, ":\n", 2);
 }
 
@@ -157,38 +185,4 @@ static bool put_shell_escaped_scan_(t_str *out, const t_str *str,
     }
 
     return shell_escape_append_len(out, str, scan->quote, pad_unquoted, need);
-}
-
-static const char *entry_color_(const t_entry *entry) {
-    const mode_t mode = entry->st.st_mode;
-
-    if (entry->stat_unavailable) {
-        return NULL;
-    }
-
-    if (S_ISDIR(mode)) {
-        return DIRECTORY;
-    }
-
-    if (S_ISLNK(mode)) {
-        return SYMLINK;
-    }
-
-    if (S_ISSOCK(mode)) {
-        return SOCKET;
-    }
-
-    if (S_ISFIFO(mode)) {
-        return FIFO;
-    }
-
-    if (S_ISBLK(mode) || S_ISCHR(mode)) {
-        return BLOCKCHAR;
-    }
-
-    if (S_ISREG(mode) && (mode & (S_IXUSR | S_IXGRP | S_IXOTH))) {
-        return EXECUTABLE;
-    }
-
-    return NULL;
 }
