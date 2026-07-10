@@ -542,9 +542,7 @@ static bool queue_operand_dir_(t_params *params, const t_str *str,
 static bool print_error_(t_str *out, const t_str *path, const int e,
                          const char *prefix, bool *output_failed) {
     if (!flush_fd(out, STDOUT_FILENO)) {
-        if (output_failed) {
-            *output_failed = true;
-        }
+        *output_failed = true;
         return false;
     }
 
