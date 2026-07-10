@@ -399,7 +399,12 @@ def create_acl_xattr(path: Path) -> tuple[list[Path], list[Path]]:
 
     setfacl = shutil.which("setfacl")
     setfattr = shutil.which("setfattr")
-    if not setfacl and not setfattr:
+
+    # We can create xattrs either with setfattr or Python's os.setxattr.
+    can_try_xattr = setfattr is not None or hasattr(os, "setxattr")
+
+    if not setfacl and not can_try_xattr:
+        print(setfacl, setfattr, can_try_xattr, 'failed')
         return out_paths, out_files
 
     meta_path.mkdir(parents=True, exist_ok=True)
@@ -408,25 +413,52 @@ def create_acl_xattr(path: Path) -> tuple[list[Path], list[Path]]:
     if setfacl:
         acl_file = meta_path.joinpath("acl_file.txt")
         acl_file.touch()
+
         acl_result = subprocess.run(
             [setfacl, "-m", f"u:{os.getuid()}:rw", str(acl_file)],
             capture_output=True,
             text=True,
         )
+
         if acl_result.returncode == 0:
             out_files.append(acl_file)
         else:
             acl_file.unlink(missing_ok=True)
 
-    if setfattr:
+    if can_try_xattr:
         xattr_file = meta_path.joinpath("xattr_file.txt")
         xattr_file.touch()
-        xattr_result = subprocess.run(
-            [setfattr, "-n", "user.ft_ls_test", "-v", "value", str(xattr_file)],
-            capture_output=True,
-            text=True,
-        )
-        if xattr_result.returncode == 0:
+
+        xattr_created = False
+
+        if setfattr:
+            xattr_result = subprocess.run(
+                [
+                    setfattr,
+                    "-n",
+                    "user.ft_ls_test",
+                    "-v",
+                    "value",
+                    str(xattr_file),
+                ],
+                capture_output=True,
+                text=True,
+            )
+            xattr_created = xattr_result.returncode == 0
+
+        else:
+            try:
+                os.setxattr(
+                    str(xattr_file),
+                    "user.ft_ls_test",
+                    b"value",
+                    follow_symlinks=True,
+                )
+                xattr_created = True
+            except OSError:
+                xattr_created = False
+
+        if xattr_created:
             out_files.append(xattr_file)
         else:
             xattr_file.unlink(missing_ok=True)
