@@ -15,7 +15,10 @@
 
 t_str *read_symlink(Arena *scratch, const t_str *path,
                     const uint64_t target_size, int *read_err) {
-    *read_err = 0;
+    if (read_err) {
+        *read_err = 0;
+    }
+
     if (target_size == UINT64_MAX) {
         return NULL;
     }
