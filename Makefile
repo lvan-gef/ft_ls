@@ -1,74 +1,72 @@
-NAME     := ft_ls
-NAME_D   := ft_ls_d
-NAME_B   := ft_ls_bonus
-NAME_B_D := ft_ls_bonus_d
-MAKEFLAGS += -j
+NAME            := ft_ls
+NAME_D          := ft_ls_d
+NAME_B          := ft_ls_bonus
+NAME_B_D        := ft_ls_bonus_d
+MAKEFLAGS       += -j
 
-TERM_SIZE ?= 80
+TERM_SIZE       ?= 80
 
 ifeq ($(shell test "$(TERM_SIZE)" -gt 0 2>/dev/null && printf valid || printf invalid),invalid)
 $(error TERM_SIZE must be a positive integer, got '$(TERM_SIZE)')
 endif
 
-CC          ?= cc
-ANALYZER_CC ?= gcc
+CC              ?= cc
+ANALYZER_CC     ?= gcc
 
-CPPFLAGS   := -DTERM_SIZE=$(TERM_SIZE) -I include
-B_CPPFLAGS := -I bonus/include -I bonus
-CFLAGS     := -std=c11 -D_DEFAULT_SOURCE                                       \
-			  -Wall -Wextra -Werror -Wshadow -Wpedantic                        \
-			  -Wconversion -Wsign-conversion                                   \
-			  -Wformat=2 -Wformat-security                                     \
-			  -Wnull-dereference -Wcast-align -Wswitch-enum -Wundef            \
-			  -Wstrict-prototypes -Wmissing-prototypes                         \
-			  -Wredundant-decls -Wwrite-strings                                \
-			  -Wimplicit-fallthrough                                           \
-			  -Wcast-qual                                                      \
-			  -Wvla -Walloca -Wold-style-definition                            \
-			  -Wbad-function-cast -Wmissing-declarations -Wstrict-overflow=5   \
-		      -Wdate-time                                                      \
-              -Wframe-larger-than=4096
+CPPFLAGS        := -DTERM_SIZE=$(TERM_SIZE) -I include
+B_CPPFLAGS      := -I bonus/include -I bonus
+CFLAGS          := -std=c11 -D_DEFAULT_SOURCE                                  \
+			       -Wall -Wextra -Werror -Wshadow -Wpedantic                   \
+			       -Wconversion -Wsign-conversion                              \
+			       -Wformat=2 -Wformat-security                                \
+			       -Wnull-dereference -Wcast-align -Wswitch-enum -Wundef       \
+			       -Wstrict-prototypes -Wmissing-prototypes                    \
+			       -Wredundant-decls -Wwrite-strings                           \
+			       -Wimplicit-fallthrough -Wcast-qual                          \
+			       -Wvla -Walloca -Wold-style-definition                       \
+			       -Wbad-function-cast -Wmissing-declarations                  \
+                   -Wstrict-overflow=5 -Wdate-time -Wframe-larger-than=4096
 
-DEPSFLAGS := -MMD -MP
+DEPSFLAGS       := -MMD -MP
 
-R_CFLAGS  := -DNDEBUG -O3 -march=native -fomit-frame-pointer                   \
-			 -fPIE -fstack-clash-protection -D_FORTIFY_SOURCE=3                \
-			 -fstack-protector-strong
-R_LDFLAGS := -pie -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack
+R_CFLAGS        := -DNDEBUG -O3 -march=native -fomit-frame-pointer             \
+			       -fPIE -fstack-clash-protection -D_FORTIFY_SOURCE=3          \
+			       -fstack-protector-strong
+R_LDFLAGS       := -pie -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack
 
-SANITIZERS := -fsanitize=address,undefined,null,leak,integer-divide-by-zero,signed-integer-overflow,bounds,pointer-compare,pointer-subtract
-D_CFLAGS   := -g3 -fno-omit-frame-pointer -fstack-protector-strong $(SANITIZERS)
-D_LDFLAGS  := $(SANITIZERS) -rdynamic
+SANITIZERS      := -fsanitize=address,undefined,null,leak,integer-divide-by-zero,signed-integer-overflow,bounds,pointer-compare,pointer-subtract
+D_CFLAGS        := -g3 -fno-omit-frame-pointer -fstack-protector-strong $(SANITIZERS)
+D_LDFLAGS       := $(SANITIZERS) -rdynamic
 
-SRC_DIR       := src
-BONUS_SRC_DIR := bonus/src
-SRC_FILES := ft_arena.c ft_array.c ft_file_info.c ft_parse.c ft_printer.c      \
-             ft_printer_helper.c ft_printer_list.c ft_shell_escape.c           \
-			 ft_sort.c ft_str.c ft_str_arena.c ft_symlink.c ft_utils.c         \
-			 ft_walk.c ft_walk_entry.c main.c
+SRC_DIR         := src
+BONUS_SRC_DIR   := bonus/src
+SRC_FILES       := ft_arena.c ft_array.c ft_file_info.c ft_parse.c ft_printer.c\
+                   ft_printer_helper.c ft_printer_list.c ft_shell_escape.c     \
+			       ft_sort.c ft_str.c ft_str_arena.c ft_symlink.c ft_utils.c   \
+			       ft_walk.c ft_walk_entry.c main.c
 
-SRCS   := $(addprefix $(SRC_DIR)/, $(SRC_FILES))
-B_SRCS := $(addprefix $(BONUS_SRC_DIR)/, $(SRC_FILES))
+SRCS            := $(addprefix $(SRC_DIR)/, $(SRC_FILES))
+B_SRCS          := $(addprefix $(BONUS_SRC_DIR)/, $(SRC_FILES))
 
-R_OBJ_DIR := obj
-R_OBJECTS := $(SRCS:$(SRC_DIR)/%.c=$(R_OBJ_DIR)/%.o)
-R_DEPS    := $(R_OBJECTS:.o=.d)
+R_OBJ_DIR       := obj
+R_OBJECTS       := $(SRCS:$(SRC_DIR)/%.c=$(R_OBJ_DIR)/%.o)
+R_DEPS          := $(R_OBJECTS:.o=.d)
 
-D_OBJ_DIR := obj_debug
-D_OBJECTS := $(SRCS:$(SRC_DIR)/%.c=$(D_OBJ_DIR)/%.o)
-D_DEPS    := $(D_OBJECTS:.o=.d)
+D_OBJ_DIR       := obj_debug
+D_OBJECTS       := $(SRCS:$(SRC_DIR)/%.c=$(D_OBJ_DIR)/%.o)
+D_DEPS          := $(D_OBJECTS:.o=.d)
 
-B_OBJ_DIR := obj_bonus
-B_OBJECTS := $(B_SRCS:$(BONUS_SRC_DIR)/%.c=$(B_OBJ_DIR)/%.o)
-B_DEPS    := $(B_OBJECTS:.o=.d)
+B_OBJ_DIR       := obj_bonus
+B_OBJECTS       := $(B_SRCS:$(BONUS_SRC_DIR)/%.c=$(B_OBJ_DIR)/%.o)
+B_DEPS          := $(B_OBJECTS:.o=.d)
 
-BD_OBJ_DIR := obj_bonus_debug
-BD_OBJECTS := $(B_SRCS:$(BONUS_SRC_DIR)/%.c=$(BD_OBJ_DIR)/%.o)
-BD_DEPS    := $(BD_OBJECTS:.o=.d)
+BD_OBJ_DIR      := obj_bonus_debug
+BD_OBJECTS      := $(B_SRCS:$(BONUS_SRC_DIR)/%.c=$(BD_OBJ_DIR)/%.o)
+BD_DEPS         := $(BD_OBJECTS:.o=.d)
 
-BLUE := \033[36m
-MARGENTA := \033[35m
-NC := \033[0m
+BLUE            := \033[36m
+MARGENTA        := \033[35m
+NC              := \033[0m
 
 TESTER          := python3 ./tester/main.py
 TEST_COLS_START ?= 80
@@ -76,9 +74,9 @@ TEST_COLS_END   ?= 81
 TEST_COLS_STEP  ?= 1
 BONUS_FLAGS     ?= g,u,f,d,o
 
-TESTER_COLS := --cols-start $(TEST_COLS_START)                                 \
-			   --cols-end $(TEST_COLS_END)                                     \
-			   --cols-step $(TEST_COLS_STEP)
+TESTER_COLS     := --cols-start $(TEST_COLS_START)                             \
+			       --cols-end $(TEST_COLS_END)                                 \
+			       --cols-step $(TEST_COLS_STEP)
 
 .PHONY: all
 all: $(NAME)  ## Build release version (default)
