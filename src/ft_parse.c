@@ -13,7 +13,7 @@
 static bool append_input_(const char *arg, t_array *inputs);
 static void print_error_(const char *flag);
 
-bool parse_args(const uint64_t argc, char **argv, t_args *args,
+bool parse_args(const uint64_t argc, const char **argv, t_args *args,
                 t_array *inputs) {
     bool is_flag = true;
 

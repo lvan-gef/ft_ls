@@ -10,7 +10,7 @@
 static void del_str_(void *ptr);
 static void init_timezone_(void);
 
-int main(const int argc, char *argv[]) {
+int main(const int argc, const char *argv[]) {
     t_args args = {0};
     t_array inputs = {0};
     if (!array_init(&inputs, (uint64_t)argc)) {

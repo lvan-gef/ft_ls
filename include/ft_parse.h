@@ -20,6 +20,7 @@ typedef struct s_args {
     bool color;
 } t_args;
 
-bool parse_args(uint64_t argc, char **argv, t_args *args, t_array *inputs);
+bool parse_args(uint64_t argc, const char **argv, t_args *args,
+                t_array *inputs);
 
 #endif /* ifndef FT_PARSE_H */
