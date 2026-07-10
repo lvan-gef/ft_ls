@@ -1,4 +1,3 @@
-#include <cstdint>
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -14,8 +13,6 @@
 #define PATH_MAX UINT64_C(4096)
 #endif /* ifndef PATH_MAX */
 
-#define SYMLINK_CAP_MAX (UINT64_MAX / UINT64_C(2))
-
 t_str *read_symlink(Arena *scratch, const t_str *path,
                     const uint64_t target_size, int *read_err) {
     *read_err = 0;
@@ -25,7 +22,11 @@ t_str *read_symlink(Arena *scratch, const t_str *path,
 
     uint64_t cap = target_size > 0 ? target_size + 1 : PATH_MAX;
     while (true) {
-        const size_t read_size = cap > SIZE_MAX ? SIZE_MAX : (size_t)cap;
+        if (cap > (uint64_t)SIZE_MAX) {
+            return NULL;
+        }
+
+        const size_t read_size = (size_t)cap;
         const Arena_Mark mark = arena_get_mark(scratch);
         t_str *str = str_arena_new(scratch, read_size);
         if (!str) {
@@ -61,7 +62,7 @@ t_str *read_symlink(Arena *scratch, const t_str *path,
         }
 
         arena_pop_to_mark(scratch, mark);
-        if (cap > SYMLINK_CAP_MAX) {
+        if (cap > (uint64_t)SIZE_MAX / UINT64_C(2)) {
             return NULL;
         }
 
