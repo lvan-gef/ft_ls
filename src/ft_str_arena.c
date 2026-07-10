@@ -7,7 +7,7 @@
 #include "./ft_str_arena.h"
 #include "./ft_utils.h"
 
-t_str *str_arena_new(Arena *arena, const uint64_t cap) {
+t_str *str_arena_new(t_arena *arena, const uint64_t cap) {
     if (cap > (uint64_t)PTRDIFF_MAX - (uint64_t)sizeof(t_str) - 1) {
         return NULL;
     }
@@ -21,7 +21,7 @@ t_str *str_arena_new(Arena *arena, const uint64_t cap) {
     return str;
 }
 
-t_str *str_arena_from_cstr(Arena *arena, const char *src) {
+t_str *str_arena_from_cstr(t_arena *arena, const char *src) {
     const uint64_t len = (uint64_t)ft_strlen(src);
     t_str *str = str_arena_new(arena, len);
     if (!str) {
@@ -32,7 +32,7 @@ t_str *str_arena_from_cstr(Arena *arena, const char *src) {
     return str;
 }
 
-t_str *str_arena_from_uint(Arena *arena, const uint64_t value) {
+t_str *str_arena_from_uint(t_arena *arena, const uint64_t value) {
     const uint64_t len = str_uint_len(value);
     t_str *str = str_arena_new(arena, len);
     if (!str) {

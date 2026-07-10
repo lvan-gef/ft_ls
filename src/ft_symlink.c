@@ -13,7 +13,7 @@
 #define PATH_MAX UINT64_C(4096)
 #endif /* ifndef PATH_MAX */
 
-t_str *read_symlink(Arena *scratch, const t_str *path,
+t_str *read_symlink(t_arena *scratch, const t_str *path,
                     const uint64_t target_size, int *read_err) {
     if (read_err) {
         *read_err = 0;
@@ -32,7 +32,7 @@ t_str *read_symlink(Arena *scratch, const t_str *path,
         }
 
         const size_t read_size = (size_t)cap;
-        const Arena_Mark mark = arena_get_mark(scratch);
+        const t_arena_mark mark = arena_get_mark(scratch);
         t_str *str = str_arena_new(scratch, read_size);
         if (!str) {
             return NULL;

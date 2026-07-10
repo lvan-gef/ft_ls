@@ -18,7 +18,7 @@ typedef struct {
     char name_buf[];
 } t_scratch_dir_entry;
 
-static t_str *join_dir_path_(Arena *scratch, const t_str *lhs,
+static t_str *join_dir_path_(t_arena *scratch, const t_str *lhs,
                              const t_str *rhs);
 
 t_entry *entry_new_file_operand(const t_str *path, const struct stat *st) {
@@ -63,7 +63,7 @@ t_entry *entry_new_path(const t_str *path, const struct stat *st,
     return entry;
 }
 
-t_entry *entry_new_dirent(Arena *scratch, const struct dirent *dp) {
+t_entry *entry_new_dirent(t_arena *scratch, const struct dirent *dp) {
     const uint64_t name_len = (uint64_t)ft_strlen(dp->d_name);
     if (name_len >
         (uint64_t)PTRDIFF_MAX - (uint64_t)sizeof(t_scratch_dir_entry) - 1) {
@@ -86,7 +86,7 @@ t_entry *entry_new_dirent(Arena *scratch, const struct dirent *dp) {
     return &ent->entry;
 }
 
-bool entry_build_path(Arena *scratch, t_entry *entry,
+bool entry_build_path(t_arena *scratch, t_entry *entry,
                       const t_str *parent_path) {
     if (entry->path) {
         return true;
@@ -120,7 +120,7 @@ void entry_del(void *ptr) {
     entry_free((t_entry *)ptr);
 }
 
-static t_str *join_dir_path_(Arena *scratch, const t_str *lhs,
+static t_str *join_dir_path_(t_arena *scratch, const t_str *lhs,
                              const t_str *rhs) {
     const bool need_slash = lhs->len != 0 && lhs->str[lhs->len - 1] != '/';
     const uint64_t slash_len = need_slash ? 1U : 0U;

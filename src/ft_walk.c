@@ -26,7 +26,7 @@
 
 typedef struct {
     const t_args *args;
-    Arena *temp_arena;
+    t_arena *temp_arena;
     t_sort_scratch sort_scratch;
     t_array dir_queue;
     t_array operand_files;
@@ -67,7 +67,7 @@ static mode_t dtype_to_mode_(unsigned char dtype);
 int process(const t_args *args, const t_array *array) {
     t_params params = {0};
     int exit_code = 0;
-    Arena *print_arena = arena_alloc(OUTPUT_BUFFER_CAP + 1);
+    t_arena *print_arena = arena_alloc(OUTPUT_BUFFER_CAP + 1);
     if (!print_arena) {
         exit_code = 2;
         goto cleanup;
@@ -324,7 +324,7 @@ failed:
 static t_operand_state classify_operand_(t_params *params, const t_str *str,
                                          struct stat *st, int *exit_code) {
     int e = 0;
-    const Arena_Mark mark = arena_get_mark(params->temp_arena);
+    const t_arena_mark mark = arena_get_mark(params->temp_arena);
     t_operand_state state = OPERAND_FILE;
 
     if (lstat(str->str, st) < 0) {

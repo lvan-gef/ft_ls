@@ -22,7 +22,7 @@ typedef struct s_print_request {
     const t_array *list_width_context;
     const t_str *dir_header;
     t_str *buffer;
-    Arena *arena;
+    t_arena *arena;
     bool quote_padding;
     bool list_mode;
     bool print_total;
