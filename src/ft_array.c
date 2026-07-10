@@ -96,7 +96,7 @@ void array_clear_with(t_array *array, const t_array_del del) {
 }
 
 static bool realloc_arr_(t_array *array) {
-    if (array->cap > MAX_ALLOC_SIZE) {
+    if (array->cap >= MAX_ALLOC_SIZE) {
         errno = ERANGE;
         return false;
     }

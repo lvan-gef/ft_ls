@@ -61,7 +61,7 @@ static bool init_print_row_(const t_print_request *req) {
         width_count = 1;
     }
 
-    if (width_count > UINT64_MAX / sizeof(*col_widths)) {
+    if (width_count > (uint64_t)PTRDIFF_MAX / sizeof(*col_widths)) {
         return false;
     }
 

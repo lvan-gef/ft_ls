@@ -59,7 +59,7 @@ bool sort(t_sort_scratch *scratch, const t_array *array, const bool reverse,
 }
 
 static bool ensure_sort_scratch_(t_sort_scratch *scratch, const uint64_t need) {
-    const uint64_t max_len = (uint64_t)(SIZE_MAX / sizeof(void *));
+    const uint64_t max_len = (uint64_t)PTRDIFF_MAX / sizeof(void *);
     if (need > max_len) {
         return false;
     }

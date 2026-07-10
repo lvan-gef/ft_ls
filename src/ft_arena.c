@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -56,7 +57,8 @@ void *arena_push(Arena *arena, const uint64_t size) {
         align_pos += arena->align - remainder;
     }
 
-    if (align_pos + size > arena->current->cap) {
+    if (align_pos > arena->current->cap ||
+        size > arena->current->cap - align_pos) {
         uint64_t cap = arena->block_size;
         if (size > cap) {
             cap = size;
@@ -125,7 +127,7 @@ void arena_clear(Arena *arena) {
 }
 
 static Arena_Block *new_block_(const uint64_t cap) {
-    if (cap > (uint64_t)SIZE_MAX - sizeof(Arena_Block)) {
+    if (cap > (uint64_t)PTRDIFF_MAX - sizeof(Arena_Block)) {
         errno = ENOMEM;
         return NULL;
     }

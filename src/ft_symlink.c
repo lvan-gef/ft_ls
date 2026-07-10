@@ -20,9 +20,11 @@ t_str *read_symlink(Arena *scratch, const t_str *path,
         return NULL;
     }
 
+    const uint64_t max_cap = (uint64_t)PTRDIFF_MAX -
+                             (uint64_t)sizeof(t_str) - 1;
     uint64_t cap = target_size > 0 ? target_size + 1 : PATH_MAX;
     while (true) {
-        if (cap > (uint64_t)SIZE_MAX) {
+        if (cap > max_cap) {
             return NULL;
         }
 
@@ -62,7 +64,7 @@ t_str *read_symlink(Arena *scratch, const t_str *path,
         }
 
         arena_pop_to_mark(scratch, mark);
-        if (cap > (uint64_t)SIZE_MAX / UINT64_C(2)) {
+        if (cap > max_cap / UINT64_C(2)) {
             return NULL;
         }
 

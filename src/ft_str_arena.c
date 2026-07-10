@@ -8,7 +8,7 @@
 #include "./ft_utils.h"
 
 t_str *str_arena_new(Arena *arena, const uint64_t cap) {
-    if (cap > UINT64_MAX - (uint64_t)sizeof(t_str) - 1) {
+    if (cap > (uint64_t)PTRDIFF_MAX - (uint64_t)sizeof(t_str) - 1) {
         return NULL;
     }
 

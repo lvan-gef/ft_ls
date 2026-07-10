@@ -32,7 +32,7 @@ void str_copy_uint(t_str *str, uint64_t value) {
 }
 
 t_str *str_new(const uint64_t cap) {
-    if (cap > UINT64_MAX - 1 - sizeof(t_str)) {
+    if (cap > (uint64_t)PTRDIFF_MAX - 1 - (uint64_t)sizeof(t_str)) {
         return NULL;
     }
 
