@@ -144,22 +144,22 @@ help:  ## Get help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  ${BLUE}%-15s${NC} %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 # Release build
-$(NAME): $(LIBFT) $(R_OBJECTS)
-	$(CC) $(R_OBJECTS) $(R_LDFLAGS) -s $(LIBFT) -o $@
+$(NAME): $(R_OBJECTS)
+	$(CC) $(R_OBJECTS) $(R_LDFLAGS) -s -o $@
 	@echo "Build complete: $(NAME) (release)"
 
 # Debug build
-$(NAME_D): $(LIBFT_D) $(D_OBJECTS)
+$(NAME_D): $(D_OBJECTS)
 	$(CC) $(D_OBJECTS) $(D_LDFLAGS) -o $@
 	@echo "Build complete: $(NAME_D) (debug)"
 
 # Bonus release build
-$(NAME_B): $(LIBFT) $(B_OBJECTS)
+$(NAME_B): $(B_OBJECTS)
 	$(CC) $(B_OBJECTS) $(R_LDFLAGS) -s -o $@
 	@echo "Build complete: $(NAME_B) (bonus release)"
 
 # Bonus debug build
-$(NAME_B_D): $(LIBFT_D) $(BD_OBJECTS)
+$(NAME_B_D): $(BD_OBJECTS)
 	$(CC) $(BD_OBJECTS) $(D_LDFLAGS) -o $@
 	@echo "Build complete: $(NAME_B_D) (bonus debug)"
 
