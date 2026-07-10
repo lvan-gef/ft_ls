@@ -13,8 +13,8 @@ endif
 CC          ?= cc
 ANALYZER_CC ?= gcc
 
-CPPFLAGS   := -DTERM_SIZE=$(TERM_SIZE) -I include -I $(LIBFT_DIR)/include
-B_CPPFLAGS := -I bonus/include -I bonus -I $(LIBFT_DIR)/include
+CPPFLAGS   := -DTERM_SIZE=$(TERM_SIZE) -I include
+B_CPPFLAGS := -I bonus/include -I bonus
 CFLAGS     := -std=c11 -D_DEFAULT_SOURCE                                       \
 			  -Wall -Wextra -Werror -Wshadow -Wpedantic                        \
 			  -Wconversion -Wsign-conversion                                   \
