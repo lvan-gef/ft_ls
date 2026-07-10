@@ -1,21 +1,20 @@
 NAME     := ft_ls
 
 CC       := gcc
-CPPFLAGS := -D_FORTIFY_SOURCE=3 -I include -D_DEFAULT_SOURCE
-CFLAGS   := -std=c11 -O3 -march=native                                         \
-			-fomit-frame-pointer -fPIE -fstack-clash-protection                \
-			-fstack-protector-strong                                           \
-			-Wall -Wextra -Werror -Wshadow -Wpedantic                          \
-			-Wconversion -Wsign-conversion                                     \
-			-Wformat=2                                                         \
-			-Wnull-dereference -Wcast-align -Wswitch-enum -Wundef              \
-			-Wstrict-prototypes -Wmissing-prototypes                           \
-			-Wredundant-decls -Wwrite-strings                                  \
-			-Wimplicit-fallthrough -Wlogical-op                                \
-			-Wcast-qual -Wduplicated-cond -Wduplicated-branches                \
-			-Wvla -Walloca -Wold-style-definition                              \
-			-Wbad-function-cast -Wmissing-declarations                         \
-			-Walloc-zero -Wframe-larger-than=4096
+CPPFLAGS := -D_FORTIFY_SOURCE=3 -D_DEFAULT_SOURCE
+CFLAGS   := -std=c11 -O3 -fPIE -fstack-clash-protection                        \
+            -fstack-protector-strong                                           \
+            -Wall -Wextra -Werror -Wshadow -Wpedantic                          \
+            -Wconversion -Wsign-conversion                                     \
+            -Wformat=2                                                         \
+            -Wnull-dereference -Wcast-align -Wswitch-enum -Wundef              \
+            -Wstrict-prototypes -Wmissing-prototypes                           \
+            -Wredundant-decls -Wwrite-strings                                  \
+            -Wimplicit-fallthrough -Wlogical-op                                \
+            -Wcast-qual -Wduplicated-cond -Wduplicated-branches                \
+            -Wvla -Walloca -Wold-style-definition                              \
+            -Wbad-function-cast -Wmissing-declarations                         \
+            -Walloc-zero -Wframe-larger-than=4096
 
 DEPFLAGS := -MMD -MP
 LDFLAGS  := -pie -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack -s
