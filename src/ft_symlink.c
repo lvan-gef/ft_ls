@@ -20,8 +20,8 @@ t_str *read_symlink(Arena *scratch, const t_str *path,
         return NULL;
     }
 
-    const uint64_t max_cap = (uint64_t)PTRDIFF_MAX -
-                             (uint64_t)sizeof(t_str) - 1;
+    const uint64_t max_cap =
+        (uint64_t)PTRDIFF_MAX - (uint64_t)sizeof(t_str) - 1;
     uint64_t cap = target_size > 0 ? target_size + 1 : PATH_MAX;
     while (true) {
         if (cap > max_cap) {

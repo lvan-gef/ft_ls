@@ -65,8 +65,8 @@ t_entry *entry_new_path(const t_str *path, const struct stat *st,
 
 t_entry *entry_new_dirent(Arena *scratch, const struct dirent *dp) {
     const uint64_t name_len = (uint64_t)ft_strlen(dp->d_name);
-    if (name_len > (uint64_t)PTRDIFF_MAX -
-                       (uint64_t)sizeof(t_scratch_dir_entry) - 1) {
+    if (name_len >
+        (uint64_t)PTRDIFF_MAX - (uint64_t)sizeof(t_scratch_dir_entry) - 1) {
         return NULL;
     }
 
