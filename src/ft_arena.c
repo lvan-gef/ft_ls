@@ -45,7 +45,7 @@ void arena_release(t_arena *arena) {
 
 t_arena_mark arena_get_mark(const t_arena *arena) {
     const t_arena_mark mark = {.block = arena->current,
-                             .pos = arena->current->pos};
+                               .pos = arena->current->pos};
     return mark;
 }
 

@@ -245,7 +245,8 @@ static bool print_list_rows_(const t_print_request *req,
 
             if (!put_mem(req->buffer, info->major->str, info->major->len) ||
                 !put_mem(req->buffer, ", ", 2) ||
-                !left_pad_(req->buffer, info->minor->len, sizes->max_len_minor) ||
+                !left_pad_(req->buffer, info->minor->len,
+                           sizes->max_len_minor) ||
                 !put_mem(req->buffer, info->minor->str, info->minor->len)) {
                 return false;
             }

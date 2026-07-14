@@ -6,9 +6,9 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include <sys/xattr.h>
 #include <time.h>
-#include <sys/sysmacros.h>
 
 #include "./ft_arena.h"
 #include "./ft_file_info.h"
