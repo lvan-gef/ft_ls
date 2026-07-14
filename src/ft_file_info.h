@@ -17,6 +17,8 @@ typedef struct s_file_info {
     t_str *size;
     t_str *symlink;
     t_str *dt;
+    t_str *major;
+    t_str *minor;
     uint64_t blocks;
 } t_file_info;
 

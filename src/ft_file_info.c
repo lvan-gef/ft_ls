@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <sys/xattr.h>
 #include <time.h>
+#include <sys/sysmacros.h>
 
 #include "./ft_arena.h"
 #include "./ft_file_info.h"
@@ -63,6 +64,7 @@ static t_str *get_group_(t_arena *arena, const t_entry *entry);
 static t_str *get_size_(t_arena *arena, const t_entry *entry);
 static t_str *get_dt_(t_arena *arena, time_t now, const t_entry *entry,
                       bool acces_time);
+static bool get_blk_(t_arena *arena, const t_entry *entry, t_file_info *info);
 static char *cache_lookup_(t_id_cache_entry *cache, uint64_t id);
 static void cache_store_(t_id_cache_entry *cache, uint64_t *next, uint64_t id,
                          const char *name);
@@ -110,6 +112,8 @@ bool prepare_list_infos(t_arena *arena, const t_array *entries,
 static bool fill_file_info_(t_arena *arena, t_file_info *info,
                             const t_entry *entry, const time_t now,
                             const bool access_time) {
+    *info = (t_file_info){0};
+
     info->perm = get_perm_(arena, entry);
     if (!info->perm) {
         return false;
@@ -130,9 +134,15 @@ static bool fill_file_info_(t_arena *arena, t_file_info *info,
         return false;
     }
 
-    info->size = get_size_(arena, entry);
-    if (!info->size) {
-        return false;
+    if (S_ISBLK(entry->st.st_mode) || S_ISCHR(entry->st.st_mode)) {
+        if (!get_blk_(arena, entry, info)) {
+            return false;
+        }
+    } else {
+        info->size = get_size_(arena, entry);
+        if (!info->size) {
+            return false;
+        }
     }
 
     info->dt = get_dt_(arena, now, entry, access_time);
@@ -357,6 +367,20 @@ static t_str *get_dt_(t_arena *arena, const time_t now, const t_entry *entry,
     new_str->len = DT_LEN - 1;
     new_str->str[DT_LEN - 1] = '\0';
     return new_str;
+}
+
+static bool get_blk_(t_arena *arena, const t_entry *entry, t_file_info *info) {
+    unsigned int major = major(entry->st.st_rdev);
+    unsigned int minor = minor(entry->st.st_rdev);
+
+    info->major = str_arena_from_uint(arena, major);
+    info->minor = str_arena_from_uint(arena, minor);
+
+    if (!info->major || !info->minor) {
+        return false;
+    }
+
+    return true;
 }
 
 static char *cache_lookup_(t_id_cache_entry *cache, const uint64_t id) {

@@ -1,6 +1,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include <unistd.h>
 
 #include "../include/ft_str.h"
@@ -16,6 +18,10 @@ typedef struct {
     uint64_t total;
     uint64_t max_len_links;
     uint64_t max_len_sizes;
+    uint64_t max_len_user;
+    uint64_t max_len_group;
+    uint64_t max_len_major;
+    uint64_t max_len_minor;
     uint64_t max_len_perm;
     bool have_quote;
 } t_list_stats;
@@ -23,6 +29,8 @@ typedef struct {
 static void apply_width_(const t_array *context, t_list_stats *sizes);
 static void update_stats_(t_list_stats *stats, const t_entry *entry,
                           const t_file_info *info);
+static uint64_t dev_width_(const t_list_stats *sizes);
+static uint64_t size_width_(const t_list_stats *sizes);
 static bool print_list_(const t_print_request *req, const t_file_info *infos);
 static bool left_pad_(t_str *out, uint64_t src_len, uint64_t max_size);
 static bool put_uint_(t_str *out, uint64_t value);
@@ -54,16 +62,34 @@ static void apply_width_(const t_array *context, t_list_stats *sizes) {
         const t_entry *entry = context->data[index];
         const uint64_t links_len =
             entry->stat_unavailable ? 1 : str_uint_len(entry->st.st_nlink);
-        const uint64_t size_len =
-            entry->stat_unavailable ? 1
-                                    : str_uint_len((uint64_t)entry->st.st_size);
 
         if (links_len > sizes->max_len_links) {
             sizes->max_len_links = links_len;
         }
 
-        if (size_len > sizes->max_len_sizes) {
-            sizes->max_len_sizes = size_len;
+        if (!entry->stat_unavailable &&
+            (S_ISBLK(entry->st.st_mode) || S_ISCHR(entry->st.st_mode))) {
+            const uint64_t major_len =
+                str_uint_len((uint64_t)major(entry->st.st_rdev));
+            const uint64_t minor_len =
+                str_uint_len((uint64_t)minor(entry->st.st_rdev));
+
+            if (major_len > sizes->max_len_major) {
+                sizes->max_len_major = major_len;
+            }
+
+            if (minor_len > sizes->max_len_minor) {
+                sizes->max_len_minor = minor_len;
+            }
+        } else {
+            const uint64_t size_len =
+                entry->stat_unavailable
+                    ? 1
+                    : str_uint_len((uint64_t)entry->st.st_size);
+
+            if (size_len > sizes->max_len_sizes) {
+                sizes->max_len_sizes = size_len;
+            }
         }
     }
 }
@@ -74,8 +100,26 @@ static void update_stats_(t_list_stats *stats, const t_entry *entry,
         stats->max_len_links = info->links->len;
     }
 
-    if (info->size->len > stats->max_len_sizes) {
-        stats->max_len_sizes = info->size->len;
+    if (info->username->len > stats->max_len_user) {
+        stats->max_len_user = info->username->len;
+    }
+
+    if (info->groupname->len > stats->max_len_group) {
+        stats->max_len_group = info->groupname->len;
+    }
+
+    if (info->size) {
+        if (info->size->len > stats->max_len_sizes) {
+            stats->max_len_sizes = info->size->len;
+        }
+    } else {
+        if (info->major && info->major->len > stats->max_len_major) {
+            stats->max_len_major = info->major->len;
+        }
+
+        if (info->minor && info->minor->len > stats->max_len_minor) {
+            stats->max_len_minor = info->minor->len;
+        }
     }
 
     if (info->perm->len > stats->max_len_perm) {
@@ -87,6 +131,19 @@ static void update_stats_(t_list_stats *stats, const t_entry *entry,
     }
 
     stats->total += info->blocks;
+}
+
+static uint64_t dev_width_(const t_list_stats *sizes) {
+    if (!sizes->max_len_major && !sizes->max_len_minor) {
+        return 0;
+    }
+
+    return sizes->max_len_major + 2 + sizes->max_len_minor;
+}
+
+static uint64_t size_width_(const t_list_stats *sizes) {
+    const uint64_t dev_width = dev_width_(sizes);
+    return sizes->max_len_sizes > dev_width ? sizes->max_len_sizes : dev_width;
 }
 
 static bool print_list_(const t_print_request *req, const t_file_info *infos) {
@@ -164,19 +221,42 @@ static bool print_list_rows_(const t_print_request *req,
 
         if (!req->no_owner &&
             (!put_mem(req->buffer, info->username->str, info->username->len) ||
+             !left_pad_(req->buffer, info->username->len,
+                        sizes->max_len_user) ||
              !put_mem(req->buffer, " ", 1))) {
             return false;
         }
 
         if (!req->no_group && (!put_mem(req->buffer, info->groupname->str,
                                         info->groupname->len) ||
+                               !left_pad_(req->buffer, info->groupname->len,
+                                          sizes->max_len_group) ||
                                !put_mem(req->buffer, " ", 1))) {
             return false;
         }
 
-        if (!left_pad_(req->buffer, info->size->len, sizes->max_len_sizes) ||
-            !put_mem(req->buffer, info->size->str, info->size->len) ||
-            !put_mem(req->buffer, " ", 1) ||
+        if (info->major) {
+            const uint64_t device_width = dev_width_(sizes);
+            if (!left_pad_(req->buffer, device_width, size_width_(sizes)) ||
+                !left_pad_(req->buffer, info->major->len,
+                           sizes->max_len_major)) {
+                return false;
+            }
+
+            if (!put_mem(req->buffer, info->major->str, info->major->len) ||
+                !put_mem(req->buffer, ", ", 2) ||
+                !left_pad_(req->buffer, info->minor->len, sizes->max_len_minor) ||
+                !put_mem(req->buffer, info->minor->str, info->minor->len)) {
+                return false;
+            }
+        } else {
+            if (!left_pad_(req->buffer, info->size->len, size_width_(sizes)) ||
+                !put_mem(req->buffer, info->size->str, info->size->len)) {
+                return false;
+            }
+        }
+
+        if (!put_mem(req->buffer, " ", 1) ||
             !put_mem(req->buffer, info->dt->str, info->dt->len) ||
             !put_mem(req->buffer, " ", 1) ||
             !put_entry_name(req->buffer, entry, sizes->have_quote, req->color,
