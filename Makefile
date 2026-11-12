@@ -2,7 +2,7 @@ NAME     := ft_ls
 
 CC       := gcc
 CPPFLAGS := -D_FORTIFY_SOURCE=3 -D_DEFAULT_SOURCE
-CFLAGS   := -std=c11 -O3 -fPIE -fstack-clash-protection                        \
+CFLAGS   := -std=c11 -O3 -funroll-loops -fPIE -fstack-clash-protection         \
             -fstack-protector-strong                                           \
             -Wall -Wextra -Werror -Wshadow -Wpedantic                          \
             -Wconversion -Wsign-conversion                                     \
@@ -54,7 +54,7 @@ re:  ## Clean all and recompile
 .PHONY: fmt
 fmt:  ## Format code via clang-format
 	@printf 'Format code\n'
-	@find src include -type f \( -name "*.c" -o -name "*.h" \) -exec clang-format -i {} +
+	@find src -type f \( -name "*.c" -o -name "*.h" \) -exec clang-format -i {} +
 
 .PHONY: help
 help:  ## Get help
