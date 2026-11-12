@@ -4,10 +4,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "../include/ft_array.h"
-#include "../include/ft_str.h"
-
 #include "./ft_arena.h"
+#include "./ft_array.h"
+#include "./ft_str.h"
 
 typedef struct s_file_info {
     t_str *perm;

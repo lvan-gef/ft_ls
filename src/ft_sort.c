@@ -4,10 +4,9 @@
 #include <sys/stat.h>
 #include <time.h>
 
-#include "../include/ft_str.h"
-
 #include "./ft_ls.h"
 #include "./ft_sort.h"
+#include "./ft_str.h"
 
 struct timespec;
 

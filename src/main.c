@@ -2,10 +2,10 @@
 #include <stdlib.h>
 #include <time.h>
 
-#include "../include/ft_array.h"
-#include "../include/ft_parse.h"
-#include "../include/ft_str.h"
-#include "../include/ft_walk.h"
+#include "./ft_array.h"
+#include "./ft_parse.h"
+#include "./ft_str.h"
+#include "./ft_walk.h"
 
 static void del_str_(void *ptr);
 static void init_timezone_(void);

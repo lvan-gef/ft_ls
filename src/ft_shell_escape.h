@@ -4,9 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "../include/ft_str.h"
-
 #include "./ft_ls.h"
+#include "./ft_str.h"
 
 void shell_scan_str(const t_str *str, t_shell_scan *scan);
 uint64_t shell_escaped_len(const t_str *str, char quote, bool pad_unquoted);

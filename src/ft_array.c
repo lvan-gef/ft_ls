@@ -4,8 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "../include/ft_array.h"
-
+#include "./ft_array.h"
 #include "./ft_utils.h"
 
 #ifndef MAX_ALLOC_SIZE

@@ -3,9 +3,8 @@
 
 #include <stdint.h>
 
-#include "../include/ft_str.h"
-
 #include "./ft_arena.h"
+#include "./ft_str.h"
 
 t_str *str_arena_new(t_arena *arena, uint64_t cap);
 t_str *str_arena_from_cstr(t_arena *arena, const char *src);

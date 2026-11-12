@@ -4,9 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "../include/ft_str.h"
-
 #include "./ft_ls.h"
+#include "./ft_str.h"
 
 #ifndef TABSIZE
 #define TABSIZE UINT64_C(8)

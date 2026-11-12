@@ -3,11 +3,10 @@
 #include <stdint.h>
 #include <unistd.h>
 
-#include "../include/ft_array.h"
-#include "../include/ft_parse.h"
-#include "../include/ft_str.h"
-
+#include "./ft_array.h"
+#include "./ft_parse.h"
 #include "./ft_printer_helper.h"
+#include "./ft_str.h"
 #include "./ft_utils.h"
 
 static bool append_input_(const char *arg, t_array *inputs);

@@ -4,10 +4,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "../include/ft_array.h"
-#include "../include/ft_str.h"
-
 #include "./ft_arena.h"
+#include "./ft_array.h"
+#include "./ft_str.h"
 
 #define DIRECTORY "\033[01;34m"
 #define SYMLINK "\033[01;36m"

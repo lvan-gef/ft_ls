@@ -2,10 +2,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "../include/ft_str.h"
-
 #include "./ft_ls.h"
 #include "./ft_shell_escape.h"
+#include "./ft_str.h"
 #include "./ft_utils.h"
 
 #define OCTAL_DIGIT_MASK 0x7

@@ -5,12 +5,11 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "../include/ft_str.h"
-
 #include "./ft_ls.h"
 #include "./ft_printer.h"
 #include "./ft_printer_helper.h"
 #include "./ft_shell_escape.h"
+#include "./ft_str.h"
 #include "./ft_utils.h"
 
 static const char *entry_color_(const t_entry *entry);

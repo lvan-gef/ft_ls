@@ -1,9 +1,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "../include/ft_str.h"
-
 #include "./ft_arena.h"
+#include "./ft_str.h"
 #include "./ft_str_arena.h"
 #include "./ft_utils.h"
 

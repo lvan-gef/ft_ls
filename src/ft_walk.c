@@ -8,20 +8,19 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "../include/ft_array.h"
-#include "../include/ft_parse.h"
-#include "../include/ft_str.h"
-#include "../include/ft_walk.h"
-
 #include "./ft_arena.h"
+#include "./ft_array.h"
 #include "./ft_ls.h"
+#include "./ft_parse.h"
 #include "./ft_printer.h"
 #include "./ft_printer_helper.h"
 #include "./ft_shell_escape.h"
 #include "./ft_sort.h"
+#include "./ft_str.h"
 #include "./ft_str_arena.h"
 #include "./ft_symlink.h"
 #include "./ft_utils.h"
+#include "./ft_walk.h"
 #include "./ft_walk_entry.h"
 
 typedef struct {

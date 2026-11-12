@@ -4,10 +4,9 @@
 #include <dirent.h>
 #include <stdbool.h>
 
-#include "../include/ft_str.h"
-
 #include "./ft_arena.h"
 #include "./ft_ls.h"
+#include "./ft_str.h"
 
 t_entry *entry_new_file_operand(const t_str *path, const struct stat *st);
 t_entry *entry_new_path(const t_str *path, const struct stat *st,

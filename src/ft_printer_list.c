@@ -5,13 +5,12 @@
 #include <sys/sysmacros.h>
 #include <unistd.h>
 
-#include "../include/ft_str.h"
-
 #include "./ft_arena.h"
 #include "./ft_file_info.h"
 #include "./ft_ls.h"
 #include "./ft_printer.h"
 #include "./ft_printer_helper.h"
+#include "./ft_str.h"
 #include "./ft_utils.h"
 
 typedef struct {
