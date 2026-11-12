@@ -151,25 +151,13 @@ size_t ft_strlen(const char *s) {
 }
 
 int ft_isprint(const int c) {
-    if (c >= 32 && c <= 126) {
-        return 1;
-    }
-
-    return 0;
+    return (c >= ' ' && c <= '~');
 }
 
 int ft_isalpha(const int c) {
-    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
-        return 1;
-    }
-
-    return 0;
+    return ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'));
 }
 
 int ft_isdigit(const int c) {
-    if (c >= 48 && c <= 57) {
-        return 1;
-    }
-
-    return 0;
+    return (c >= '0' && c <= '9');
 }
