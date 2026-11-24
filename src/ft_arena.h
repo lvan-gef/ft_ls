@@ -28,6 +28,10 @@ typedef struct {
 #define ARENA_SIZE 65536
 #endif /* ifndef ARENA_SIZE */
 
+#ifndef ARENA_ALIGN
+#define ARENA_ALIGN 8
+#endif /* ifndef ARENA_ALIGN */
+
 t_arena *arena_alloc(size_t cap);
 void arena_release(t_arena *arena);
 t_arena_mark arena_get_mark(const t_arena *arena);

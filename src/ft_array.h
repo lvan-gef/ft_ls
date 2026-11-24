@@ -6,8 +6,12 @@
 #include <stdint.h>
 
 #ifndef ARRAY_SIZE
-#define ARRAY_SIZE ((size_t)64)
+#define ARRAY_SIZE 64
 #endif /* ifndef ARRAY_SIZE */
+
+#ifndef MAX_ALLOC_SIZE
+#define MAX_ALLOC_SIZE ((PTRDIFF_MAX / sizeof(void *)))
+#endif /* ifndef MAX_ALLOC_SIZE */
 
 typedef void (*t_array_del)(void *ptr);
 

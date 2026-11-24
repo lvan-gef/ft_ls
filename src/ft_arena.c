@@ -3,7 +3,6 @@
 #include <stdlib.h>
 
 #include "./ft_arena.h"
-#include "./ft_const.h"
 
 static t_arena_block *new_block_(size_t cap);
 
