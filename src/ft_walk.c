@@ -106,7 +106,7 @@ static bool run_listing_(t_params *params, const t_array *array,
                            .list_width_context = &params->dir_queue,
                            .dir_header = NULL,
                            .buffer = &params->out,
-                           .arena = arena_alloc(ARENA_SIZE),
+                           .arena = params->temp_arena,
                            .quoted = params->quote_padding,
                            .list_mode = params->args->list,
                            .print_total = false,
@@ -116,10 +116,6 @@ static bool run_listing_(t_params *params, const t_array *array,
                            .color = params->args->color,
                            .is_stdout = true,
                            .term_size = get_terminal_width()};
-
-    if (!req.arena) {
-        goto cleanup;
-    }
 
     if (!isatty(STDOUT_FILENO)) {
         req.is_stdout = false;
@@ -143,10 +139,6 @@ static bool run_listing_(t_params *params, const t_array *array,
     ok = true;
 cleanup:
     out_flush(&params->out);
-    if (req.arena) {
-        arena_release(req.arena);
-    }
-
     return ok && !params->out.failed;
 }
 

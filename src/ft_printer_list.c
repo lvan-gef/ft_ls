@@ -4,7 +4,6 @@
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
 
-#include "./ft_arena.h"
 #include "./ft_file_info.h"
 #include "./ft_ls.h"
 #include "./ft_out.h"
@@ -45,7 +44,6 @@ bool printer_list(const t_print_request *req) {
         print_list_(req, infos);
     }
 
-    arena_clear(req->arena);
     return ok;
 }
 

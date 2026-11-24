@@ -69,7 +69,6 @@ static bool init_print_row_(const t_print_request *req) {
                req->term_size);
     put_dir_header(req->buffer, req->dir_header, req->is_stdout);
     create_row_(req, &map, col_widths, req->quoted);
-    arena_clear(req->arena);
     return true;
 }
 
