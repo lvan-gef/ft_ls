@@ -23,14 +23,6 @@ struct timespec;
 #define CACHE_SIZE 64
 #endif /* ifndef CACHE_SIZE */
 
-#ifndef PERMISSION_SIZE
-#define PERMISSION_SIZE 12
-#endif /* ifndef PERMISSION_SIZE */
-
-#ifndef DT_LEN
-#define DT_LEN 13
-#endif /* ifndef DT_LEN */
-
 #ifndef LOGIN_NAME_MAX
 #define LOGIN_NAME_MAX INT64_C(256)
 #endif /* ifndef LOGIN_NAME_MAX */
@@ -60,7 +52,7 @@ static t_id_cache group_cache = {0};
 
 static bool fill_file_info_(t_arena *arena, t_file_info *info,
                             const t_entry *entry, time_t now, bool access_time);
-static t_str *get_perm_(t_arena *arena, const t_entry *entry);
+static void get_perm_(t_arena *arena, t_file_info *info, const t_entry *entry);
 static char file_type_char_(mode_t mode);
 static t_str *get_links_(t_arena *arena, const t_entry *entry);
 static t_str *get_id_name_(t_arena *arena, t_id_cache *cache, size_t id,
@@ -68,8 +60,8 @@ static t_str *get_id_name_(t_arena *arena, t_id_cache *cache, size_t id,
 static const char *user_name_(size_t id);
 static const char *group_name_(size_t id);
 static t_str *get_size_(t_arena *arena, const t_entry *entry);
-static t_str *get_dt_(t_arena *arena, time_t now, const t_entry *entry,
-                      bool acces_time);
+static bool get_dt_(char *dt, const time_t now, const t_entry *entry,
+                    const bool acces_time);
 static bool get_blk_(t_arena *arena, const t_entry *entry, t_file_info *info);
 static const char *cache_lookup_(const t_id_cache *cache, size_t id);
 static void cache_store_(t_id_cache *cache, size_t id, const char *name);
@@ -115,11 +107,7 @@ static bool fill_file_info_(t_arena *arena, t_file_info *info,
                             const bool access_time) {
     *info = (t_file_info){0};
 
-    info->perm = get_perm_(arena, entry);
-    if (!info->perm) {
-        return false;
-    }
-
+    get_perm_(arena, info, entry);
     info->links = get_links_(arena, entry);
     if (!info->links) {
         return false;
@@ -150,8 +138,7 @@ static bool fill_file_info_(t_arena *arena, t_file_info *info,
         }
     }
 
-    info->dt = get_dt_(arena, now, entry, access_time);
-    if (!info->dt) {
+    if (!get_dt_(info->dt, now, entry, access_time)) {
         return false;
     }
 
@@ -169,45 +156,37 @@ static bool fill_file_info_(t_arena *arena, t_file_info *info,
     return true;
 }
 
-static t_str *get_perm_(t_arena *arena, const t_entry *entry) {
-    t_str *str = str_arena_new(arena, PERMISSION_SIZE);
-    if (!str) {
-        return NULL;
-    }
-
+static void get_perm_(t_arena *arena, t_file_info *info, const t_entry *entry) {
     size_t index = 0;
-    str->str[index++] = file_type_char_(entry->st.st_mode);
+    char *p = info->perm;
+    p[index++] = file_type_char_(entry->st.st_mode);
     if (entry->stat_unavailable) {
         while (index < 10) {
-            str->str[index++] = '?';
+            p[index++] = '?';
         }
 
-        str->len = index;
-        str->str[index] = '\0';
-        return str;
+        p[index] = '\0';
+        info->perm_len = index;
+        return;
     }
 
-    str->str[index++] = entry->st.st_mode & S_IRUSR ? 'r' : '-';
-    str->str[index++] = entry->st.st_mode & S_IWUSR ? 'w' : '-';
-    str->str[index++] =
-        exec_char_(entry->st.st_mode, S_IXUSR, S_ISUID, 's', 'S');
-    str->str[index++] = entry->st.st_mode & S_IRGRP ? 'r' : '-';
-    str->str[index++] = entry->st.st_mode & S_IWGRP ? 'w' : '-';
-    str->str[index++] =
-        exec_char_(entry->st.st_mode, S_IXGRP, S_ISGID, 's', 'S');
-    str->str[index++] = entry->st.st_mode & S_IROTH ? 'r' : '-';
-    str->str[index++] = entry->st.st_mode & S_IWOTH ? 'w' : '-';
-    str->str[index++] =
-        exec_char_(entry->st.st_mode, S_IXOTH, S_ISVTX, 't', 'T');
+    p[index++] = entry->st.st_mode & S_IRUSR ? 'r' : '-';
+    p[index++] = entry->st.st_mode & S_IWUSR ? 'w' : '-';
+    p[index++] = exec_char_(entry->st.st_mode, S_IXUSR, S_ISUID, 's', 'S');
+    p[index++] = entry->st.st_mode & S_IRGRP ? 'r' : '-';
+    p[index++] = entry->st.st_mode & S_IWGRP ? 'w' : '-';
+    p[index++] = exec_char_(entry->st.st_mode, S_IXGRP, S_ISGID, 's', 'S');
+    p[index++] = entry->st.st_mode & S_IROTH ? 'r' : '-';
+    p[index++] = entry->st.st_mode & S_IWOTH ? 'w' : '-';
+    p[index++] = exec_char_(entry->st.st_mode, S_IXOTH, S_ISVTX, 't', 'T');
 
     const char chr = get_acl_attr_(arena, entry->path->str);
     if (chr != ' ') {
-        str->str[index++] = chr;
+        p[index++] = chr;
     }
 
-    str->len = index;
-    str->str[index] = '\0';
-    return str;
+    p[index] = '\0';
+    info->perm_len = index;
 }
 
 static char file_type_char_(const mode_t mode) {
@@ -288,45 +267,31 @@ static t_str *get_size_(t_arena *arena, const t_entry *entry) {
     return str_arena_from_uint(arena, (size_t)entry->st.st_size);
 }
 
-static t_str *get_dt_(t_arena *arena, const time_t now, const t_entry *entry,
-                      const bool acces_time) {
+static bool get_dt_(char *dt, const time_t now, const t_entry *entry,
+                    const bool acces_time) {
     if (entry->stat_unavailable) {
-        return str_arena_from_cstr(arena, "           ?");
+        ft_memcpy(dt, "           ?", DT_LEN);
+        return true;
     }
 
-    t_str *new_str = str_arena_new(arena, DT_LEN);
-    if (!new_str) {
-        return NULL;
+    const time_t stamp =
+        acces_time ? entry->st.st_atim.tv_sec : entry->st.st_mtim.tv_sec;
+    const char *s = ctime(&stamp);
+    if (!s) {
+        return false;
     }
 
-    const struct timespec *ctim;
-    if (acces_time) {
-        ctim = &entry->st.st_atim;
-    } else {
-        ctim = &entry->st.st_mtim;
-    }
-    const time_t stamp = ctim->tv_sec;
-    const char *dt = ctime(&stamp);
-    if (!dt) {
-        return NULL;
-    }
-
-    bool recent = false;
-    if (stamp <= now) {
-        recent = now - stamp < LS_RECENT_SECS;
-    }
-
+    bool recent = stamp <= now && now - stamp < LS_RECENT_SECS;
     if (recent) {
-        ft_memcpy(new_str->str, dt + 4, DT_LEN - 1);
+        ft_memcpy(dt, s + 4, DT_LEN - 1);
     } else {
-        ft_memcpy(new_str->str, dt + 4, 7);
-        new_str->str[7] = ' ';
-        ft_memcpy(new_str->str + 8, dt + 20, 4);
+        ft_memcpy(dt, s + 4, 7);
+        dt[7] = ' ';
+        ft_memcpy(dt + 8, s + 20, 4);
     }
 
-    new_str->len = DT_LEN - 1;
-    new_str->str[DT_LEN - 1] = '\0';
-    return new_str;
+    dt[DT_LEN - 1] = '\0';
+    return true;
 }
 
 static bool get_blk_(t_arena *arena, const t_entry *entry, t_file_info *info) {

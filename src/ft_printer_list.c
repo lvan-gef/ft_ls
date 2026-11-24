@@ -80,8 +80,8 @@ static void update_stats_(t_list_stats *stats, const t_file_info *info) {
         stats->max_len_group = info->groupname->len;
     }
 
-    if (info->perm->len > stats->max_len_perm) {
-        stats->max_len_perm = info->perm->len;
+    if (info->perm_len > stats->max_len_perm) {
+        stats->max_len_perm = info->perm_len;
     }
 
     stats->total += info->blocks;
@@ -128,7 +128,8 @@ static void print_list_rows_(const t_print_request *req,
         const t_entry *entry = req->entries->data[index];
         const t_file_info *info = &infos[index];
 
-        put_padded_(out, info->perm, sizes->max_len_perm);
+        out_put(out, info->perm, info->perm_len);
+        out_pad(out, ' ', sizes->max_len_perm - info->perm_len);
         out_put(out, " ", 1);
         put_right_(out, info->links, sizes->max_len_links);
         out_put(out, " ", 1);
@@ -153,7 +154,7 @@ static void print_list_rows_(const t_print_request *req,
         }
 
         out_put(out, " ", 1);
-        out_put(out, info->dt->str, info->dt->len);
+        out_put(out, info->dt, DT_LEN - 1);
         out_put(out, " ", 1);
         put_entry_name(out, entry, req->quoted, req->color, req->is_stdout);
 

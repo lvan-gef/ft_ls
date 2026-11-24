@@ -2,20 +2,30 @@
 #define FT_FILE_INFO_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "./ft_arena.h"
 #include "./ft_array.h"
 #include "./ft_str.h"
 
+#ifndef PERMISSION_SIZE
+#define PERMISSION_SIZE 12
+#endif /* ifndef PERMISSION_SIZE */
+
+#ifndef DT_LEN
+#define DT_LEN 13
+#endif /* ifndef DT_LEN */
+
 typedef struct s_file_info {
-    t_str *perm;
+    char perm[PERMISSION_SIZE];
+    size_t perm_len;
+    char dt[DT_LEN];
     t_str *links;
     t_str *username;
     t_str *groupname;
     t_str *size;
     t_str *symlink;
-    t_str *dt;
     t_str *major;
     t_str *minor;
     size_t blocks;
