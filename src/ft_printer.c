@@ -100,22 +100,15 @@ static bool entries_have_quote_(const t_array *array) {
 static void calc_cols_(const t_array *array, t_map *map, const bool quoted,
                        size_t *col_widths, const size_t max_cols,
                        const size_t term_size) {
-    size_t width_count = array->len < max_cols ? array->len : max_cols;
-    if (!width_count) {
-        width_count = 1;
+
+    size_t cols = max_cols;
+    while (!calc_width_(array, quoted, cols, col_widths, term_size) &&
+           cols > 1) {
+        --cols;
     }
 
-    size_t best = 1;
-    for (size_t cols = width_count; cols > 0; --cols) {
-        if (calc_width_(array, quoted, cols, col_widths, term_size)) {
-            best = cols;
-            break;
-        }
-    }
-
-    map->cols = best;
-    map->rows = (array->len + best - 1) / best;
-    (void)calc_width_(array, quoted, best, col_widths, term_size);
+    map->cols = cols;
+    map->rows = (array->len + cols - 1) / cols;
 }
 
 static bool calc_width_(const t_array *array, const bool quoted,
