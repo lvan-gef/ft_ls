@@ -12,7 +12,6 @@
 #define BYTE_OCTAL_HIGH_SHIFT 6
 #define BYTE_OCTAL_MID_SHIFT 3
 
-/* dst == NULL only counts the length (used to compute display widths). */
 typedef struct s_shell_out {
     t_out *dst;
     size_t len;

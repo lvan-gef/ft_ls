@@ -21,7 +21,7 @@ LDFLAGS  := -pie -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack -s
 LDLIBS   :=
 
 SRCDIR   := src
-SRCFILES := ft_arena.c ft_array.c ft_file_info.c ft_parse.c ft_printer.c       \
+SRCFILES := ft_arena.c ft_array.c ft_file_info.c ft_out ft_parse.c ft_printer.c\
             ft_printer_helper.c ft_printer_list.c ft_shell_escape.c            \
 			ft_sort.c ft_str.c ft_str_arena.c ft_symlink.c ft_utils.c          \
 			ft_walk.c ft_walk_entry.c main.c
