@@ -20,15 +20,15 @@
 struct timespec;
 
 #ifndef CACHE_SIZE
-#define CACHE_SIZE ((size_t)64)
+#define CACHE_SIZE 64
 #endif /* ifndef CACHE_SIZE */
 
 #ifndef PERMISSION_SIZE
-#define PERMISSION_SIZE ((size_t)12)
+#define PERMISSION_SIZE 12
 #endif /* ifndef PERMISSION_SIZE */
 
 #ifndef DT_LEN
-#define DT_LEN ((size_t)13)
+#define DT_LEN 13
 #endif /* ifndef DT_LEN */
 
 #ifndef LOGIN_NAME_MAX
@@ -40,7 +40,7 @@ struct timespec;
 #endif /* ifndef LS_RECENT_SECS */
 
 #ifndef XATTR_STACK_SIZE
-#define XATTR_STACK_SIZE ((size_t)1024)
+#define XATTR_STACK_SIZE 1024
 #endif /* ifndef XATTR_STACK_SIZE */
 
 typedef struct {
@@ -294,7 +294,6 @@ static t_str *get_dt_(t_arena *arena, const time_t now, const t_entry *entry,
         return str_arena_from_cstr(arena, "           ?");
     }
 
-    const t_arena_mark mark = arena_get_mark(arena);
     t_str *new_str = str_arena_new(arena, DT_LEN);
     if (!new_str) {
         return NULL;
@@ -309,7 +308,6 @@ static t_str *get_dt_(t_arena *arena, const time_t now, const t_entry *entry,
     const time_t stamp = ctim->tv_sec;
     const char *dt = ctime(&stamp);
     if (!dt) {
-        arena_pop_to_mark(arena, mark);
         return NULL;
     }
 
@@ -403,10 +401,8 @@ static char get_acl_attr_(t_arena *arena, const char *path) {
         return ' ';
     }
 
-    const t_arena_mark mark = arena_get_mark(arena);
     char *large_names = arena_push(arena, (size_t)size);
     if (!large_names) {
-        arena_pop_to_mark(arena, mark);
         return '?';
     }
 
@@ -414,7 +410,6 @@ static char get_acl_attr_(t_arena *arena, const char *path) {
     const char chr = size >= 0 ? classify_xattrs_(large_names, size)
                                : xattr_error_marker_(errno);
 
-    arena_pop_to_mark(arena, mark);
     return chr;
 }
 

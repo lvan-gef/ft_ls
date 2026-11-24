@@ -38,12 +38,6 @@ void arena_release(t_arena *arena) {
     free(arena);
 }
 
-t_arena_mark arena_get_mark(const t_arena *arena) {
-    const t_arena_mark mark = {.block = arena->current,
-                               .pos = arena->current->pos};
-    return mark;
-}
-
 void *arena_push(t_arena *arena, const size_t size) {
     size_t align_pos = arena->current->pos;
 
@@ -75,35 +69,6 @@ void *arena_push(t_arena *arena, const size_t size) {
     arena->current->pos = align_pos + size;
 
     return ptr;
-}
-
-void arena_pop_to_mark(t_arena *arena, const t_arena_mark mark) {
-    const t_arena_block *cursor = arena->current;
-    while (cursor && cursor != mark.block) {
-        cursor = cursor->prev;
-    }
-
-    if (!cursor) {
-        return;
-    }
-
-    t_arena_block *block = arena->current;
-    while (block && block != mark.block) {
-        t_arena_block *prev = block->prev;
-        if (prev) {
-            prev->next = NULL;
-        }
-
-        free(block);
-        block = prev;
-    }
-
-    if (!block) {
-        return;
-    }
-
-    block->pos = mark.pos;
-    arena->current = block;
 }
 
 void arena_clear(t_arena *arena) {

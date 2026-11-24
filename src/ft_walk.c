@@ -273,7 +273,6 @@ failed:
 static t_operand_state classify_operand_(t_params *params, const t_str *str,
                                          struct stat *st, int *exit_code) {
     int e = 0;
-    const t_arena_mark mark = arena_get_mark(params->temp_arena);
     t_operand_state state = OPERAND_FILE;
 
     if (lstat(str->str, st) < 0) {
@@ -321,7 +320,6 @@ static t_operand_state classify_operand_(t_params *params, const t_str *str,
         state = OPERAND_SKIP;
     }
 cleanup:
-    arena_pop_to_mark(params->temp_arena, mark);
     return state;
 }
 

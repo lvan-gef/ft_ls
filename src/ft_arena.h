@@ -19,11 +19,6 @@ typedef struct s_arena {
     t_arena_block *current;
 } t_arena;
 
-typedef struct {
-    t_arena_block *block;
-    size_t pos;
-} t_arena_mark;
-
 #ifndef ARENA_SIZE
 #define ARENA_SIZE 65536
 #endif /* ifndef ARENA_SIZE */
@@ -34,9 +29,7 @@ typedef struct {
 
 t_arena *arena_alloc(size_t cap);
 void arena_release(t_arena *arena);
-t_arena_mark arena_get_mark(const t_arena *arena);
 void *arena_push(t_arena *arena, size_t size);
-void arena_pop_to_mark(t_arena *arena, t_arena_mark mark);
 void arena_clear(t_arena *arena);
 
 #endif /* ifndef ARENA_H */
