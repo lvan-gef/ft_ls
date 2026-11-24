@@ -17,18 +17,18 @@ static bool put_shell_escaped_scan_(t_str *out, const t_str *str,
                                     const t_shell_scan *scan,
                                     bool pad_unquoted);
 
-bool put_mem(t_str *out, const char *src, const uint64_t len) {
+bool put_mem(t_str *out, const char *src, const size_t len) {
     return put_mem_fd(out, src, len, STDOUT_FILENO);
 }
 
-bool put_mem_fd(t_str *out, const char *src, uint64_t len, const int fd) {
+bool put_mem_fd(t_str *out, const char *src, size_t len, const int fd) {
     while (len) {
         if (out->len == out->cap - 1 && !flush_fd(out, fd)) {
             return false;
         }
 
-        const uint64_t avail = out->cap - 1 - out->len;
-        const uint64_t to_copy = len < avail ? len : avail;
+        const size_t avail = out->cap - 1 - out->len;
+        const size_t to_copy = len < avail ? len : avail;
         ft_memcpy(out->str + out->len, src, (size_t)to_copy);
         out->len += to_copy;
         out->str[out->len] = '\0';
@@ -52,7 +52,7 @@ bool put_entry_name(t_str *out, const t_entry *entry, const bool pad_unquoted,
         start = entry_color_(entry);
     }
 
-    if (start && !put_mem(out, start, (uint64_t)ft_strlen(start))) {
+    if (start && !put_mem(out, start, ft_strlen(start))) {
         return false;
     }
 
@@ -102,13 +102,13 @@ bool flush_fd(t_str *out, const int fd) {
         return true;
     }
 
-    uint64_t written_total = 0;
+    size_t written_total = 0;
     while (written_total < out->len) {
         const ssize_t written = write(fd, out->str + written_total,
                                       (size_t)(out->len - written_total));
 
         if (written > 0) {
-            written_total += (uint64_t)written;
+            written_total += (size_t)written;
             continue;
         }
 
@@ -117,7 +117,7 @@ bool flush_fd(t_str *out, const int fd) {
         }
 
         if (written_total > 0) {
-            const uint64_t remaining = out->len - written_total;
+            const size_t remaining = out->len - written_total;
             ft_memcpy(out->str, out->str + written_total, (size_t)remaining);
             out->len = remaining;
             out->str[remaining] = '\0';
@@ -147,7 +147,7 @@ bool put_dir_header(t_str *out, const t_str *dir_header, const bool is_stdout) {
         scan.quote = '\'';
     }
 
-    const uint64_t need = shell_escaped_len(dir_header, scan.quote, false);
+    const size_t need = shell_escaped_len(dir_header, scan.quote, false);
 
     return put_shell_escaped_scan_(out, dir_header,
                                    &(t_shell_scan){.display_len = need,
@@ -160,7 +160,7 @@ bool put_dir_header(t_str *out, const t_str *dir_header, const bool is_stdout) {
 static bool put_shell_escaped_scan_(t_str *out, const t_str *str,
                                     const t_shell_scan *scan,
                                     const bool pad_unquoted) {
-    const uint64_t need =
+    const size_t need =
         pad_unquoted ? scan->padded_display_len : scan->display_len;
 
     if (need > out->cap - 1) {

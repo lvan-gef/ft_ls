@@ -63,9 +63,9 @@ t_entry *entry_new_path(const t_str *path, const struct stat *st,
 }
 
 t_entry *entry_new_dirent(t_arena *scratch, const struct dirent *dp) {
-    const uint64_t name_len = (uint64_t)ft_strlen(dp->d_name);
+    const size_t name_len = (size_t)ft_strlen(dp->d_name);
     if (name_len >
-        (uint64_t)PTRDIFF_MAX - (uint64_t)sizeof(t_scratch_dir_entry) - 1) {
+        (size_t)PTRDIFF_MAX - (size_t)sizeof(t_scratch_dir_entry) - 1) {
         return NULL;
     }
 
@@ -122,13 +122,13 @@ void entry_del(void *ptr) {
 static t_str *join_dir_path_(t_arena *scratch, const t_str *lhs,
                              const t_str *rhs) {
     const bool need_slash = lhs->len != 0 && lhs->str[lhs->len - 1] != '/';
-    const uint64_t slash_len = need_slash ? 1U : 0U;
-    if (lhs->len > UINT64_MAX - rhs->len - slash_len) {
+    const size_t slash_len = need_slash ? 1U : 0U;
+    if (lhs->len > SIZE_MAX - rhs->len - slash_len) {
         return NULL;
     }
 
-    const uint64_t total_len = lhs->len + rhs->len + slash_len;
-    if (total_len > (uint64_t)PTRDIFF_MAX - (uint64_t)sizeof(t_str) - 1) {
+    const size_t total_len = lhs->len + rhs->len + slash_len;
+    if (total_len > PTRDIFF_MAX - sizeof(t_str) - 1) {
         return NULL;
     }
 
@@ -139,13 +139,13 @@ static t_str *join_dir_path_(t_arena *scratch, const t_str *lhs,
 
     str_init(path, (char *)(path + 1), total_len);
 
-    ft_memcpy(path->str, lhs->str, (size_t)lhs->len);
+    ft_memcpy(path->str, lhs->str, lhs->len);
     path->len = lhs->len;
     if (need_slash) {
         path->str[path->len++] = '/';
     }
 
-    ft_memcpy(path->str + path->len, rhs->str, (size_t)rhs->len);
+    ft_memcpy(path->str + path->len, rhs->str, rhs->len);
     path->len += rhs->len;
     path->str[path->len] = '\0';
 

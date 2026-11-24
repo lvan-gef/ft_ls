@@ -12,11 +12,11 @@
 static bool append_input_(const char *arg, t_array *inputs);
 static void print_error_(const char *flag);
 
-bool parse_args(const uint64_t argc, const char **argv, t_args *args,
+bool parse_args(const size_t argc, const char **argv, t_args *args,
                 t_array *inputs) {
     bool is_flag = true;
 
-    for (uint64_t index = 1; index < argc; ++index) {
+    for (size_t index = 1; index < argc; ++index) {
         const size_t len = ft_strlen(argv[index]);
         if (is_flag && !ft_strncmp(argv[index], "--", 2)) {
             is_flag = false;
@@ -92,7 +92,7 @@ static void print_error_(const char *flag) {
     const char usage[] = "\nusage: ft_ls [-RalrtgufdoG] [file ...]\n";
     str_init(&out, buf, sizeof(buf) - 1);
     (void)(put_mem_fd(&out, cmd, sizeof(cmd) - 1, STDERR_FILENO) &&
-           put_mem_fd(&out, flag, (uint64_t)ft_strlen(flag), STDERR_FILENO) &&
+           put_mem_fd(&out, flag, ft_strlen(flag), STDERR_FILENO) &&
            put_mem_fd(&out, usage, sizeof(usage) - 1, STDERR_FILENO) &&
            flush_fd(&out, STDERR_FILENO));
 }

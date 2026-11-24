@@ -20,15 +20,15 @@
 struct timespec;
 
 #ifndef CACHE_SIZE
-#define CACHE_SIZE UINT64_C(64)
+#define CACHE_SIZE ((size_t)64)
 #endif /* ifndef CACHE_SIZE */
 
 #ifndef PERMISSION_SIZE
-#define PERMISSION_SIZE UINT64_C(12)
+#define PERMISSION_SIZE ((size_t)12)
 #endif /* ifndef PERMISSION_SIZE */
 
 #ifndef DT_LEN
-#define DT_LEN UINT64_C(13)
+#define DT_LEN ((size_t)13)
 #endif /* ifndef DT_LEN */
 
 #ifndef LOGIN_NAME_MAX
@@ -40,18 +40,18 @@ struct timespec;
 #endif /* ifndef LS_RECENT_SECS */
 
 #ifndef XATTR_STACK_SIZE
-#define XATTR_STACK_SIZE 1024
+#define XATTR_STACK_SIZE ((size_t)1024)
 #endif /* ifndef XATTR_STACK_SIZE */
 
 typedef struct {
     char name[LOGIN_NAME_MAX];
-    uint64_t id;
+    size_t id;
 } t_id_cache_entry;
 
-static uint64_t user_index = 0;
+static size_t user_index = 0;
 static t_id_cache_entry user_cache[CACHE_SIZE] = {0};
 
-static uint64_t group_index = 0;
+static size_t group_index = 0;
 static t_id_cache_entry group_cache[CACHE_SIZE] = {0};
 
 static bool fill_file_info_(t_arena *arena, t_file_info *info,
@@ -65,8 +65,8 @@ static t_str *get_size_(t_arena *arena, const t_entry *entry);
 static t_str *get_dt_(t_arena *arena, time_t now, const t_entry *entry,
                       bool acces_time);
 static bool get_blk_(t_arena *arena, const t_entry *entry, t_file_info *info);
-static char *cache_lookup_(t_id_cache_entry *cache, uint64_t id);
-static void cache_store_(t_id_cache_entry *cache, uint64_t *next, uint64_t id,
+static char *cache_lookup_(t_id_cache_entry *cache, size_t id);
+static void cache_store_(t_id_cache_entry *cache, size_t *next, size_t id,
                          const char *name);
 static char exec_char_(mode_t mode, mode_t exec_bit, mode_t special_bit,
                        char lower, char upper);
@@ -88,7 +88,7 @@ bool prepare_list_infos(t_arena *arena, const t_array *entries,
         return false;
     }
 
-    if (entries->len > (uint64_t)PTRDIFF_MAX / sizeof(**infos)) {
+    if (entries->len > PTRDIFF_MAX / sizeof(**infos)) {
         return false;
     }
 
@@ -97,7 +97,7 @@ bool prepare_list_infos(t_arena *arena, const t_array *entries,
         return false;
     }
 
-    for (uint64_t index = 0; index < entries->len; ++index) {
+    for (size_t index = 0; index < entries->len; ++index) {
         const t_entry *entry = entries->data[index];
 
         if (!fill_file_info_(arena, &(*infos)[index], entry, now,
@@ -152,7 +152,7 @@ static bool fill_file_info_(t_arena *arena, t_file_info *info,
 
     if (S_ISLNK(entry->st.st_mode)) {
         info->symlink =
-            read_symlink(arena, entry->path, (uint64_t)entry->st.st_size, NULL);
+            read_symlink(arena, entry->path, (size_t)entry->st.st_size, NULL);
         if (!info->symlink) {
             return false;
         }
@@ -160,7 +160,7 @@ static bool fill_file_info_(t_arena *arena, t_file_info *info,
         info->symlink = NULL;
     }
 
-    info->blocks = (uint64_t)entry->st.st_blocks;
+    info->blocks = (size_t)entry->st.st_blocks;
     return true;
 }
 
@@ -170,7 +170,7 @@ static t_str *get_perm_(t_arena *arena, const t_entry *entry) {
         return NULL;
     }
 
-    uint64_t index = 0;
+    size_t index = 0;
     str->str[index++] = file_type_char_(entry->st.st_mode);
     if (entry->stat_unavailable) {
         while (index < 10) {
@@ -242,7 +242,7 @@ static t_str *get_links_(t_arena *arena, const t_entry *entry) {
         return str_arena_from_cstr(arena, "?");
     }
 
-    return str_arena_from_uint(arena, (uint64_t)entry->st.st_nlink);
+    return str_arena_from_uint(arena, (size_t)entry->st.st_nlink);
 }
 
 static t_str *get_user_(t_arena *arena, const t_entry *entry) {
@@ -250,7 +250,7 @@ static t_str *get_user_(t_arena *arena, const t_entry *entry) {
         return str_arena_from_cstr(arena, "?");
     }
 
-    const uint64_t user_id = (uint64_t)entry->st.st_uid;
+    const size_t user_id = entry->st.st_uid;
     const char *name = cache_lookup_(user_cache, user_id);
     if (name) {
         return str_arena_from_cstr(arena, name);
@@ -286,7 +286,7 @@ static t_str *get_group_(t_arena *arena, const t_entry *entry) {
         return str_arena_from_cstr(arena, "?");
     }
 
-    const uint64_t group_id = (uint64_t)entry->st.st_gid;
+    const size_t group_id = (size_t)entry->st.st_gid;
     const char *name = cache_lookup_(group_cache, group_id);
     if (name) {
         return str_arena_from_cstr(arena, name);
@@ -323,7 +323,7 @@ static t_str *get_size_(t_arena *arena, const t_entry *entry) {
         return str_arena_from_cstr(arena, "?");
     }
 
-    return str_arena_from_uint(arena, (uint64_t)entry->st.st_size);
+    return str_arena_from_uint(arena, (size_t)entry->st.st_size);
 }
 
 static t_str *get_dt_(t_arena *arena, const time_t now, const t_entry *entry,
@@ -383,8 +383,8 @@ static bool get_blk_(t_arena *arena, const t_entry *entry, t_file_info *info) {
     return true;
 }
 
-static char *cache_lookup_(t_id_cache_entry *cache, const uint64_t id) {
-    for (uint64_t index = 0; index < CACHE_SIZE; ++index) {
+static char *cache_lookup_(t_id_cache_entry *cache, const size_t id) {
+    for (size_t index = 0; index < CACHE_SIZE; ++index) {
         if (!*cache[index].name) {
             continue;
         }
@@ -397,9 +397,9 @@ static char *cache_lookup_(t_id_cache_entry *cache, const uint64_t id) {
     return NULL;
 }
 
-static void cache_store_(t_id_cache_entry *cache, uint64_t *next,
-                         const uint64_t id, const char *name) {
-    const uint64_t index = *next % CACHE_SIZE;
+static void cache_store_(t_id_cache_entry *cache, size_t *next, const size_t id,
+                         const char *name) {
+    const size_t index = *next % CACHE_SIZE;
     cache[index].id = id;
     ft_strlcpy(cache[index].name, name, LOGIN_NAME_MAX);
     ++(*next);

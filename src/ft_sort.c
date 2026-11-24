@@ -11,16 +11,16 @@
 struct timespec;
 
 typedef struct {
-    uint64_t left;
-    uint64_t mid;
-    uint64_t right;
+    size_t left;
+    size_t mid;
+    size_t right;
 } t_range;
 
 typedef int (*t_cmp_entry)(const t_entry *a, const t_entry *b);
 
-static bool ensure_sort_scratch_(t_sort_scratch *scratch, uint64_t need);
+static bool ensure_sort_scratch_(t_sort_scratch *scratch, size_t need);
 static void merge_sort_(void **tmp, const t_array *array, t_cmp_entry cmp);
-static uint64_t get_cap_(uint64_t lhs, uint64_t rhs, uint64_t cap);
+static size_t get_cap_(size_t lhs, size_t rhs, size_t cap);
 static void merge_(void **data, void **tmp, const t_range *range,
                    t_cmp_entry cmp);
 static int cmp_name_entry_(const t_entry *a, const t_entry *b);
@@ -57,8 +57,8 @@ bool sort(t_sort_scratch *scratch, const t_array *array, const bool reverse,
     return true;
 }
 
-static bool ensure_sort_scratch_(t_sort_scratch *scratch, const uint64_t need) {
-    const uint64_t max_len = (uint64_t)PTRDIFF_MAX / sizeof(void *);
+static bool ensure_sort_scratch_(t_sort_scratch *scratch, const size_t need) {
+    const size_t max_len = PTRDIFF_MAX / sizeof(void *);
     if (need > max_len) {
         return false;
     }
@@ -67,7 +67,7 @@ static bool ensure_sort_scratch_(t_sort_scratch *scratch, const uint64_t need) {
         return true;
     }
 
-    uint64_t new_cap = scratch->cap ? scratch->cap : 1;
+    size_t new_cap = scratch->cap ? scratch->cap : 1;
     while (new_cap < need) {
         if (new_cap > max_len / 2) {
             new_cap = need;
@@ -90,10 +90,10 @@ static bool ensure_sort_scratch_(t_sort_scratch *scratch, const uint64_t need) {
 
 static void merge_sort_(void **tmp, const t_array *array,
                         const t_cmp_entry cmp) {
-    for (uint64_t width = 1; width < array->len;) {
-        uint64_t left = 0;
+    for (size_t width = 1; width < array->len;) {
+        size_t left = 0;
         while (left < array->len) {
-            const uint64_t mid = get_cap_(left, width, array->len);
+            const size_t mid = get_cap_(left, width, array->len);
             t_range range = {.left = left,
                              .mid = mid,
                              .right = get_cap_(mid, width, array->len)};
@@ -101,7 +101,7 @@ static void merge_sort_(void **tmp, const t_array *array,
                 merge_(array->data, tmp, &range, cmp);
             }
 
-            const uint64_t step = get_cap_(width, width, array->len);
+            const size_t step = get_cap_(width, width, array->len);
             left = get_cap_(left, step, array->len);
         }
 
@@ -113,8 +113,7 @@ static void merge_sort_(void **tmp, const t_array *array,
     }
 }
 
-static uint64_t get_cap_(const uint64_t lhs, const uint64_t rhs,
-                         const uint64_t cap) {
+static size_t get_cap_(const size_t lhs, const size_t rhs, const size_t cap) {
     if (lhs >= cap || rhs >= cap - lhs) {
         return cap;
     }
@@ -124,9 +123,9 @@ static uint64_t get_cap_(const uint64_t lhs, const uint64_t rhs,
 
 static void merge_(void **data, void **tmp, const t_range *range,
                    const t_cmp_entry cmp) {
-    uint64_t i = range->left;
-    uint64_t j = range->mid;
-    uint64_t out = range->left;
+    size_t i = range->left;
+    size_t j = range->mid;
+    size_t out = range->left;
 
     while (i < range->mid && j < range->right) {
         const t_entry *a = data[i];
@@ -147,7 +146,7 @@ static void merge_(void **data, void **tmp, const t_range *range,
         tmp[out++] = data[j++];
     }
 
-    for (uint64_t idx = range->left; idx < range->right; ++idx) {
+    for (size_t idx = range->left; idx < range->right; ++idx) {
         data[idx] = tmp[idx];
     }
 }
@@ -193,9 +192,9 @@ static t_str *entry_name_(const t_entry *entry) {
 static int compare_(const t_str *lhs, const t_str *rhs) {
     const unsigned char *a = (const unsigned char *)lhs->str;
     const unsigned char *b = (const unsigned char *)rhs->str;
-    const uint64_t limit = lhs->len < rhs->len ? lhs->len : rhs->len;
+    const size_t limit = lhs->len < rhs->len ? lhs->len : rhs->len;
 
-    for (uint64_t index = 0; index < limit; ++index) {
+    for (size_t index = 0; index < limit; ++index) {
         if (a[index] != b[index]) {
             return (int)a[index] - (int)b[index];
         }

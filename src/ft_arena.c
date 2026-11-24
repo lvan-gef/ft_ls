@@ -1,17 +1,13 @@
-#include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 
 #include "./ft_arena.h"
+#include "./ft_const.h"
 
-#ifndef ARENA_ALIGN
-#define ARENA_ALIGN UINT64_C(8)
-#endif /* ifndef ARENA_ALIGN */
+static t_arena_block *new_block_(size_t cap);
 
-static t_arena_block *new_block_(uint64_t cap);
-
-t_arena *arena_alloc(const uint64_t cap) {
+t_arena *arena_alloc(const size_t cap) {
     t_arena_block *block = new_block_(cap);
     if (!block) {
         return NULL;
@@ -49,17 +45,17 @@ t_arena_mark arena_get_mark(const t_arena *arena) {
     return mark;
 }
 
-void *arena_push(t_arena *arena, const uint64_t size) {
-    uint64_t align_pos = arena->current->pos;
+void *arena_push(t_arena *arena, const size_t size) {
+    size_t align_pos = arena->current->pos;
 
-    const uint64_t remainder = align_pos % arena->align;
+    const size_t remainder = align_pos % arena->align;
     if (remainder) {
         align_pos += arena->align - remainder;
     }
 
     if (align_pos > arena->current->cap ||
         size > arena->current->cap - align_pos) {
-        uint64_t cap = arena->block_size;
+        size_t cap = arena->block_size;
         if (size > cap) {
             cap = size;
         }
@@ -126,9 +122,8 @@ void arena_clear(t_arena *arena) {
     arena->current = arena->first;
 }
 
-static t_arena_block *new_block_(const uint64_t cap) {
-    if (cap > (uint64_t)PTRDIFF_MAX - sizeof(t_arena_block)) {
-        errno = ENOMEM;
+static t_arena_block *new_block_(const size_t cap) {
+    if (cap > PTRDIFF_MAX - sizeof(t_arena_block)) {
         return NULL;
     }
 

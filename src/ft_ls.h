@@ -2,15 +2,16 @@
 #define FT_LS_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <sys/stat.h>
 
 #include "./ft_str.h"
 
 typedef struct s_shell_scan {
-    uint64_t len;
-    uint64_t display_len;
-    uint64_t padded_display_len;
+    size_t len;
+    size_t display_len;
+    size_t padded_display_len;
     char quote;
 } t_shell_scan;
 

@@ -30,11 +30,11 @@ typedef struct s_print_request {
     bool access_time;
     bool color;
     bool is_stdout;
-    uint64_t term_size;
+    size_t term_size;
 } t_print_request;
 
 bool printer(const t_print_request *req);
 bool printer_list(const t_print_request *req);
-uint64_t get_terminal_width(void);
+size_t get_terminal_width(void);
 
 #endif /* ifndef FT_PRINTER_H */

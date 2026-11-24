@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <time.h>
@@ -13,11 +14,11 @@ static void init_timezone_(void);
 int main(const int argc, const char *argv[]) {
     t_args args = {0};
     t_array inputs = {0};
-    if (!array_init(&inputs, (uint64_t)argc)) {
+    if (!array_init(&inputs, (size_t)argc)) {
         return 1;
     }
 
-    if (!parse_args((uint64_t)argc, argv, &args, &inputs)) {
+    if (!parse_args((size_t)argc, argv, &args, &inputs)) {
         array_destroy_with(&inputs, del_str_);
         return 1;
     }

@@ -267,7 +267,7 @@ error:
 
 static bool collect_operands_(t_params *params, const t_array *array,
                               int *exit_code) {
-    for (uint64_t index = 0; index < array->len; ++index) {
+    for (size_t index = 0; index < array->len; ++index) {
         struct stat st = {0};
         const t_str *str = array->data[index];
 
@@ -351,7 +351,7 @@ static t_operand_state classify_operand_(t_params *params, const t_str *str,
             st_dir = &st_target;
         }
 
-        if (!read_symlink(params->temp_arena, str, (uint64_t)st->st_size, &e)) {
+        if (!read_symlink(params->temp_arena, str, (size_t)st->st_size, &e)) {
             state = OPERAND_FATAL;
             goto cleanup;
         }
@@ -475,7 +475,7 @@ static void clear_directory_entries_(t_params *params) {
 
 static bool queue_recursive_dirs_(t_params *params, const t_str *parent_path) {
     if (params->args->recursive && params->current_entries.len) {
-        uint64_t index = params->current_entries.len;
+        size_t index = params->current_entries.len;
         while (index > 0) {
             --index;
             t_entry *entry = params->current_entries.data[index];
@@ -558,13 +558,13 @@ static bool print_error_(t_str *out, const t_str *path, const int e,
             const bool ok =
                 put_mem_fd(&err_out, "ft_ls: ", sizeof("ft_ls: ") - 1,
                            STDERR_FILENO) &&
-                put_mem_fd(&err_out, prefix, (uint64_t)ft_strlen(prefix),
+                put_mem_fd(&err_out, prefix, (size_t)ft_strlen(prefix),
                            STDERR_FILENO) &&
                 put_mem_fd(&err_out, " ", 1, STDERR_FILENO) &&
                 put_mem_fd(&err_out, escaped->str, escaped->len,
                            STDERR_FILENO) &&
                 put_mem_fd(&err_out, ": ", 2, STDERR_FILENO) &&
-                put_mem_fd(&err_out, msg, (uint64_t)ft_strlen(msg),
+                put_mem_fd(&err_out, msg, (size_t)ft_strlen(msg),
                            STDERR_FILENO) &&
                 put_mem_fd(&err_out, "\n", 1, STDERR_FILENO) &&
                 flush_fd(&err_out, STDERR_FILENO);
@@ -575,12 +575,11 @@ static bool print_error_(t_str *out, const t_str *path, const int e,
 
     return put_mem_fd(&err_out, "ft_ls: ", sizeof("ft_ls: ") - 1,
                       STDERR_FILENO) &&
-           put_mem_fd(&err_out, prefix, (uint64_t)ft_strlen(prefix),
-                      STDERR_FILENO) &&
+           put_mem_fd(&err_out, prefix, ft_strlen(prefix), STDERR_FILENO) &&
            put_mem_fd(&err_out, " '", 2, STDERR_FILENO) &&
            put_mem_fd(&err_out, path->str, path->len, STDERR_FILENO) &&
            put_mem_fd(&err_out, "': ", 3, STDERR_FILENO) &&
-           put_mem_fd(&err_out, msg, (uint64_t)ft_strlen(msg), STDERR_FILENO) &&
+           put_mem_fd(&err_out, msg, ft_strlen(msg), STDERR_FILENO) &&
            put_mem_fd(&err_out, "\n", 1, STDERR_FILENO) &&
            flush_fd(&err_out, STDERR_FILENO);
 }

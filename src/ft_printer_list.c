@@ -14,25 +14,25 @@
 #include "./ft_utils.h"
 
 typedef struct {
-    uint64_t total;
-    uint64_t max_len_links;
-    uint64_t max_len_sizes;
-    uint64_t max_len_user;
-    uint64_t max_len_group;
-    uint64_t max_len_major;
-    uint64_t max_len_minor;
-    uint64_t max_len_perm;
+    size_t total;
+    size_t max_len_links;
+    size_t max_len_sizes;
+    size_t max_len_user;
+    size_t max_len_group;
+    size_t max_len_major;
+    size_t max_len_minor;
+    size_t max_len_perm;
     bool have_quote;
 } t_list_stats;
 
 static void apply_width_(const t_array *context, t_list_stats *sizes);
 static void update_stats_(t_list_stats *stats, const t_entry *entry,
                           const t_file_info *info);
-static uint64_t dev_width_(const t_list_stats *sizes);
-static uint64_t size_width_(const t_list_stats *sizes);
+static size_t dev_width_(const t_list_stats *sizes);
+static size_t size_width_(const t_list_stats *sizes);
 static bool print_list_(const t_print_request *req, const t_file_info *infos);
-static bool left_pad_(t_str *out, uint64_t src_len, uint64_t max_size);
-static bool put_uint_(t_str *out, uint64_t value);
+static bool left_pad_(t_str *out, size_t src_len, size_t max_size);
+static bool put_uint_(t_str *out, size_t value);
 static bool print_list_rows_(const t_print_request *req,
                              const t_file_info *infos,
                              const t_list_stats *sizes);
@@ -57,9 +57,9 @@ static void apply_width_(const t_array *context, t_list_stats *sizes) {
         return;
     }
 
-    for (uint64_t index = 0; index < context->len; ++index) {
+    for (size_t index = 0; index < context->len; ++index) {
         const t_entry *entry = context->data[index];
-        const uint64_t links_len =
+        const size_t links_len =
             entry->stat_unavailable ? 1 : str_uint_len(entry->st.st_nlink);
 
         if (links_len > sizes->max_len_links) {
@@ -68,10 +68,10 @@ static void apply_width_(const t_array *context, t_list_stats *sizes) {
 
         if (!entry->stat_unavailable &&
             (S_ISBLK(entry->st.st_mode) || S_ISCHR(entry->st.st_mode))) {
-            const uint64_t major_len =
-                str_uint_len((uint64_t)major(entry->st.st_rdev));
-            const uint64_t minor_len =
-                str_uint_len((uint64_t)minor(entry->st.st_rdev));
+            const size_t major_len =
+                str_uint_len((size_t)major(entry->st.st_rdev));
+            const size_t minor_len =
+                str_uint_len((size_t)minor(entry->st.st_rdev));
 
             if (major_len > sizes->max_len_major) {
                 sizes->max_len_major = major_len;
@@ -81,10 +81,10 @@ static void apply_width_(const t_array *context, t_list_stats *sizes) {
                 sizes->max_len_minor = minor_len;
             }
         } else {
-            const uint64_t size_len =
+            const size_t size_len =
                 entry->stat_unavailable
                     ? 1
-                    : str_uint_len((uint64_t)entry->st.st_size);
+                    : str_uint_len((size_t)entry->st.st_size);
 
             if (size_len > sizes->max_len_sizes) {
                 sizes->max_len_sizes = size_len;
@@ -132,7 +132,7 @@ static void update_stats_(t_list_stats *stats, const t_entry *entry,
     stats->total += info->blocks;
 }
 
-static uint64_t dev_width_(const t_list_stats *sizes) {
+static size_t dev_width_(const t_list_stats *sizes) {
     if (!sizes->max_len_major && !sizes->max_len_minor) {
         return 0;
     }
@@ -140,14 +140,14 @@ static uint64_t dev_width_(const t_list_stats *sizes) {
     return sizes->max_len_major + 2 + sizes->max_len_minor;
 }
 
-static uint64_t size_width_(const t_list_stats *sizes) {
-    const uint64_t dev_width = dev_width_(sizes);
+static size_t size_width_(const t_list_stats *sizes) {
+    const size_t dev_width = dev_width_(sizes);
     return sizes->max_len_sizes > dev_width ? sizes->max_len_sizes : dev_width;
 }
 
 static bool print_list_(const t_print_request *req, const t_file_info *infos) {
     t_list_stats sizes = {0};
-    for (uint64_t index = 0; index < req->entries->len; ++index) {
+    for (size_t index = 0; index < req->entries->len; ++index) {
         const t_entry *entry = req->entries->data[index];
         update_stats_(&sizes, entry, &infos[index]);
     }
@@ -172,17 +172,16 @@ static bool print_list_(const t_print_request *req, const t_file_info *infos) {
     return print_list_rows_(req, infos, &sizes);
 }
 
-static bool left_pad_(t_str *out, const uint64_t src_len,
-                      const uint64_t max_size) {
-    uint64_t count = max_size - src_len;
+static bool left_pad_(t_str *out, const size_t src_len, const size_t max_size) {
+    size_t count = max_size - src_len;
 
     while (count) {
         if (out->len == out->cap - 1 && !flush_fd(out, STDOUT_FILENO)) {
             return false;
         }
 
-        const uint64_t avail = out->cap - 1 - out->len;
-        const uint64_t to_fill = count < avail ? count : avail;
+        const size_t avail = out->cap - 1 - out->len;
+        const size_t to_fill = count < avail ? count : avail;
         ft_memset(out->str + out->len, ' ', (size_t)to_fill);
         out->len += to_fill;
         out->str[out->len] = '\0';
@@ -192,7 +191,7 @@ static bool left_pad_(t_str *out, const uint64_t src_len,
     return true;
 }
 
-static bool put_uint_(t_str *out, const uint64_t value) {
+static bool put_uint_(t_str *out, const size_t value) {
     char digits[32];
     t_str str;
 
@@ -205,7 +204,7 @@ static bool put_uint_(t_str *out, const uint64_t value) {
 static bool print_list_rows_(const t_print_request *req,
                              const t_file_info *infos,
                              const t_list_stats *sizes) {
-    for (uint64_t index = 0; index < req->entries->len; ++index) {
+    for (size_t index = 0; index < req->entries->len; ++index) {
         const t_entry *entry = req->entries->data[index];
         const t_file_info *info = &infos[index];
 
@@ -235,7 +234,7 @@ static bool print_list_rows_(const t_print_request *req,
         }
 
         if (info->major) {
-            const uint64_t device_width = dev_width_(sizes);
+            const size_t device_width = dev_width_(sizes);
             if (!left_pad_(req->buffer, device_width, size_width_(sizes)) ||
                 !left_pad_(req->buffer, info->major->len,
                            sizes->max_len_major)) {

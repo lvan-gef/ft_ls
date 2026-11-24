@@ -8,25 +8,24 @@
 #include "./ft_printer_helper.h"
 
 #ifndef DEFAULT_TERM_SIZE
-#define DEFAULT_TERM_SIZE UINT64_C(80)
+#define DEFAULT_TERM_SIZE 80
 #endif /* ifndef DEFAULT_TERM_SIZE */
 
 typedef struct {
-    uint64_t rows;
-    uint64_t cols;
+    size_t rows;
+    size_t cols;
 } t_map;
 
 static bool init_print_row_(const t_print_request *req);
 static bool init_print_lines_(const t_print_request *req);
 static bool entries_have_quote_(const t_array *array);
 static void calc_cols_(const t_array *array, t_map *map, bool quoted,
-                       uint64_t *col_widths, uint64_t max_cols,
-                       uint64_t term_size);
-static bool calc_width_(const t_array *array, bool quoted, uint64_t num_cols,
-                        uint64_t *col_widths, uint64_t term_size);
+                       size_t *col_widths, size_t max_cols, size_t term_size);
+static bool calc_width_(const t_array *array, bool quoted, size_t num_cols,
+                        size_t *col_widths, size_t term_size);
 static bool create_row_(const t_print_request *req, const t_map *map,
-                        const uint64_t *col_widths, bool quoted);
-static bool indent_(t_str *out, uint64_t from, uint64_t to);
+                        const size_t *col_widths, bool quoted);
+static bool indent_(t_str *out, size_t from, size_t to);
 
 bool printer(const t_print_request *req) {
     if (req->list_mode) {
@@ -40,11 +39,11 @@ bool printer(const t_print_request *req) {
     return init_print_row_(req);
 }
 
-uint64_t get_terminal_width(void) {
+size_t get_terminal_width(void) {
     struct winsize ws;
 
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 0) {
-        return (uint64_t)ws.ws_col;
+        return (size_t)ws.ws_col;
     }
 
     return DEFAULT_TERM_SIZE;
@@ -52,16 +51,16 @@ uint64_t get_terminal_width(void) {
 
 static bool init_print_row_(const t_print_request *req) {
     t_map map = {.cols = 1, .rows = req->entries->len};
-    uint64_t *col_widths = NULL;
-    const uint64_t max_cols = (req->term_size + SPACE_GAP) / (1 + SPACE_GAP);
+    size_t *col_widths = NULL;
+    const size_t max_cols = (req->term_size + SPACE_GAP) / (1 + SPACE_GAP);
 
-    uint64_t width_count =
+    size_t width_count =
         req->entries->len < max_cols ? req->entries->len : max_cols;
     if (!width_count) {
         width_count = 1;
     }
 
-    if (width_count > (uint64_t)PTRDIFF_MAX / sizeof(*col_widths)) {
+    if (width_count > (size_t)PTRDIFF_MAX / sizeof(*col_widths)) {
         return false;
     }
 
@@ -88,7 +87,7 @@ static bool init_print_lines_(const t_print_request *req) {
         return false;
     }
 
-    for (uint64_t index = 0; index < req->entries->len; ++index) {
+    for (size_t index = 0; index < req->entries->len; ++index) {
         const t_entry *entry = req->entries->data[index];
 
         if (!put_entry_name(req->buffer, entry, false, req->color,
@@ -102,7 +101,7 @@ static bool init_print_lines_(const t_print_request *req) {
 }
 
 static bool entries_have_quote_(const t_array *array) {
-    for (uint64_t index = 0; index < array->len; ++index) {
+    for (size_t index = 0; index < array->len; ++index) {
         const t_entry *entry = array->data[index];
         if (entry->name_scan.quote != '\0') {
             return true;
@@ -113,15 +112,15 @@ static bool entries_have_quote_(const t_array *array) {
 }
 
 static void calc_cols_(const t_array *array, t_map *map, const bool quoted,
-                       uint64_t *col_widths, const uint64_t max_cols,
-                       const uint64_t term_size) {
-    uint64_t width_count = array->len < max_cols ? array->len : max_cols;
+                       size_t *col_widths, const size_t max_cols,
+                       const size_t term_size) {
+    size_t width_count = array->len < max_cols ? array->len : max_cols;
     if (!width_count) {
         width_count = 1;
     }
 
-    uint64_t best = 1;
-    for (uint64_t cols = width_count; cols > 0; --cols) {
+    size_t best = 1;
+    for (size_t cols = width_count; cols > 0; --cols) {
         if (calc_width_(array, quoted, cols, col_widths, term_size)) {
             best = cols;
             break;
@@ -134,21 +133,21 @@ static void calc_cols_(const t_array *array, t_map *map, const bool quoted,
 }
 
 static bool calc_width_(const t_array *array, const bool quoted,
-                        const uint64_t num_cols, uint64_t *col_widths,
-                        const uint64_t term_size) {
-    const uint64_t file_count = array->len;
-    const uint64_t num_rows = (file_count + num_cols - 1) / num_cols;
-    uint64_t line_len = num_cols * MIN_COLUMN_WIDTH;
+                        const size_t num_cols, size_t *col_widths,
+                        const size_t term_size) {
+    const size_t file_count = array->len;
+    const size_t num_rows = (file_count + num_cols - 1) / num_cols;
+    size_t line_len = num_cols * MIN_COLUMN_WIDTH;
 
-    for (uint64_t index = 0; index < num_cols; ++index) {
+    for (size_t index = 0; index < num_cols; ++index) {
         col_widths[index] = MIN_COLUMN_WIDTH;
     }
 
-    for (uint64_t filesno = 0; filesno < file_count; ++filesno) {
-        const uint64_t index = filesno / num_rows;
+    for (size_t filesno = 0; filesno < file_count; ++filesno) {
+        const size_t index = filesno / num_rows;
         const t_entry *entry = array->data[filesno];
-        uint64_t real_length = quoted ? entry->name_scan.padded_display_len
-                                      : entry->name_scan.display_len;
+        size_t real_length = quoted ? entry->name_scan.padded_display_len
+                                    : entry->name_scan.display_len;
 
         if (index != num_cols - 1) {
             real_length += SPACE_GAP;
@@ -167,20 +166,20 @@ static bool calc_width_(const t_array *array, const bool quoted,
 }
 
 static bool create_row_(const t_print_request *req, const t_map *map,
-                        const uint64_t *col_widths, const bool quoted) {
-    const uint64_t files_len = req->entries->len;
+                        const size_t *col_widths, const bool quoted) {
+    const size_t files_len = req->entries->len;
 
-    for (uint64_t row = 0; row < map->rows; ++row) {
-        uint64_t col = 0;
-        uint64_t filesno = row;
-        uint64_t pos = 0;
+    for (size_t row = 0; row < map->rows; ++row) {
+        size_t col = 0;
+        size_t filesno = row;
+        size_t pos = 0;
 
         while (true) {
             const t_entry *entry = req->entries->data[filesno];
-            const uint64_t name_length =
-                quoted ? entry->name_scan.padded_display_len
-                       : entry->name_scan.display_len;
-            const uint64_t max_name_length = col_widths[col++];
+            const size_t name_length = quoted
+                                           ? entry->name_scan.padded_display_len
+                                           : entry->name_scan.display_len;
+            const size_t max_name_length = col_widths[col++];
 
             if (!put_entry_name(req->buffer, entry, quoted, req->color, true)) {
                 return false;
@@ -207,7 +206,7 @@ static bool create_row_(const t_print_request *req, const t_map *map,
     return true;
 }
 
-static bool indent_(t_str *out, uint64_t from, const uint64_t to) {
+static bool indent_(t_str *out, size_t from, const size_t to) {
     while (from < to) {
         if (to / TABSIZE > (from + 1) / TABSIZE) {
             if (!put_mem(out, "\t", 1)) {

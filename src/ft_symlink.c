@@ -10,22 +10,21 @@
 #include "./ft_symlink.h"
 
 #ifndef PATH_MAX
-#define PATH_MAX UINT64_C(4096)
+#define PATH_MAX 4096
 #endif /* ifndef PATH_MAX */
 
 t_str *read_symlink(t_arena *scratch, const t_str *path,
-                    const uint64_t target_size, int *read_err) {
+                    const size_t target_size, int *read_err) {
     if (read_err) {
         *read_err = 0;
     }
 
-    if (target_size == UINT64_MAX) {
+    if (target_size == SIZE_MAX) {
         return NULL;
     }
 
-    const uint64_t max_cap =
-        (uint64_t)PTRDIFF_MAX - (uint64_t)sizeof(t_str) - 1;
-    uint64_t cap = target_size > 0 ? target_size + 1 : PATH_MAX;
+    const size_t max_cap = PTRDIFF_MAX - sizeof(t_str) - 1;
+    size_t cap = target_size > 0 ? target_size + 1 : PATH_MAX;
     while (true) {
         if (cap > max_cap) {
             return NULL;
@@ -54,7 +53,7 @@ t_str *read_symlink(t_arena *scratch, const t_str *path,
             return NULL;
         }
 
-        const uint64_t read_len = (uint64_t)len;
+        const size_t read_len = (size_t)len;
         if (read_len < cap) {
             if (read_len >= str->cap) {
                 arena_pop_to_mark(scratch, mark);
@@ -67,7 +66,7 @@ t_str *read_symlink(t_arena *scratch, const t_str *path,
         }
 
         arena_pop_to_mark(scratch, mark);
-        if (cap > max_cap / UINT64_C(2)) {
+        if (cap > max_cap / 2) {
             return NULL;
         }
 

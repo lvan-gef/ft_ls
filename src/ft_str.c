@@ -5,33 +5,33 @@
 #include "./ft_str.h"
 #include "./ft_utils.h"
 
-void str_init(t_str *str, char *buf, const uint64_t cap) {
+void str_init(t_str *str, char *buf, const size_t cap) {
     str->str = buf;
     str->cap = cap + 1;
     str->len = 0;
     str->str[0] = '\0';
 }
 
-void str_copy_cstr(t_str *str, const char *src, const uint64_t len) {
+void str_copy_cstr(t_str *str, const char *src, const size_t len) {
     ft_memcpy(str->str, src, (size_t)len);
     str->len = len;
     str->str[str->len] = '\0';
 }
 
-void str_copy_uint(t_str *str, uint64_t value) {
-    const uint64_t len = str_uint_len(value);
+void str_copy_uint(t_str *str, size_t value) {
+    const size_t len = str_uint_len(value);
 
     str->len = len;
     str->str[len] = '\0';
-    for (uint64_t pos = len; pos > 0;) {
+    for (size_t pos = len; pos > 0;) {
         --pos;
         str->str[pos] = (char)(value % 10 + '0');
         value /= 10;
     }
 }
 
-t_str *str_new(const uint64_t cap) {
-    if (cap > (uint64_t)PTRDIFF_MAX - 1 - (uint64_t)sizeof(t_str)) {
+t_str *str_new(const size_t cap) {
+    if (cap > (size_t)PTRDIFF_MAX - 1 - (size_t)sizeof(t_str)) {
         return NULL;
     }
 
@@ -52,7 +52,7 @@ t_str *str_from_cstr(const char *src) {
         return NULL;
     }
 
-    str_copy_cstr(new_str, src, (uint64_t)len);
+    str_copy_cstr(new_str, src, (size_t)len);
     return new_str;
 }
 
@@ -71,8 +71,8 @@ void str_free(t_str *str) {
     free(str);
 }
 
-uint64_t str_uint_len(uint64_t value) {
-    uint64_t len = 1;
+size_t str_uint_len(size_t value) {
+    size_t len = 1;
 
     while (value >= 10) {
         value /= 10;

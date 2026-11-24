@@ -8,7 +8,7 @@
 
 typedef struct {
     void **data;
-    uint64_t cap;
+    size_t cap;
 } t_sort_scratch;
 
 bool sort(t_sort_scratch *scratch, const t_array *array, bool reverse,

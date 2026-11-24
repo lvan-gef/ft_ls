@@ -1,19 +1,15 @@
-#include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 
 #include "./ft_array.h"
+#include "./ft_const.h"
 #include "./ft_utils.h"
-
-#ifndef MAX_ALLOC_SIZE
-#define MAX_ALLOC_SIZE ((uint64_t)(PTRDIFF_MAX / sizeof(void *)))
-#endif /* ifndef MAX_ALLOC_SIZE */
 
 static bool realloc_arr_(t_array *array);
 
-bool array_init(t_array *array, const uint64_t initial_cap) {
+bool array_init(t_array *array, const size_t initial_cap) {
     array->len = 0;
     array->cap = 0;
     array->data = NULL;
@@ -23,7 +19,6 @@ bool array_init(t_array *array, const uint64_t initial_cap) {
     }
 
     if (initial_cap > MAX_ALLOC_SIZE) {
-        errno = ERANGE;
         return false;
     }
 
@@ -37,8 +32,8 @@ bool array_init(t_array *array, const uint64_t initial_cap) {
 }
 
 void array_reverse(const t_array *array) {
-    uint64_t left = 0;
-    uint64_t right = array->len;
+    size_t left = 0;
+    size_t right = array->len;
 
     while (left < right) {
         --right;
@@ -57,7 +52,7 @@ void array_destroy(t_array *array) {
 }
 
 void array_destroy_with(t_array *array, const t_array_del del) {
-    for (uint64_t index = 0; index < array->len; ++index) {
+    for (size_t index = 0; index < array->len; ++index) {
         del(array->data[index]);
     }
 
@@ -87,7 +82,7 @@ void array_clear(t_array *array) {
 }
 
 void array_clear_with(t_array *array, const t_array_del del) {
-    for (uint64_t index = 0; index < array->len; ++index) {
+    for (size_t index = 0; index < array->len; ++index) {
         del(array->data[index]);
     }
 
@@ -96,17 +91,16 @@ void array_clear_with(t_array *array, const t_array_del del) {
 
 static bool realloc_arr_(t_array *array) {
     if (array->cap >= MAX_ALLOC_SIZE) {
-        errno = ERANGE;
         return false;
     }
 
-    uint64_t new_cap = array->cap ? array->cap * 2 : 1;
+    size_t new_cap = array->cap ? array->cap * 2 : 1;
     if (new_cap < array->cap || new_cap > MAX_ALLOC_SIZE) {
         new_cap = MAX_ALLOC_SIZE;
     }
 
     void **old_data = array->data;
-    void **new_data = (void **)malloc((size_t)new_cap * sizeof(*new_data));
+    void **new_data = (void **)malloc(new_cap * sizeof(*new_data));
     if (!new_data) {
         return false;
     }
