@@ -88,10 +88,6 @@ bool prepare_list_infos(t_arena *arena, const t_array *entries,
         return false;
     }
 
-    if (entries->len > PTRDIFF_MAX / sizeof(**infos)) {
-        return false;
-    }
-
     *infos = arena_push(arena, sizeof(**infos) * entries->len);
     if (!*infos) {
         return false;

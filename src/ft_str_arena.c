@@ -7,10 +7,6 @@
 #include "./ft_utils.h"
 
 t_str *str_arena_new(t_arena *arena, const size_t cap) {
-    if (cap > PTRDIFF_MAX - sizeof(t_str) - 1) {
-        return NULL;
-    }
-
     t_str *str = arena_push(arena, sizeof(*str) + cap + 1);
     if (!str) {
         return NULL;

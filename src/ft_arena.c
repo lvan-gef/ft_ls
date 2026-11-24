@@ -122,10 +122,6 @@ void arena_clear(t_arena *arena) {
 }
 
 static t_arena_block *new_block_(const size_t cap) {
-    if (cap > PTRDIFF_MAX - sizeof(t_arena_block)) {
-        return NULL;
-    }
-
     t_arena_block *block = malloc(sizeof(*block) + cap);
     if (!block) {
         return NULL;

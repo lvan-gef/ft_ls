@@ -31,10 +31,6 @@ void str_copy_uint(t_str *str, size_t value) {
 }
 
 t_str *str_new(const size_t cap) {
-    if (cap > (size_t)PTRDIFF_MAX - 1 - (size_t)sizeof(t_str)) {
-        return NULL;
-    }
-
     t_str *str = malloc(sizeof(*str) + cap + 1);
     if (!str) {
         return NULL;

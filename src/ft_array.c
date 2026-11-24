@@ -17,10 +17,6 @@ bool array_init(t_array *array, const size_t initial_cap) {
         return true;
     }
 
-    if (initial_cap > MAX_ALLOC_SIZE) {
-        return false;
-    }
-
     array->data = (void **)malloc((size_t)initial_cap * sizeof(*array->data));
     if (!array->data) {
         return false;
@@ -89,15 +85,7 @@ void array_clear_with(t_array *array, const t_array_del del) {
 }
 
 static bool realloc_arr_(t_array *array) {
-    if (array->cap >= MAX_ALLOC_SIZE) {
-        return false;
-    }
-
     size_t new_cap = array->cap ? array->cap * 2 : 1;
-    if (new_cap < array->cap || new_cap > MAX_ALLOC_SIZE) {
-        new_cap = MAX_ALLOC_SIZE;
-    }
-
     void **old_data = array->data;
     void **new_data = (void **)malloc(new_cap * sizeof(*new_data));
     if (!new_data) {

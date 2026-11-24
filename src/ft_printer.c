@@ -61,10 +61,6 @@ static bool init_print_row_(const t_print_request *req) {
         width_count = 1;
     }
 
-    if (width_count > (size_t)PTRDIFF_MAX / sizeof(*col_widths)) {
-        return false;
-    }
-
     col_widths = arena_push(req->arena, width_count * sizeof(*col_widths));
     if (!col_widths) {
         return false;
