@@ -4,8 +4,8 @@
 #include <unistd.h>
 
 #include "./ft_array.h"
+#include "./ft_out.h"
 #include "./ft_parse.h"
-#include "./ft_printer_helper.h"
 #include "./ft_str.h"
 #include "./ft_utils.h"
 
@@ -88,13 +88,11 @@ static bool append_input_(const char *arg, t_array *inputs) {
 
 static void print_error_(const char *flag) {
     char buf[256];
-    t_str out;
+    t_out out;
 
-    const char cmd[] = "ft_ls: invalid option -- ";
-    const char usage[] = "\nusage: ft_ls [-RalrtgufdoG] [file ...]\n";
-    str_init(&out, buf, sizeof(buf) - 1);
-    (void)(put_mem_fd(&out, cmd, sizeof(cmd) - 1, STDERR_FILENO) &&
-           put_mem_fd(&out, flag, ft_strlen(flag), STDERR_FILENO) &&
-           put_mem_fd(&out, usage, sizeof(usage) - 1, STDERR_FILENO) &&
-           flush_fd(&out, STDERR_FILENO));
+    out_init(&out, buf, sizeof(buf), STDERR_FILENO);
+    out_str(&out, "ft_ls: invalid option -- ");
+    out_str(&out, flag);
+    out_str(&out, "\nusage: ft_ls [-RalrtgufdoG] [file ...]\n");
+    out_flush(&out);
 }

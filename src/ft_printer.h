@@ -6,6 +6,7 @@
 
 #include "./ft_arena.h"
 #include "./ft_array.h"
+#include "./ft_out.h"
 #include "./ft_str.h"
 
 #define DIRECTORY "\033[01;34m"
@@ -20,7 +21,7 @@ typedef struct s_print_request {
     const t_array *entries;
     const t_array *list_width_context;
     const t_str *dir_header;
-    t_str *buffer;
+    t_out *buffer;
     t_arena *arena;
     bool quote_padding;
     bool list_mode;

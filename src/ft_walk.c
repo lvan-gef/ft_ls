@@ -11,13 +11,13 @@
 #include "./ft_arena.h"
 #include "./ft_array.h"
 #include "./ft_ls.h"
+#include "./ft_out.h"
 #include "./ft_parse.h"
 #include "./ft_printer.h"
 #include "./ft_printer_helper.h"
 #include "./ft_shell_escape.h"
 #include "./ft_sort.h"
 #include "./ft_str.h"
-#include "./ft_str_arena.h"
 #include "./ft_symlink.h"
 #include "./ft_utils.h"
 #include "./ft_walk.h"
@@ -29,8 +29,8 @@ typedef struct {
     t_array dir_queue;
     t_array operand_files;
     t_array current_entries;
-    t_str out;
-    bool output_failed;
+    t_out out;
+    bool fatal;
     bool quote_padding;
 } t_params;
 
@@ -58,27 +58,17 @@ static t_operand_state classify_operand_(t_params *params, const t_str *str,
 static void cleanup_process_(t_params *params);
 static bool queue_operand_dir_(t_params *params, const t_str *str,
                                const struct stat *st);
-static bool print_error_(t_str *out, const t_str *path, int e,
-                         const char *prefix, bool *output_failed);
+static void print_error_(t_out *out, const t_str *path, int e,
+                         const char *prefix);
 static mode_t dtype_to_mode_(unsigned char dtype);
 
 int process(const t_args *args, const t_array *array) {
+    static char out_buf[OUTPUT_BUFFER_CAP];
     t_params params = {0};
     int exit_code = 0;
-    t_arena *print_arena = arena_alloc(OUTPUT_BUFFER_CAP + 1);
-    if (!print_arena) {
-        exit_code = 2;
-        goto cleanup;
-    }
-
-    const t_str *out_buf = str_arena_new(print_arena, OUTPUT_BUFFER_CAP);
-    if (!out_buf) {
-        exit_code = 2;
-        goto cleanup;
-    }
 
     params.args = args;
-    params.out = *out_buf;
+    out_init(&params.out, out_buf, sizeof(out_buf), STDOUT_FILENO);
     params.temp_arena = arena_alloc(ARENA_SIZE);
     if (!params.temp_arena) {
         exit_code = 2;
@@ -103,18 +93,12 @@ int process(const t_args *args, const t_array *array) {
 
 cleanup:
     cleanup_process_(&params);
-    if (print_arena) {
-        arena_release(print_arena);
-    }
     return exit_code;
 }
 
 static bool run_listing_(t_params *params, const t_array *array,
                          int *exit_code) {
     bool printed_files = false;
-    params->out.len = 0;
-    params->out.str[0] = '\0';
-    params->output_failed = false;
     bool ok = false;
 
     t_print_request req = {.entries = &params->operand_files,
@@ -158,12 +142,12 @@ static bool run_listing_(t_params *params, const t_array *array,
 
     ok = true;
 cleanup:
-    ok = flush_fd(&params->out, STDOUT_FILENO) && ok;
+    out_flush(&params->out);
     if (req.arena) {
         arena_release(req.arena);
     }
 
-    return ok;
+    return ok && !params->out.failed;
 }
 
 static bool print_operand_files_(t_params *params, const t_print_request *req,
@@ -194,19 +178,17 @@ static bool process_queue_(t_params *params, const t_array *array,
         array_reverse(&params->dir_queue);
     }
 
-    while (params->dir_queue.len) {
+    while (params->dir_queue.len && !params->out.failed) {
         dir_path = array_pop(&params->dir_queue);
 
         if (!inserted_files_dirs_gap && printed_files && dir_path->is_operand) {
-            if (!put_mem(req->buffer, "\n", 1)) {
-                goto error;
-            }
+            out_put(req->buffer, "\n", 1);
             inserted_files_dirs_gap = true;
         }
 
         if (!load_directory_entries_(params, dir_path, exit_code)) {
             clear_directory_entries_(params);
-            if (params->output_failed) {
+            if (params->fatal) {
                 goto error;
             }
             entry_free(dir_path);
@@ -224,9 +206,7 @@ static bool process_queue_(t_params *params, const t_array *array,
         }
 
         if (printed_dir) {
-            if (!put_mem(req->buffer, "\n", 1)) {
-                goto error;
-            }
+            out_put(req->buffer, "\n", 1);
         }
 
         req->dir_header = print_dir_path ? dir_path->path : NULL;
@@ -304,13 +284,7 @@ static t_operand_state classify_operand_(t_params *params, const t_str *str,
     t_operand_state state = OPERAND_FILE;
 
     if (lstat(str->str, st) < 0) {
-        e = errno;
-        const char *prefix = "cannot access";
-        if (!print_error_(&params->out, str, e, prefix,
-                          &params->output_failed)) {
-            return OPERAND_FATAL;
-        }
-
+        print_error_(&params->out, str, errno, "cannot access");
         *exit_code = 2;
         return OPERAND_SKIP;
     }
@@ -336,18 +310,9 @@ static t_operand_state classify_operand_(t_params *params, const t_str *str,
         if (e) {
             *exit_code = 2;
             if (params->args->list) {
-                if (!print_error_(&params->out, str, e,
-                                  "cannot read symbolic link",
-                                  &params->output_failed)) {
-                    state = OPERAND_FATAL;
-                    goto cleanup;
-                }
+                print_error_(&params->out, str, e, "cannot read symbolic link");
             } else {
-                if (!print_error_(&params->out, str, e, "cannot access",
-                                  &params->output_failed)) {
-                    state = OPERAND_FATAL;
-                    goto cleanup;
-                }
+                print_error_(&params->out, str, e, "cannot access");
                 state = OPERAND_SKIP;
                 goto cleanup;
             }
@@ -371,12 +336,9 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
                                     int *exit_code) {
     errno = 0;
     bool ok = false;
-    bool hard_failure = false;
     DIR *d = opendir(path->path->str);
     if (!d) {
-        const int e = errno;
-        (void)print_error_(&params->out, path->path, e, "cannot open directory",
-                           &params->output_failed);
+        print_error_(&params->out, path->path, errno, "cannot open directory");
         *exit_code = path->is_operand ? 2 : 1;
         return false;
     }
@@ -395,24 +357,17 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
 
         t_entry *entry = entry_new_dirent(params->temp_arena, dp);
         if (!entry) {
-            hard_failure = true;
             goto cleanup;
         }
 
         entry->st.st_mode = mode;
         if (need_lstat) {
             if (!entry_build_path(params->temp_arena, entry, path->path)) {
-                hard_failure = true;
                 goto cleanup;
             }
 
             if (lstat(entry->path->str, &entry->st) < 0) {
-                const int e = errno;
-                if (!print_error_(&params->out, entry->path, e, "cannot access",
-                                  &params->output_failed)) {
-                    goto cleanup;
-                }
-
+                print_error_(&params->out, entry->path, errno, "cannot access");
                 entry->stat_unavailable = true;
                 if (*exit_code != 2) {
                     *exit_code = 1;
@@ -421,7 +376,6 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
         }
 
         if (!array_append(&params->current_entries, entry)) {
-            hard_failure = true;
             goto cleanup;
         }
     }
@@ -431,9 +385,7 @@ cleanup:
     closedir(d);
 
     if (!ok) {
-        if (hard_failure) {
-            params->output_failed = true;
-        }
+        params->fatal = true;
         *exit_code = 2;
     }
 
@@ -510,50 +462,30 @@ static bool queue_operand_dir_(t_params *params, const t_str *str,
     return true;
 }
 
-static bool print_error_(t_str *out, const t_str *path, const int e,
-                         const char *prefix, bool *output_failed) {
-    if (!flush_fd(out, STDOUT_FILENO)) {
-        *output_failed = true;
-        return false;
-    }
-
-    char err_buf[1024];
-    t_str err_out;
-    str_init(&err_out, err_buf, sizeof(err_buf) - 1);
-
+static void print_error_(t_out *out, const t_str *path, const int e,
+                         const char *prefix) {
+    char buf[1024];
+    t_out err;
     t_shell_scan scan;
-    shell_scan_str(path, &scan);
-    const char *msg = strerror(e);
-    if (scan.quote) {
-        t_str *escaped = shell_escape_str(path, scan.quote);
-        if (escaped) {
-            const bool ok =
-                put_mem_fd(&err_out, "ft_ls: ", sizeof("ft_ls: ") - 1,
-                           STDERR_FILENO) &&
-                put_mem_fd(&err_out, prefix, (size_t)ft_strlen(prefix),
-                           STDERR_FILENO) &&
-                put_mem_fd(&err_out, " ", 1, STDERR_FILENO) &&
-                put_mem_fd(&err_out, escaped->str, escaped->len,
-                           STDERR_FILENO) &&
-                put_mem_fd(&err_out, ": ", 2, STDERR_FILENO) &&
-                put_mem_fd(&err_out, msg, (size_t)ft_strlen(msg),
-                           STDERR_FILENO) &&
-                put_mem_fd(&err_out, "\n", 1, STDERR_FILENO) &&
-                flush_fd(&err_out, STDERR_FILENO);
-            str_free(escaped);
-            return ok;
-        }
-    }
 
-    return put_mem_fd(&err_out, "ft_ls: ", sizeof("ft_ls: ") - 1,
-                      STDERR_FILENO) &&
-           put_mem_fd(&err_out, prefix, ft_strlen(prefix), STDERR_FILENO) &&
-           put_mem_fd(&err_out, " '", 2, STDERR_FILENO) &&
-           put_mem_fd(&err_out, path->str, path->len, STDERR_FILENO) &&
-           put_mem_fd(&err_out, "': ", 3, STDERR_FILENO) &&
-           put_mem_fd(&err_out, msg, ft_strlen(msg), STDERR_FILENO) &&
-           put_mem_fd(&err_out, "\n", 1, STDERR_FILENO) &&
-           flush_fd(&err_out, STDERR_FILENO);
+    out_flush(out);
+    out_init(&err, buf, sizeof(buf), STDERR_FILENO);
+    shell_scan_str(path, &scan);
+
+    out_str(&err, "ft_ls: ");
+    out_str(&err, prefix);
+    out_put(&err, " ", 1);
+    if (scan.quote) {
+        shell_escape_put(&err, path, scan.quote, false);
+    } else {
+        out_put(&err, "'", 1);
+        out_put(&err, path->str, path->len);
+        out_put(&err, "'", 1);
+    }
+    out_str(&err, ": ");
+    out_str(&err, strerror(e));
+    out_put(&err, "\n", 1);
+    out_flush(&err);
 }
 
 static mode_t dtype_to_mode_(const unsigned char dtype) {

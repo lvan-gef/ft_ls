@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #include "./ft_ls.h"
+#include "./ft_out.h"
 #include "./ft_shell_escape.h"
 #include "./ft_str.h"
 #include "./ft_utils.h"
@@ -11,8 +12,9 @@
 #define BYTE_OCTAL_HIGH_SHIFT 6
 #define BYTE_OCTAL_MID_SHIFT 3
 
+/* dst == NULL only counts the length (used to compute display widths). */
 typedef struct s_shell_out {
-    t_str *dst;
+    t_out *dst;
     size_t len;
 } t_shell_out;
 
@@ -30,9 +32,6 @@ typedef struct s_shell_analysis {
     bool has_non_print;
 } t_shell_analysis;
 
-static void escape_str_(t_str *dst, const t_str *str, char quote,
-                        bool pad_unquoted);
-static void append_bytes_(t_str *dst, const char *src, size_t len);
 static void emit_bytes_(t_shell_out *out, const char *src, size_t len);
 static void emit_ansi_byte_(t_shell_out *out, unsigned char byte);
 static void enter_single_(t_shell_out *out, t_escape_state *state);
@@ -66,69 +65,33 @@ void shell_scan_str(const t_str *str, t_shell_scan *scan) {
     fill_scan_(scan, str->str, &analysis);
 }
 
-size_t shell_escaped_len(const t_str *str, const char quote,
-                         const bool pad_unquoted) {
-    return escaped_len_(str->str, str->len, quote, pad_unquoted);
-}
-
-bool shell_escape_append_len(t_str *dst, const t_str *str, const char quote,
-                             const bool pad_unquoted,
-                             const size_t escaped_len) {
-    if (dst->cap - 1 - dst->len < escaped_len) {
-        return false;
-    }
-
-    escape_str_(dst, str, quote, pad_unquoted);
-    return true;
-}
-
-t_str *shell_escape_str(const t_str *str, const char quote) {
-    const size_t escaped_len = shell_escaped_len(str, quote, false);
-    t_str *new_str = str_new(escaped_len);
-
-    if (!new_str) {
-        return NULL;
-    }
-
-    escape_str_(new_str, str, quote, false);
-    return new_str;
-}
-
-static void escape_str_(t_str *dst, const t_str *str, const char quote,
-                        const bool pad_unquoted) {
+void shell_escape_put(t_out *out, const t_str *str, const char quote,
+                      const bool pad_unquoted) {
     if (!quote) {
         if (pad_unquoted) {
-            append_bytes_(dst, " ", 1);
+            out_put(out, " ", 1);
         }
 
-        append_bytes_(dst, str->str, str->len);
+        out_put(out, str->str, str->len);
         return;
     }
 
     if (quote == '"') {
-        append_bytes_(dst, "\"", 1);
-        append_bytes_(dst, str->str, str->len);
-        append_bytes_(dst, "\"", 1);
+        out_put(out, "\"", 1);
+        out_put(out, str->str, str->len);
+        out_put(out, "\"", 1);
         return;
     }
 
-    shell_escape_bytes_(&(t_shell_out){.dst = dst, .len = 0}, str->str,
+    shell_escape_bytes_(&(t_shell_out){.dst = out, .len = 0}, str->str,
                         str->len);
 }
 
-static void append_bytes_(t_str *dst, const char *src, const size_t len) {
-    ft_memcpy(dst->str + dst->len, src, (size_t)len);
-    dst->len += len;
-    dst->str[dst->len] = '\0';
-}
-
 static void emit_bytes_(t_shell_out *out, const char *src, const size_t len) {
-    if (!out->dst) {
-        out->len += len;
-        return;
+    if (out->dst) {
+        out_put(out->dst, src, len);
     }
 
-    append_bytes_(out->dst, src, len);
     out->len += len;
 }
 

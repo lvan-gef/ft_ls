@@ -17,15 +17,15 @@ typedef struct {
 } t_map;
 
 static bool init_print_row_(const t_print_request *req);
-static bool init_print_lines_(const t_print_request *req);
+static void init_print_lines_(const t_print_request *req);
 static bool entries_have_quote_(const t_array *array);
 static void calc_cols_(const t_array *array, t_map *map, bool quoted,
                        size_t *col_widths, size_t max_cols, size_t term_size);
 static bool calc_width_(const t_array *array, bool quoted, size_t num_cols,
                         size_t *col_widths, size_t term_size);
-static bool create_row_(const t_print_request *req, const t_map *map,
+static void create_row_(const t_print_request *req, const t_map *map,
                         const size_t *col_widths, bool quoted);
-static bool indent_(t_str *out, size_t from, size_t to);
+static void indent_(t_out *out, size_t from, size_t to);
 
 bool printer(const t_print_request *req) {
     if (req->list_mode) {
@@ -33,7 +33,8 @@ bool printer(const t_print_request *req) {
     }
 
     if (!req->is_stdout) {
-        return init_print_lines_(req);
+        init_print_lines_(req);
+        return true;
     }
 
     return init_print_row_(req);
@@ -72,32 +73,21 @@ static bool init_print_row_(const t_print_request *req) {
     const bool quoted = req->quote_padding || entries_have_quote_(req->entries);
     calc_cols_(req->entries, &map, quoted, col_widths, width_count,
                req->term_size);
-    if (!put_dir_header(req->buffer, req->dir_header, req->is_stdout)) {
-        arena_clear(req->arena);
-        return false;
-    }
-
-    const bool ok = create_row_(req, &map, col_widths, quoted);
+    put_dir_header(req->buffer, req->dir_header, req->is_stdout);
+    create_row_(req, &map, col_widths, quoted);
     arena_clear(req->arena);
-    return ok;
+    return true;
 }
 
-static bool init_print_lines_(const t_print_request *req) {
-    if (!put_dir_header(req->buffer, req->dir_header, req->is_stdout)) {
-        return false;
-    }
+static void init_print_lines_(const t_print_request *req) {
+    put_dir_header(req->buffer, req->dir_header, req->is_stdout);
 
     for (size_t index = 0; index < req->entries->len; ++index) {
         const t_entry *entry = req->entries->data[index];
 
-        if (!put_entry_name(req->buffer, entry, false, req->color,
-                            req->is_stdout) ||
-            !put_mem(req->buffer, "\n", 1)) {
-            return false;
-        }
+        put_entry_name(req->buffer, entry, false, req->color, req->is_stdout);
+        out_put(req->buffer, "\n", 1);
     }
-
-    return true;
 }
 
 static bool entries_have_quote_(const t_array *array) {
@@ -165,7 +155,7 @@ static bool calc_width_(const t_array *array, const bool quoted,
     return true;
 }
 
-static bool create_row_(const t_print_request *req, const t_map *map,
+static void create_row_(const t_print_request *req, const t_map *map,
                         const size_t *col_widths, const bool quoted) {
     const size_t files_len = req->entries->len;
 
@@ -181,47 +171,30 @@ static bool create_row_(const t_print_request *req, const t_map *map,
                                            : entry->name_scan.display_len;
             const size_t max_name_length = col_widths[col++];
 
-            if (!put_entry_name(req->buffer, entry, quoted, req->color, true)) {
-                return false;
-            }
+            put_entry_name(req->buffer, entry, quoted, req->color, true);
 
             if (files_len - map->rows <= filesno) {
                 break;
             }
 
             filesno += map->rows;
-            if (!indent_(req->buffer, pos + name_length,
-                         pos + max_name_length)) {
-                return false;
-            }
+            indent_(req->buffer, pos + name_length, pos + max_name_length);
 
             pos += max_name_length;
         }
 
-        if (!put_mem(req->buffer, "\n", 1)) {
-            return false;
-        }
+        out_put(req->buffer, "\n", 1);
     }
-
-    return true;
 }
 
-static bool indent_(t_str *out, size_t from, const size_t to) {
+static void indent_(t_out *out, size_t from, const size_t to) {
     while (from < to) {
         if (to / TABSIZE > (from + 1) / TABSIZE) {
-            if (!put_mem(out, "\t", 1)) {
-                return false;
-            }
-
+            out_put(out, "\t", 1);
             from += TABSIZE - from % TABSIZE;
         } else {
-            if (!put_mem(out, " ", 1)) {
-                return false;
-            }
-
+            out_put(out, " ", 1);
             ++from;
         }
     }
-
-    return true;
 }
