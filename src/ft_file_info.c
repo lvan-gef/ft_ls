@@ -48,26 +48,31 @@ typedef struct {
     size_t id;
 } t_id_cache_entry;
 
-static size_t user_index = 0;
-static t_id_cache_entry user_cache[CACHE_SIZE] = {0};
+typedef struct {
+    t_id_cache_entry entries[CACHE_SIZE];
+    size_t next;
+} t_id_cache;
 
-static size_t group_index = 0;
-static t_id_cache_entry group_cache[CACHE_SIZE] = {0};
+typedef const char *(*t_id_lookup)(size_t id);
+
+static t_id_cache user_cache = {0};
+static t_id_cache group_cache = {0};
 
 static bool fill_file_info_(t_arena *arena, t_file_info *info,
                             const t_entry *entry, time_t now, bool access_time);
 static t_str *get_perm_(t_arena *arena, const t_entry *entry);
 static char file_type_char_(mode_t mode);
 static t_str *get_links_(t_arena *arena, const t_entry *entry);
-static t_str *get_user_(t_arena *arena, const t_entry *entry);
-static t_str *get_group_(t_arena *arena, const t_entry *entry);
+static t_str *get_id_name_(t_arena *arena, t_id_cache *cache, size_t id,
+                           t_id_lookup lookup);
+static const char *user_name_(size_t id);
+static const char *group_name_(size_t id);
 static t_str *get_size_(t_arena *arena, const t_entry *entry);
 static t_str *get_dt_(t_arena *arena, time_t now, const t_entry *entry,
                       bool acces_time);
 static bool get_blk_(t_arena *arena, const t_entry *entry, t_file_info *info);
-static char *cache_lookup_(t_id_cache_entry *cache, size_t id);
-static void cache_store_(t_id_cache_entry *cache, size_t *next, size_t id,
-                         const char *name);
+static const char *cache_lookup_(const t_id_cache *cache, size_t id);
+static void cache_store_(t_id_cache *cache, size_t id, const char *name);
 static char exec_char_(mode_t mode, mode_t exec_bit, mode_t special_bit,
                        char lower, char upper);
 static char get_acl_attr_(t_arena *arena, const char *path);
@@ -120,13 +125,17 @@ static bool fill_file_info_(t_arena *arena, t_file_info *info,
         return false;
     }
 
-    info->username = get_user_(arena, entry);
-    if (!info->username) {
-        return false;
+    if (entry->stat_unavailable) {
+        info->username = str_arena_from_cstr(arena, "?");
+        info->groupname = info->username;
+    } else {
+        info->username =
+            get_id_name_(arena, &user_cache, entry->st.st_uid, user_name_);
+        info->groupname =
+            get_id_name_(arena, &group_cache, entry->st.st_gid, group_name_);
     }
 
-    info->groupname = get_group_(arena, entry);
-    if (!info->groupname) {
+    if (!info->username || !info->groupname) {
         return false;
     }
 
@@ -241,77 +250,34 @@ static t_str *get_links_(t_arena *arena, const t_entry *entry) {
     return str_arena_from_uint(arena, (size_t)entry->st.st_nlink);
 }
 
-static t_str *get_user_(t_arena *arena, const t_entry *entry) {
-    if (entry->stat_unavailable) {
-        return str_arena_from_cstr(arena, "?");
-    }
-
-    const size_t user_id = entry->st.st_uid;
-    const char *name = cache_lookup_(user_cache, user_id);
+static t_str *get_id_name_(t_arena *arena, t_id_cache *cache, const size_t id,
+                           const t_id_lookup lookup) {
+    const char *name = cache_lookup_(cache, id);
     if (name) {
         return str_arena_from_cstr(arena, name);
     }
 
     errno = 0;
-    const struct passwd *pwd = getpwuid((uid_t)user_id);
-    t_str *new_str = NULL;
-    if (pwd) {
-        new_str = str_arena_from_cstr(arena, pwd->pw_name);
-        if (!new_str) {
-            return NULL;
-        }
-        cache_store_(user_cache, &user_index, user_id, pwd->pw_name);
-    } else {
-        const int err = errno;
+    name = lookup(id);
+    const int err = errno;
 
-        new_str = str_arena_from_uint(arena, user_id);
-        if (!new_str) {
-            return NULL;
-        }
-
-        if (!err) {
-            cache_store_(user_cache, &user_index, user_id, new_str->str);
-        }
+    t_str *str = name ? str_arena_from_cstr(arena, name)
+                      : str_arena_from_uint(arena, id);
+    if (str && (name || !err)) {
+        cache_store_(cache, id, str->str);
     }
 
-    return new_str;
+    return str;
 }
 
-static t_str *get_group_(t_arena *arena, const t_entry *entry) {
-    if (entry->stat_unavailable) {
-        return str_arena_from_cstr(arena, "?");
-    }
+static const char *user_name_(const size_t id) {
+    const struct passwd *pwd = getpwuid((uid_t)id);
+    return pwd ? pwd->pw_name : NULL;
+}
 
-    const size_t group_id = (size_t)entry->st.st_gid;
-    const char *name = cache_lookup_(group_cache, group_id);
-    if (name) {
-        return str_arena_from_cstr(arena, name);
-    }
-
-    errno = 0;
-    const struct group *grp = getgrgid((gid_t)group_id);
-    t_str *new_str = NULL;
-    if (grp) {
-        new_str = str_arena_from_cstr(arena, grp->gr_name);
-        if (!new_str) {
-            return NULL;
-        }
-
-        cache_store_(group_cache, &group_index, group_id, grp->gr_name);
-    } else {
-        const int err = errno;
-
-        new_str = str_arena_from_uint(arena, group_id);
-        if (!new_str) {
-            return NULL;
-        }
-
-        if (!err) {
-            cache_store_(group_cache, &group_index, group_id, new_str->str);
-        }
-    }
-
-    return new_str;
+static const char *group_name_(const size_t id) {
+    const struct group *grp = getgrgid((gid_t)id);
+    return grp ? grp->gr_name : NULL;
 }
 
 static t_str *get_size_(t_arena *arena, const t_entry *entry) {
@@ -379,26 +345,23 @@ static bool get_blk_(t_arena *arena, const t_entry *entry, t_file_info *info) {
     return true;
 }
 
-static char *cache_lookup_(t_id_cache_entry *cache, const size_t id) {
+static const char *cache_lookup_(const t_id_cache *cache, const size_t id) {
     for (size_t index = 0; index < CACHE_SIZE; ++index) {
-        if (!*cache[index].name) {
-            continue;
-        }
-
-        if (cache[index].id == id) {
-            return cache[index].name;
+        const t_id_cache_entry *slot = &cache->entries[index];
+        if (*slot->name && slot->id == id) {
+            return slot->name;
         }
     }
 
     return NULL;
 }
 
-static void cache_store_(t_id_cache_entry *cache, size_t *next, const size_t id,
-                         const char *name) {
-    const size_t index = *next % CACHE_SIZE;
-    cache[index].id = id;
-    ft_strlcpy(cache[index].name, name, LOGIN_NAME_MAX);
-    ++(*next);
+static void cache_store_(t_id_cache *cache, const size_t id, const char *name) {
+    t_id_cache_entry *slot = &cache->entries[cache->next % CACHE_SIZE];
+
+    slot->id = id;
+    ft_strlcpy(slot->name, name, LOGIN_NAME_MAX);
+    ++cache->next;
 }
 
 static char exec_char_(const mode_t mode, const mode_t exec_bit,
