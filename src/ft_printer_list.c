@@ -24,18 +24,19 @@ typedef struct {
     bool have_quote;
 } t_list_stats;
 
-static void apply_width_(const t_array *context, t_list_stats *sizes);
+static void print_list_(const t_print_request *req, const t_file_info *infos);
 static void update_stats_(t_list_stats *stats, const t_entry *entry,
                           const t_file_info *info);
 static size_t dev_width_(const t_list_stats *sizes);
 static size_t size_width_(const t_list_stats *sizes);
-static void print_list_(const t_print_request *req, const t_file_info *infos);
 static void put_uint_(t_out *out, size_t value);
 static void put_padded_(t_out *out, const t_str *str, size_t width);
 static void put_right_(t_out *out, const t_str *str, size_t width);
 static void print_list_rows_(const t_print_request *req,
                              const t_file_info *infos,
                              const t_list_stats *sizes);
+static void update_num_widths_(t_list_stats *s, const t_entry *e);
+static void max_(size_t *dst, size_t value);
 
 bool printer_list(const t_print_request *req) {
     t_file_info *infos = NULL;
@@ -50,73 +51,42 @@ bool printer_list(const t_print_request *req) {
     return ok;
 }
 
-static void apply_width_(const t_array *context, t_list_stats *sizes) {
-    if (!context) {
-        return;
+static void print_list_(const t_print_request *req, const t_file_info *infos) {
+    t_list_stats sizes = {0};
+    for (size_t index = 0; index < req->entries->len; ++index) {
+        const t_entry *entry = req->entries->data[index];
+        update_num_widths_(&sizes, entry);
+        update_stats_(&sizes, entry, &infos[index]);
     }
 
-    for (size_t index = 0; index < context->len; ++index) {
-        const t_entry *entry = context->data[index];
-        const size_t links_len =
-            entry->stat_unavailable ? 1 : str_uint_len(entry->st.st_nlink);
-
-        if (links_len > sizes->max_len_links) {
-            sizes->max_len_links = links_len;
-        }
-
-        if (!entry->stat_unavailable &&
-            (S_ISBLK(entry->st.st_mode) || S_ISCHR(entry->st.st_mode))) {
-            const size_t major_len =
-                str_uint_len((size_t)major(entry->st.st_rdev));
-            const size_t minor_len =
-                str_uint_len((size_t)minor(entry->st.st_rdev));
-
-            if (major_len > sizes->max_len_major) {
-                sizes->max_len_major = major_len;
-            }
-
-            if (minor_len > sizes->max_len_minor) {
-                sizes->max_len_minor = minor_len;
-            }
-        } else {
-            const size_t size_len =
-                entry->stat_unavailable
-                    ? 1
-                    : str_uint_len((size_t)entry->st.st_size);
-
-            if (size_len > sizes->max_len_sizes) {
-                sizes->max_len_sizes = size_len;
-            }
-        }
+    const t_array *context = req->list_width_context;
+    for (size_t index = 0; context && index < context->len; ++index) {
+        update_num_widths_(&sizes, context->data[index]);
     }
+
+    if (!sizes.have_quote) {
+        sizes.have_quote = req->quote_padding;
+    }
+
+    put_dir_header(req->buffer, req->dir_header, req->is_stdout);
+
+    if (req->print_total) {
+        out_put(req->buffer, "total ", 6);
+        put_uint_(req->buffer, (sizes.total + 1) / 2);
+        out_put(req->buffer, "\n", 1);
+    }
+
+    print_list_rows_(req, infos, &sizes);
 }
 
 static void update_stats_(t_list_stats *stats, const t_entry *entry,
                           const t_file_info *info) {
-    if (info->links->len > stats->max_len_links) {
-        stats->max_len_links = info->links->len;
-    }
-
     if (info->username->len > stats->max_len_user) {
         stats->max_len_user = info->username->len;
     }
 
     if (info->groupname->len > stats->max_len_group) {
         stats->max_len_group = info->groupname->len;
-    }
-
-    if (info->size) {
-        if (info->size->len > stats->max_len_sizes) {
-            stats->max_len_sizes = info->size->len;
-        }
-    } else {
-        if (info->major && info->major->len > stats->max_len_major) {
-            stats->max_len_major = info->major->len;
-        }
-
-        if (info->minor && info->minor->len > stats->max_len_minor) {
-            stats->max_len_minor = info->minor->len;
-        }
     }
 
     if (info->perm->len > stats->max_len_perm) {
@@ -141,29 +111,6 @@ static size_t dev_width_(const t_list_stats *sizes) {
 static size_t size_width_(const t_list_stats *sizes) {
     const size_t dev_width = dev_width_(sizes);
     return sizes->max_len_sizes > dev_width ? sizes->max_len_sizes : dev_width;
-}
-
-static void print_list_(const t_print_request *req, const t_file_info *infos) {
-    t_list_stats sizes = {0};
-    for (size_t index = 0; index < req->entries->len; ++index) {
-        const t_entry *entry = req->entries->data[index];
-        update_stats_(&sizes, entry, &infos[index]);
-    }
-
-    apply_width_(req->list_width_context, &sizes);
-    if (!sizes.have_quote) {
-        sizes.have_quote = req->quote_padding;
-    }
-
-    put_dir_header(req->buffer, req->dir_header, req->is_stdout);
-
-    if (req->print_total) {
-        out_put(req->buffer, "total ", 6);
-        put_uint_(req->buffer, (sizes.total + 1) / 2);
-        out_put(req->buffer, "\n", 1);
-    }
-
-    print_list_rows_(req, infos, &sizes);
 }
 
 static void put_uint_(t_out *out, const size_t value) {
@@ -230,5 +177,24 @@ static void print_list_rows_(const t_print_request *req,
         }
 
         out_put(out, "\n", 1);
+    }
+}
+
+static void update_num_widths_(t_list_stats *s, const t_entry *e) {
+    max_(&s->max_len_links,
+         e->stat_unavailable ? 1 : str_uint_len(e->st.st_nlink));
+
+    if (S_ISBLK(e->st.st_mode) || S_ISCHR(e->st.st_mode)) {
+        max_(&s->max_len_major, str_uint_len(major(e->st.st_rdev)));
+        max_(&s->max_len_minor, str_uint_len(minor(e->st.st_rdev)));
+    } else {
+        max_(&s->max_len_sizes,
+             e->stat_unavailable ? 1 : str_uint_len((size_t)e->st.st_size));
+    }
+}
+
+static void max_(size_t *dst, const size_t value) {
+    if (value > *dst) {
+        *dst = value;
     }
 }
