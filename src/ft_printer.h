@@ -23,7 +23,7 @@ typedef struct s_print_request {
     const t_str *dir_header;
     t_out *buffer;
     t_arena *arena;
-    bool quote_padding;
+    bool quoted;
     bool list_mode;
     bool print_total;
     bool no_owner;

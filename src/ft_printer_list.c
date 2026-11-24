@@ -21,12 +21,10 @@ typedef struct {
     size_t max_len_major;
     size_t max_len_minor;
     size_t max_len_perm;
-    bool have_quote;
 } t_list_stats;
 
 static void print_list_(const t_print_request *req, const t_file_info *infos);
-static void update_stats_(t_list_stats *stats, const t_entry *entry,
-                          const t_file_info *info);
+static void update_stats_(t_list_stats *stats, const t_file_info *info);
 static size_t dev_width_(const t_list_stats *sizes);
 static size_t size_width_(const t_list_stats *sizes);
 static void put_uint_(t_out *out, size_t value);
@@ -56,16 +54,12 @@ static void print_list_(const t_print_request *req, const t_file_info *infos) {
     for (size_t index = 0; index < req->entries->len; ++index) {
         const t_entry *entry = req->entries->data[index];
         update_num_widths_(&sizes, entry);
-        update_stats_(&sizes, entry, &infos[index]);
+        update_stats_(&sizes, &infos[index]);
     }
 
     const t_array *context = req->list_width_context;
     for (size_t index = 0; context && index < context->len; ++index) {
         update_num_widths_(&sizes, context->data[index]);
-    }
-
-    if (!sizes.have_quote) {
-        sizes.have_quote = req->quote_padding;
     }
 
     put_dir_header(req->buffer, req->dir_header, req->is_stdout);
@@ -79,8 +73,7 @@ static void print_list_(const t_print_request *req, const t_file_info *infos) {
     print_list_rows_(req, infos, &sizes);
 }
 
-static void update_stats_(t_list_stats *stats, const t_entry *entry,
-                          const t_file_info *info) {
+static void update_stats_(t_list_stats *stats, const t_file_info *info) {
     if (info->username->len > stats->max_len_user) {
         stats->max_len_user = info->username->len;
     }
@@ -91,10 +84,6 @@ static void update_stats_(t_list_stats *stats, const t_entry *entry,
 
     if (info->perm->len > stats->max_len_perm) {
         stats->max_len_perm = info->perm->len;
-    }
-
-    if (!stats->have_quote) {
-        stats->have_quote = entry->name_scan.quote != '\0';
     }
 
     stats->total += info->blocks;
@@ -168,8 +157,7 @@ static void print_list_rows_(const t_print_request *req,
         out_put(out, " ", 1);
         out_put(out, info->dt->str, info->dt->len);
         out_put(out, " ", 1);
-        put_entry_name(out, entry, sizes->have_quote, req->color,
-                       req->is_stdout);
+        put_entry_name(out, entry, req->quoted, req->color, req->is_stdout);
 
         if (info->symlink && info->symlink->len > 0) {
             out_put(out, " -> ", 4);

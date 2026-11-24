@@ -32,6 +32,7 @@ typedef struct {
     t_out out;
     bool fatal;
     bool quote_padding;
+    bool dir_quoted;
 } t_params;
 
 typedef enum {
@@ -106,7 +107,7 @@ static bool run_listing_(t_params *params, const t_array *array,
                            .dir_header = NULL,
                            .buffer = &params->out,
                            .arena = arena_alloc(ARENA_SIZE),
-                           .quote_padding = params->quote_padding,
+                           .quoted = params->quote_padding,
                            .list_mode = params->args->list,
                            .print_total = false,
                            .no_owner = params->args->no_owner,
@@ -134,7 +135,6 @@ static bool run_listing_(t_params *params, const t_array *array,
     }
 
     req.print_total = true;
-    req.quote_padding = false;
     req.list_width_context = NULL;
     if (!process_queue_(params, array, &req, exit_code, printed_files)) {
         goto cleanup;
@@ -211,6 +211,7 @@ static bool process_queue_(t_params *params, const t_array *array,
 
         req->dir_header = print_dir_path ? dir_path->path : NULL;
         req->entries = &params->current_entries;
+        req->quoted = params->dir_quoted;
         if (!printer(req)) {
             goto error;
         }
@@ -360,6 +361,7 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
             goto cleanup;
         }
 
+        params->dir_quoted = params->dir_quoted || entry->name_scan.quote;
         entry->st.st_mode = mode;
         if (need_lstat) {
             if (!entry_build_path(params->temp_arena, entry, path->path)) {
@@ -394,6 +396,7 @@ cleanup:
 
 static void clear_directory_entries_(t_params *params) {
     array_clear(&params->current_entries);
+    params->dir_quoted = false;
     if (params->temp_arena) {
         arena_clear(params->temp_arena);
     }

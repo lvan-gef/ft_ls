@@ -18,7 +18,6 @@ typedef struct {
 
 static bool init_print_row_(const t_print_request *req);
 static void init_print_lines_(const t_print_request *req);
-static bool entries_have_quote_(const t_array *array);
 static void calc_cols_(const t_array *array, t_map *map, bool quoted,
                        size_t *col_widths, size_t max_cols, size_t term_size);
 static bool calc_width_(const t_array *array, bool quoted, size_t num_cols,
@@ -66,11 +65,10 @@ static bool init_print_row_(const t_print_request *req) {
         return false;
     }
 
-    const bool quoted = req->quote_padding || entries_have_quote_(req->entries);
-    calc_cols_(req->entries, &map, quoted, col_widths, width_count,
+    calc_cols_(req->entries, &map, req->quoted, col_widths, width_count,
                req->term_size);
     put_dir_header(req->buffer, req->dir_header, req->is_stdout);
-    create_row_(req, &map, col_widths, quoted);
+    create_row_(req, &map, col_widths, req->quoted);
     arena_clear(req->arena);
     return true;
 }
@@ -84,17 +82,6 @@ static void init_print_lines_(const t_print_request *req) {
         put_entry_name(req->buffer, entry, false, req->color, req->is_stdout);
         out_put(req->buffer, "\n", 1);
     }
-}
-
-static bool entries_have_quote_(const t_array *array) {
-    for (size_t index = 0; index < array->len; ++index) {
-        const t_entry *entry = array->data[index];
-        if (entry->name_scan.quote != '\0') {
-            return true;
-        }
-    }
-
-    return false;
 }
 
 static void calc_cols_(const t_array *array, t_map *map, const bool quoted,
