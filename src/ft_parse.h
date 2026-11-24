@@ -18,6 +18,7 @@ typedef struct s_args {
     bool directory;
     bool no_group;
     bool color;
+    bool sort_time;
 } t_args;
 
 bool parse_args(size_t argc, const char **argv, t_args *args, t_array *inputs);

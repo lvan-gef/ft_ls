@@ -4,7 +4,9 @@
 #include <sys/stat.h>
 #include <time.h>
 
+#include "./ft_array.h"
 #include "./ft_ls.h"
+#include "./ft_parse.h"
 #include "./ft_sort.h"
 #include "./ft_str.h"
 
@@ -16,113 +18,57 @@ typedef struct {
     size_t right;
 } t_range;
 
-typedef int (*t_cmp_entry)(const t_entry *a, const t_entry *b);
+typedef struct {
+    bool reverse;
+    bool sort_time;
+    bool access_time;
+} t_sort_opts;
 
-static bool ensure_sort_scratch_(t_sort_scratch *scratch, size_t need);
-static void merge_sort_(void **tmp, const t_array *array, t_cmp_entry cmp);
-static size_t get_cap_(size_t lhs, size_t rhs, size_t cap);
-static void merge_(void **data, void **tmp, const t_range *range,
-                   t_cmp_entry cmp);
-static int cmp_name_entry_(const t_entry *a, const t_entry *b);
-static int cmp_name_entry_rev_(const t_entry *a, const t_entry *b);
-static int cmp_time_entry_(const t_entry *a, const t_entry *b);
-static int cmp_time_entry_rev_(const t_entry *a, const t_entry *b);
-static int cmp_atime_entry_(const t_entry *a, const t_entry *b);
-static int cmp_atime_entry_rev_(const t_entry *a, const t_entry *b);
-static t_str *entry_name_(const t_entry *entry);
+static void merge_sort_(void **buffer, const t_array *array,
+                        const t_sort_opts *sort_opts);
+static void merge_(void **data, void **buffer, const t_range *range,
+                   const t_sort_opts *sort_opts);
 static int compare_(const t_str *lhs, const t_str *rhs);
 static int compare_time_(const struct timespec *a, const struct timespec *b);
+static int cmp_entry_(const t_entry *a, const t_entry *b,
+                      const t_sort_opts *opts);
+static size_t min_(size_t a, size_t b);
 
-bool sort(t_sort_scratch *scratch, const t_array *array, const bool reverse,
-          const bool sort_time, const bool access_time) {
-    if (array->len <= 1) {
+bool sort(const t_array *array, const t_args *args, const bool reverse) {
+    if (args->unsort || array->len <= 1) {
         return true;
     }
 
-    t_cmp_entry cmp;
-
-    if (sort_time && access_time) {
-        cmp = reverse ? cmp_atime_entry_rev_ : cmp_atime_entry_;
-    } else if (sort_time) {
-        cmp = reverse ? cmp_time_entry_rev_ : cmp_time_entry_;
-    } else {
-        cmp = reverse ? cmp_name_entry_rev_ : cmp_name_entry_;
-    }
-
-    if (!ensure_sort_scratch_(scratch, array->len)) {
+    void **buffer = (void **)malloc(array->len * sizeof(*buffer));
+    if (!buffer) {
         return false;
     }
 
-    merge_sort_(scratch->data, array, cmp);
+    const t_sort_opts sort_opts = {.reverse = reverse,
+                                   .sort_time = args->sort_time,
+                                   .access_time = args->access_time};
+    merge_sort_(buffer, array, &sort_opts);
+    free((void *)buffer);
     return true;
 }
 
-static bool ensure_sort_scratch_(t_sort_scratch *scratch, const size_t need) {
-    const size_t max_len = PTRDIFF_MAX / sizeof(void *);
-    if (need > max_len) {
-        return false;
-    }
+static void merge_sort_(void **buffer, const t_array *array,
+                        const t_sort_opts *sort_opts) {
+    for (size_t width = 1; width < array->len; width *= 2) {
+        for (size_t left = 0; left < array->len; left += 2 * width) {
+            const t_range range = {.left = left,
+                                   .mid = min_(left + width, array->len),
+                                   .right = min_(left + 2 * width, array->len)};
 
-    if (scratch->cap >= need) {
-        return true;
-    }
-
-    size_t new_cap = scratch->cap ? scratch->cap : 1;
-    while (new_cap < need) {
-        if (new_cap > max_len / 2) {
-            new_cap = need;
-            break;
-        }
-
-        new_cap *= 2;
-    }
-
-    void **new_data = (void **)malloc((size_t)new_cap * sizeof(*new_data));
-    if (!new_data) {
-        return false;
-    }
-
-    free((void *)scratch->data);
-    scratch->data = new_data;
-    scratch->cap = new_cap;
-    return true;
-}
-
-static void merge_sort_(void **tmp, const t_array *array,
-                        const t_cmp_entry cmp) {
-    for (size_t width = 1; width < array->len;) {
-        size_t left = 0;
-        while (left < array->len) {
-            const size_t mid = get_cap_(left, width, array->len);
-            t_range range = {.left = left,
-                             .mid = mid,
-                             .right = get_cap_(mid, width, array->len)};
             if (range.mid < range.right) {
-                merge_(array->data, tmp, &range, cmp);
+                merge_(array->data, buffer, &range, sort_opts);
             }
-
-            const size_t step = get_cap_(width, width, array->len);
-            left = get_cap_(left, step, array->len);
         }
-
-        if (width >= array->len - width) {
-            break;
-        }
-
-        width += width;
     }
 }
 
-static size_t get_cap_(const size_t lhs, const size_t rhs, const size_t cap) {
-    if (lhs >= cap || rhs >= cap - lhs) {
-        return cap;
-    }
-
-    return lhs + rhs;
-}
-
-static void merge_(void **data, void **tmp, const t_range *range,
-                   const t_cmp_entry cmp) {
+static void merge_(void **data, void **buffer, const t_range *range,
+                   const t_sort_opts *sort_opts) {
     size_t i = range->left;
     size_t j = range->mid;
     size_t out = range->left;
@@ -131,62 +77,24 @@ static void merge_(void **data, void **tmp, const t_range *range,
         const t_entry *a = data[i];
         const t_entry *b = data[j];
 
-        if (cmp(a, b) <= 0) {
-            tmp[out++] = data[i++];
+        if (cmp_entry_(a, b, sort_opts) <= 0) {
+            buffer[out++] = data[i++];
         } else {
-            tmp[out++] = data[j++];
+            buffer[out++] = data[j++];
         }
     }
 
     while (i < range->mid) {
-        tmp[out++] = data[i++];
+        buffer[out++] = data[i++];
     }
 
     while (j < range->right) {
-        tmp[out++] = data[j++];
+        buffer[out++] = data[j++];
     }
 
     for (size_t idx = range->left; idx < range->right; ++idx) {
-        data[idx] = tmp[idx];
+        data[idx] = buffer[idx];
     }
-}
-
-static int cmp_name_entry_(const t_entry *a, const t_entry *b) {
-    return compare_(entry_name_(a), entry_name_(b));
-}
-
-static int cmp_name_entry_rev_(const t_entry *a, const t_entry *b) {
-    return cmp_name_entry_(b, a);
-}
-
-static int cmp_time_entry_(const t_entry *a, const t_entry *b) {
-    const int cmp = compare_time_(&a->st.st_mtim, &b->st.st_mtim);
-    if (cmp != 0) {
-        return -cmp;
-    }
-
-    return compare_(entry_name_(a), entry_name_(b));
-}
-
-static int cmp_time_entry_rev_(const t_entry *a, const t_entry *b) {
-    return cmp_time_entry_(b, a);
-}
-
-static int cmp_atime_entry_(const t_entry *a, const t_entry *b) {
-    const int cmp = compare_time_(&a->st.st_atim, &b->st.st_atim);
-    if (cmp != 0) {
-        return -cmp;
-    }
-
-    return compare_(entry_name_(a), entry_name_(b));
-}
-
-static int cmp_atime_entry_rev_(const t_entry *a, const t_entry *b) {
-    return cmp_atime_entry_(b, a);
-}
-
-static t_str *entry_name_(const t_entry *entry) {
-    return entry->name ? entry->name : entry->path;
 }
 
 static int compare_(const t_str *lhs, const t_str *rhs) {
@@ -213,4 +121,29 @@ static int compare_time_(const struct timespec *a, const struct timespec *b) {
     }
 
     return (a->tv_nsec > b->tv_nsec) - (a->tv_nsec < b->tv_nsec);
+}
+
+static int cmp_entry_(const t_entry *a, const t_entry *b,
+                      const t_sort_opts *opts) {
+    int r = 0;
+
+    if (opts->sort_time) {
+        const struct timespec *ta =
+            opts->access_time ? &a->st.st_atim : &a->st.st_mtim;
+        const struct timespec *tb =
+            opts->access_time ? &b->st.st_atim : &b->st.st_mtim;
+        r = -compare_time_(ta, tb);
+    }
+
+    if (r == 0) {
+        const t_str *an = a->name ? a->name : a->path;
+        const t_str *bn = b->name ? b->name : b->path;
+        r = compare_(an, bn);
+    }
+
+    return opts->reverse ? -r : r;
+}
+
+static size_t min_(const size_t a, const size_t b) {
+    return a < b ? a : b;
 }

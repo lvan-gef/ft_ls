@@ -5,13 +5,8 @@
 #include <stdint.h>
 
 #include "./ft_array.h"
+#include "./ft_parse.h"
 
-typedef struct {
-    void **data;
-    size_t cap;
-} t_sort_scratch;
-
-bool sort(t_sort_scratch *scratch, const t_array *array, bool reverse,
-          bool sort_time, bool access_time);
+bool sort(const t_array *array, const t_args *args, bool reverse);
 
 #endif /* ifndef FT_SORT_H */

@@ -26,7 +26,6 @@
 typedef struct {
     const t_args *args;
     t_arena *temp_arena;
-    t_sort_scratch sort_scratch;
     t_array dir_queue;
     t_array operand_files;
     t_array current_entries;
@@ -173,24 +172,12 @@ static bool print_operand_files_(t_params *params, const t_print_request *req,
         return true;
     }
 
-    bool ok = false;
-    const bool sort_time = !params->args->unsort &&
-                           (params->args->time ||
-                            (params->args->access_time && !params->args->list));
-    if (!params->args->unsort) {
-        ok = sort(&params->sort_scratch, &params->operand_files,
-                  params->args->reverse, sort_time, params->args->access_time);
-        if (!ok) {
-            goto cleanup;
-        }
-    }
-
-    ok = printer(req);
+    bool ok = sort(&params->operand_files, params->args, params->args->reverse);
     if (ok) {
-        *printed_files = true;
+        ok = printer(req);
+        *printed_files = ok;
     }
 
-cleanup:
     array_clear_with(&params->operand_files, entry_del);
     return ok;
 }
@@ -201,9 +188,6 @@ static bool process_queue_(t_params *params, const t_array *array,
     bool printed_dir = false;
     bool inserted_files_dirs_gap = false;
     const bool print_dir_path = params->args->recursive || array->len > 1;
-    const bool sort_time = !params->args->unsort &&
-                           (params->args->time ||
-                            (params->args->access_time && !params->args->list));
     t_entry *dir_path = NULL;
 
     if (params->args->unsort) {
@@ -230,10 +214,8 @@ static bool process_queue_(t_params *params, const t_array *array,
             continue;
         }
 
-        if (!params->args->unsort &&
-            !sort(&params->sort_scratch, &params->current_entries,
-                  params->args->reverse, sort_time,
-                  params->args->access_time)) {
+        if (!sort(&params->current_entries, params->args,
+                  params->args->reverse)) {
             goto error;
         }
 
@@ -305,12 +287,7 @@ static bool collect_operands_(t_params *params, const t_array *array,
         }
     }
 
-    const bool sort_time = !params->args->unsort &&
-                           (params->args->time ||
-                            (params->args->access_time && !params->args->list));
-    if (params->dir_queue.len && !params->args->unsort &&
-        !sort(&params->sort_scratch, &params->dir_queue, !params->args->reverse,
-              sort_time, params->args->access_time)) {
+    if (!sort(&params->dir_queue, params->args, !params->args->reverse)) {
         goto failed;
     }
 
@@ -406,14 +383,11 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
 
     clear_directory_entries_(params);
     const struct dirent *dp;
-    const bool sort_time = !params->args->unsort &&
-                           (params->args->time ||
-                            (params->args->access_time && !params->args->list));
     while ((dp = readdir(d))) {
         const unsigned char dtype = dp->d_type;
         const mode_t mode = dtype_to_mode_(dtype);
-        const bool need_lstat =
-            params->args->list || sort_time || params->args->color || mode == 0;
+        const bool need_lstat = params->args->list || params->args->sort_time ||
+                                params->args->color || mode == 0;
 
         if (!params->args->all && dp->d_name[0] == '.') {
             continue;
@@ -518,8 +492,6 @@ static void cleanup_process_(t_params *params) {
     if (params->temp_arena) {
         arena_release(params->temp_arena);
     }
-
-    free((void *)params->sort_scratch.data);
 }
 
 static bool queue_operand_dir_(t_params *params, const t_str *str,

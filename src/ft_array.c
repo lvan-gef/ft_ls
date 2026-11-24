@@ -4,7 +4,6 @@
 #include <stdlib.h>
 
 #include "./ft_array.h"
-#include "./ft_const.h"
 #include "./ft_utils.h"
 
 static bool realloc_arr_(t_array *array);

@@ -67,6 +67,8 @@ bool parse_args(const size_t argc, const char **argv, t_args *args,
         }
     }
 
+    args->sort_time =
+        !args->unsort && (args->time || (args->access_time && !args->list));
     return true;
 }
 
