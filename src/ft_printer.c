@@ -6,6 +6,7 @@
 #include "./ft_ls.h"
 #include "./ft_printer.h"
 #include "./ft_printer_helper.h"
+#include "ft_parse.h"
 
 #ifndef DEFAULT_TERM_SIZE
 #define DEFAULT_TERM_SIZE 80
@@ -27,11 +28,11 @@ static void create_row_(const t_print_request *req, const t_map *map,
 static void indent_(t_out *out, size_t from, size_t to);
 
 bool printer(const t_print_request *req) {
-    if (req->list_mode) {
+    if (req->ctx->args->list) {
         return printer_list(req);
     }
 
-    if (!req->is_stdout) {
+    if (!req->ctx->is_stdout) {
         init_print_lines_(req);
         return true;
     }
@@ -50,9 +51,10 @@ size_t get_terminal_width(void) {
 }
 
 static bool init_print_row_(const t_print_request *req) {
+    const t_print_ctx *ctx = req->ctx;
     t_map map = {.cols = 1, .rows = req->entries->len};
     size_t *col_widths = NULL;
-    const size_t max_cols = (req->term_size + SPACE_GAP) / (1 + SPACE_GAP);
+    const size_t max_cols = (ctx->term_size + SPACE_GAP) / (1 + SPACE_GAP);
 
     size_t width_count =
         req->entries->len < max_cols ? req->entries->len : max_cols;
@@ -60,26 +62,29 @@ static bool init_print_row_(const t_print_request *req) {
         width_count = 1;
     }
 
-    col_widths = arena_push(req->arena, width_count * sizeof(*col_widths));
+    col_widths = arena_push(ctx->arena, width_count * sizeof(*col_widths));
     if (!col_widths) {
         return false;
     }
 
     calc_cols_(req->entries, &map, req->quoted, col_widths, width_count,
-               req->term_size);
-    put_dir_header(req->buffer, req->dir_header, req->is_stdout);
+               ctx->term_size);
+    put_dir_header(ctx->out, req->dir_header, ctx->is_stdout);
     create_row_(req, &map, col_widths, req->quoted);
     return true;
 }
 
 static void init_print_lines_(const t_print_request *req) {
-    put_dir_header(req->buffer, req->dir_header, req->is_stdout);
+    const t_print_ctx *ctx = req->ctx;
+
+    put_dir_header(ctx->out, req->dir_header, ctx->is_stdout);
 
     for (size_t index = 0; index < req->entries->len; ++index) {
         const t_entry *entry = req->entries->data[index];
 
-        put_entry_name(req->buffer, entry, false, req->color, req->is_stdout);
-        out_put(req->buffer, "\n", 1);
+        put_entry_name(ctx->out, entry, false, ctx->args->color,
+                       ctx->is_stdout);
+        out_put(ctx->out, "\n", 1);
     }
 }
 
@@ -133,6 +138,8 @@ static bool calc_width_(const t_array *array, const bool quoted,
 static void create_row_(const t_print_request *req, const t_map *map,
                         const size_t *col_widths, const bool quoted) {
     const size_t files_len = req->entries->len;
+    t_out *out = req->ctx->out;
+    const t_args *args = req->ctx->args;
 
     for (size_t row = 0; row < map->rows; ++row) {
         size_t col = 0;
@@ -146,19 +153,19 @@ static void create_row_(const t_print_request *req, const t_map *map,
                                            : entry->name_scan.display_len;
             const size_t max_name_length = col_widths[col++];
 
-            put_entry_name(req->buffer, entry, quoted, req->color, true);
+            put_entry_name(out, entry, quoted, args->color, true);
 
             if (files_len - map->rows <= filesno) {
                 break;
             }
 
             filesno += map->rows;
-            indent_(req->buffer, pos + name_length, pos + max_name_length);
+            indent_(out, pos + name_length, pos + max_name_length);
 
             pos += max_name_length;
         }
 
-        out_put(req->buffer, "\n", 1);
+        out_put(out, "\n", 1);
     }
 }
 

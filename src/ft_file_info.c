@@ -84,7 +84,7 @@ bool prepare_list_infos(const t_print_request *req, t_file_info **infos) {
         return false;
     }
 
-    *infos = arena_push(req->arena, sizeof(**infos) * entries->len);
+    *infos = arena_push(req->ctx->arena, sizeof(**infos) * entries->len);
     if (!*infos) {
         return false;
     }
@@ -103,12 +103,13 @@ bool prepare_list_infos(const t_print_request *req, t_file_info **infos) {
 static bool fill_file_info_(const t_print_request *req, t_file_info *info,
                             const t_entry *entry, const time_t now) {
     *info = (t_file_info){0};
-    t_arena *arena = req->arena;
+    const t_args *args = req->ctx->args;
+    t_arena *arena = req->ctx->arena;
     const bool unknown = entry->stat_unavailable;
 
     get_perm_(arena, info, entry);
 
-    if (!req->no_owner) {
+    if (!args->no_owner) {
         info->username = unknown ? str_arena_from_cstr(arena, "?")
                                  : get_id_name_(arena, &user_cache,
                                                 entry->st.st_uid, user_name_);
@@ -116,7 +117,7 @@ static bool fill_file_info_(const t_print_request *req, t_file_info *info,
             return false;
         }
     }
-    if (!req->no_group) {
+    if (!args->no_group) {
         info->groupname = unknown ? str_arena_from_cstr(arena, "?")
                                   : get_id_name_(arena, &group_cache,
                                                  entry->st.st_gid, group_name_);
@@ -125,7 +126,7 @@ static bool fill_file_info_(const t_print_request *req, t_file_info *info,
         }
     }
 
-    if (!get_dt_(info->dt, now, entry, req->access_time)) {
+    if (!get_dt_(info->dt, now, entry, args->access_time)) {
         return false;
     }
 

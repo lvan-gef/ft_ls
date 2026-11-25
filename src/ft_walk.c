@@ -30,6 +30,7 @@ typedef struct {
     t_array operand_files;
     t_array current_entries;
     t_out out;
+    t_print_ctx ctx;
     bool fatal;
     bool quote_padding;
     bool dir_quoted;
@@ -37,11 +38,9 @@ typedef struct {
 
 static bool run_listing_(t_params *params, const t_array *array,
                          int *exit_code);
-static bool print_operand_files_(t_params *params, const t_print_request *req,
-                                 bool *printed_files);
+static bool print_operand_files_(t_params *params, bool *printed_files);
 static bool process_queue_(t_params *params, const t_array *array,
-                           t_print_request *req, int *exit_code,
-                           bool printed_files);
+                           int *exit_code, bool printed_files);
 static bool load_directory_entries_(t_params *params, const t_entry *path,
                                     int *exit_code);
 static bool queue_recursive_dirs_(t_params *params, const t_str *parent_path);
@@ -100,26 +99,13 @@ static bool run_listing_(t_params *params, const t_array *array,
     bool printed_files = false;
     bool ok = false;
 
-    t_print_request req = {.entries = &params->operand_files,
-                           .list_width_context = &params->dir_queue,
-                           .dir_header = NULL,
-                           .buffer = &params->out,
-                           .arena = params->temp_arena,
-                           .quoted = params->quote_padding,
-                           .list_mode = params->args->list,
-                           .print_total = false,
-                           .no_owner = params->args->no_owner,
-                           .access_time = params->args->access_time,
-                           .no_group = params->args->no_group,
-                           .color = params->args->color,
-                           .is_stdout = true,
-                           .term_size = get_terminal_width()};
+    params->ctx = (t_print_ctx){.args = params->args,
+                                .out = &params->out,
+                                .arena = params->temp_arena,
+                                .is_stdout = isatty(STDOUT_FILENO),
+                                .term_size = get_terminal_width()};
 
-    if (!isatty(STDOUT_FILENO)) {
-        req.is_stdout = false;
-    }
-
-    if (!print_operand_files_(params, &req, &printed_files)) {
+    if (!print_operand_files_(params, &printed_files)) {
         goto cleanup;
     }
 
@@ -128,9 +114,7 @@ static bool run_listing_(t_params *params, const t_array *array,
         goto cleanup;
     }
 
-    req.print_total = true;
-    req.list_width_context = NULL;
-    if (!process_queue_(params, array, &req, exit_code, printed_files)) {
+    if (!process_queue_(params, array, exit_code, printed_files)) {
         goto cleanup;
     }
 
@@ -140,15 +124,18 @@ cleanup:
     return ok && !params->out.failed;
 }
 
-static bool print_operand_files_(t_params *params, const t_print_request *req,
-                                 bool *printed_files) {
+static bool print_operand_files_(t_params *params, bool *printed_files) {
     if (!params->operand_files.len) {
         return true;
     }
 
     bool ok = sort(&params->operand_files, params->args, params->args->reverse);
     if (ok) {
-        ok = printer(req);
+        const t_print_request req = {.ctx = &params->ctx,
+                                     .entries = &params->operand_files,
+                                     .list_width_context = &params->dir_queue,
+                                     .quoted = params->quote_padding};
+        ok = printer(&req);
         *printed_files = ok;
     }
 
@@ -157,8 +144,7 @@ static bool print_operand_files_(t_params *params, const t_print_request *req,
 }
 
 static bool process_queue_(t_params *params, const t_array *array,
-                           t_print_request *req, int *exit_code,
-                           const bool printed_files) {
+                           int *exit_code, const bool printed_files) {
     bool printed_dir = false;
     bool inserted_files_dirs_gap = false;
     const bool print_dir_path = params->args->recursive || array->len > 1;
@@ -172,7 +158,7 @@ static bool process_queue_(t_params *params, const t_array *array,
         dir_path = array_pop(&params->dir_queue);
 
         if (!inserted_files_dirs_gap && printed_files && dir_path->is_operand) {
-            out_put(req->buffer, "\n", 1);
+            out_put(&params->out, "\n", 1);
             inserted_files_dirs_gap = true;
         }
 
@@ -196,13 +182,16 @@ static bool process_queue_(t_params *params, const t_array *array,
         }
 
         if (printed_dir) {
-            out_put(req->buffer, "\n", 1);
+            out_put(&params->out, "\n", 1);
         }
 
-        req->dir_header = print_dir_path ? dir_path->path : NULL;
-        req->entries = &params->current_entries;
-        req->quoted = params->dir_quoted;
-        if (!printer(req)) {
+        const t_print_request req = {.ctx = &params->ctx,
+                                     .entries = &params->current_entries,
+                                     .dir_header =
+                                         print_dir_path ? dir_path->path : NULL,
+                                     .quoted = params->dir_quoted,
+                                     .print_total = true};
+        if (!printer(&req)) {
             goto error;
         }
 

@@ -49,6 +49,7 @@ bool printer_list(const t_print_request *req) {
 }
 
 static void print_list_(const t_print_request *req, const t_file_info *infos) {
+    const t_print_ctx *ctx = req->ctx;
     t_list_stats sizes = {0};
     for (size_t index = 0; index < req->entries->len; ++index) {
         const t_entry *entry = req->entries->data[index];
@@ -62,12 +63,12 @@ static void print_list_(const t_print_request *req, const t_file_info *infos) {
         update_num_widths_(&sizes, context->data[index]);
     }
 
-    put_dir_header(req->buffer, req->dir_header, req->is_stdout);
+    put_dir_header(ctx->out, req->dir_header, ctx->is_stdout);
 
     if (req->print_total) {
-        out_put(req->buffer, "total ", 6);
-        put_uint_(req->buffer, (sizes.total + 1) / 2);
-        out_put(req->buffer, "\n", 1);
+        out_put(ctx->out, "total ", 6);
+        put_uint_(ctx->out, (sizes.total + 1) / 2);
+        out_put(ctx->out, "\n", 1);
     }
 
     print_list_rows_(req, infos, &sizes);
@@ -133,7 +134,8 @@ static void put_uint_right_(t_out *out, const size_t value,
 static void print_list_rows_(const t_print_request *req,
                              const t_file_info *infos,
                              const t_list_stats *sizes) {
-    t_out *out = req->buffer;
+    const t_print_ctx *ctx = req->ctx;
+    t_out *out = ctx->out;
 
     for (size_t index = 0; index < req->entries->len; ++index) {
         const t_entry *entry = req->entries->data[index];
@@ -146,12 +148,12 @@ static void print_list_rows_(const t_print_request *req,
         put_num_(out, entry, st->st_nlink, sizes->max_len_links);
         out_put(out, " ", 1);
 
-        if (!req->no_owner) {
+        if (!ctx->args->no_owner) {
             put_padded_(out, info->username, sizes->max_len_user);
             out_put(out, " ", 1);
         }
 
-        if (!req->no_group) {
+        if (!ctx->args->no_group) {
             put_padded_(out, info->groupname, sizes->max_len_group);
             out_put(out, " ", 1);
         }
@@ -168,11 +170,12 @@ static void print_list_rows_(const t_print_request *req,
         out_put(out, " ", 1);
         out_put(out, info->dt, DT_LEN - 1);
         out_put(out, " ", 1);
-        put_entry_name(out, entry, req->quoted, req->color, req->is_stdout);
+        put_entry_name(out, entry, req->quoted, ctx->args->color,
+                       ctx->is_stdout);
 
         if (info->symlink && info->symlink->len > 0) {
             out_put(out, " -> ", 4);
-            put_link_target(out, info->symlink, req->is_stdout);
+            put_link_target(out, info->symlink, ctx->is_stdout);
         }
 
         out_put(out, "\n", 1);
