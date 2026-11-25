@@ -8,10 +8,6 @@
 #include "./ft_str.h"
 #include "./ft_utils.h"
 
-#define OCTAL_DIGIT_MASK 0x7U
-#define BYTE_OCTAL_HIGH_SHIFT 6U
-#define BYTE_OCTAL_MID_SHIFT 3U
-
 typedef struct s_shell_out {
     t_out *dst;
     size_t len;
@@ -29,7 +25,6 @@ static void shell_escape_bytes_(t_shell_out *out, const char *src, size_t len);
 static void escape_byte_(t_shell_out *out, t_quote_mode *mode, unsigned char c);
 static size_t escaped_len_(const char *src, size_t len, char quote);
 static bool needs_raw_quote_(unsigned char c, size_t index);
-static bool is_safe_punct_(unsigned char c, size_t index);
 static void put_literal_(t_out *out, const char *src, size_t len);
 static void switch_mode_(t_shell_out *out, t_quote_mode *mode,
                          const t_quote_mode next);
@@ -110,11 +105,9 @@ static void emit_ansi_byte_(t_shell_out *out, const unsigned char byte) {
         case '\r': repr[1] = 'r'; break;
         default:
             len = 4;
-            repr[1] = (char)('0' + (((unsigned)byte >> BYTE_OCTAL_HIGH_SHIFT) &
-                                    OCTAL_DIGIT_MASK));
-            repr[2] = (char)('0' + (((unsigned)byte >> BYTE_OCTAL_MID_SHIFT) &
-                                    OCTAL_DIGIT_MASK));
-            repr[3] = (char)('0' + ((unsigned)byte & OCTAL_DIGIT_MASK));
+            repr[1] = (char)('0' + byte / 64);
+            repr[2] = (char)('0' + byte / 8 % 8);
+            repr[3] = (char)('0' + byte % 8);
             break;
     }
 
@@ -137,18 +130,18 @@ static void escape_byte_(t_shell_out *out, t_quote_mode *mode,
                          const unsigned char c) {
     if (ft_isprint(c) && c != '\'') {
         switch_mode_(out, mode, MODE_SINGLE);
-        const char ch = (char)c;
-        emit_bytes_(out, &ch, 1);
+        emit_bytes_(out, (const char *)&c, 1);
         return;
     }
 
     if (c == '\'') {
-        if (*mode == MODE_ANSI) {
+        if (*mode == MODE_SINGLE) {
+            emit_bytes_(out, "'\\''", 4);
+        } else {
             switch_mode_(out, mode, MODE_NONE);
+            emit_bytes_(out, "\\'", 2);
         }
 
-        emit_bytes_(out, *mode == MODE_SINGLE ? "'\\''" : "\\'",
-                    *mode == MODE_SINGLE ? 4U : 2U);
         return;
     }
 
@@ -173,26 +166,15 @@ static size_t escaped_len_(const char *src, const size_t len,
 }
 
 static bool needs_raw_quote_(const unsigned char c, const size_t index) {
-    return !ft_isalpha(c) && !ft_isdigit(c) && !is_safe_punct_(c, index);
-}
-
-static bool is_safe_punct_(const unsigned char c, const size_t index) {
-    switch (c) {
-        case '_':
-        case '-':
-        case '.':
-        case '/':
-        case '+':
-        case ':':
-        case ',':
-        case '@':
-        case '%':
-        case '{':
-        case '}': return true;
-        case '#':
-        case '~': return index != 0;
-        default: return false;
+    if (ft_isalpha(c) || ft_isdigit(c) || ft_memchr("_-./+:,@%{}", c, 11)) {
+        return false;
     }
+
+    if (c == '#' || c == '~') {
+        return index == 0;
+    }
+
+    return true;
 }
 
 static void put_literal_(t_out *out, const char *src, const size_t len) {
