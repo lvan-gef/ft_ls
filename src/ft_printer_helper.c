@@ -14,7 +14,7 @@ static const char *entry_color_(const t_entry *entry);
 
 void put_entry_name(t_out *out, const t_entry *entry, const bool pad_unquoted,
                     const bool color, const bool is_stdout) {
-    const t_str *name = entry->name ? entry->name : entry->path;
+    const t_str *name = entry->name;
 
     if (!is_stdout) {
         out_put(out, name->str, name->len);

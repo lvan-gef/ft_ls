@@ -20,27 +20,6 @@ typedef struct {
 static t_str *join_dir_path_(t_arena *scratch, const t_str *lhs,
                              const t_str *rhs);
 
-t_entry *entry_new_file_operand(const t_str *path, const struct stat *st) {
-    t_entry *entry = malloc(sizeof(*entry));
-    if (!entry) {
-        return NULL;
-    }
-
-    *entry = (t_entry){0};
-    entry->name = str_dup(path);
-    if (!entry->name) {
-        free(entry);
-        return NULL;
-    }
-
-    entry->path = entry->name;
-    entry->st = *st;
-    entry->is_operand = true;
-    shell_scan_str(entry->name, &entry->name_scan);
-
-    return entry;
-}
-
 t_entry *entry_new_path(const t_str *path, const struct stat *st,
                         const bool is_operand) {
     t_entry *entry = malloc(sizeof(*entry));
@@ -50,14 +29,14 @@ t_entry *entry_new_path(const t_str *path, const struct stat *st,
 
     *entry = (t_entry){0};
     entry->path = str_dup(path);
-    entry->st = *st;
-    entry->is_operand = is_operand;
-
     if (!entry->path) {
-        entry_free(entry);
+        free(entry);
         return NULL;
     }
 
+    entry->name = entry->path;
+    entry->st = *st;
+    entry->is_operand = is_operand;
     shell_scan_str(entry->path, &entry->name_scan);
     return entry;
 }

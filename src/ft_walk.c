@@ -248,7 +248,7 @@ static bool collect_operands_(t_params *params, const t_array *array,
             continue;
         }
 
-        t_entry *entry = entry_new_file_operand(str, &st);
+        t_entry *entry = entry_new_path(str, &st, true);
         if (!entry) {
             goto failed;
         }

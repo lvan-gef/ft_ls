@@ -136,9 +136,7 @@ static int cmp_entry_(const t_entry *a, const t_entry *b,
     }
 
     if (r == 0) {
-        const t_str *an = a->name ? a->name : a->path;
-        const t_str *bn = b->name ? b->name : b->path;
-        r = compare_(an, bn);
+        r = compare_(a->name, b->name);
     }
 
     return opts->reverse ? -r : r;

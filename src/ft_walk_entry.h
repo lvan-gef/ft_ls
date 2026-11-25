@@ -8,7 +8,6 @@
 #include "./ft_ls.h"
 #include "./ft_str.h"
 
-t_entry *entry_new_file_operand(const t_str *path, const struct stat *st);
 t_entry *entry_new_path(const t_str *path, const struct stat *st,
                         bool is_operand);
 t_entry *entry_new_dirent(t_arena *scratch, const struct dirent *dp);
