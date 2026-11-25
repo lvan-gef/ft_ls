@@ -49,6 +49,7 @@ static bool is_safe_punct_(unsigned char c, size_t index);
 static void analyze_shell_byte_(t_shell_analysis *analysis, unsigned char c,
                                 size_t index);
 static char quote_from_analysis_(const t_shell_analysis *analysis);
+static void put_literal_(t_out *out, const char *src, size_t len);
 
 void shell_scan_str(const t_str *str, t_shell_scan *scan) {
     t_shell_analysis analysis = {0};
@@ -71,7 +72,7 @@ void shell_escape_put(t_out *out, const t_str *str, const char quote,
             out_put(out, " ", 1);
         }
 
-        out_put(out, str->str, str->len);
+        put_literal_(out, str->str, str->len);
         return;
     }
 
@@ -303,4 +304,18 @@ static char quote_from_analysis_(const t_shell_analysis *analysis) {
     }
 
     return '\'';
+}
+
+static void put_literal_(t_out *out, const char *src, const size_t len) {
+    size_t start = 0;
+
+    for (size_t i = 0; i < len; ++i) {
+        if (src[i] == '\n') {
+            out_put(out, src + start, i - start);
+            out_put(out, "?", 1);
+            start = i + 1;
+        }
+    }
+
+    out_put(out, src + start, len - start);
 }

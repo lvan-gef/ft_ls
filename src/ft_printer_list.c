@@ -173,7 +173,7 @@ static void print_list_rows_(const t_print_request *req,
 
         if (info->symlink && info->symlink->len > 0) {
             out_put(out, " -> ", 4);
-            out_put(out, info->symlink->str, info->symlink->len);
+            put_link_target(out, info->symlink, req->is_stdout);
         }
 
         out_put(out, "\n", 1);

@@ -17,7 +17,7 @@ void put_entry_name(t_out *out, const t_entry *entry, const bool pad_unquoted,
     const t_str *name = entry->name;
 
     if (!is_stdout) {
-        out_put(out, name->str, name->len);
+        shell_escape_put(out, name, '\0', false);
         return;
     }
 
@@ -39,7 +39,7 @@ void put_dir_header(t_out *out, const t_str *dir_header, const bool is_stdout) {
     }
 
     if (!is_stdout) {
-        out_put(out, dir_header->str, dir_header->len);
+        shell_escape_put(out, dir_header, '\0', false);
         out_put(out, ":\n", 2);
         return;
     }
@@ -53,6 +53,16 @@ void put_dir_header(t_out *out, const t_str *dir_header, const bool is_stdout) {
 
     shell_escape_put(out, dir_header, scan.quote, false);
     out_put(out, ":\n", 2);
+}
+
+void put_link_target(t_out *out, const t_str *target, const bool is_stdout) {
+    t_shell_scan scan = {0};
+
+    if (is_stdout) {
+        shell_scan_str(target, &scan);
+    }
+
+    shell_escape_put(out, target, scan.quote, false);
 }
 
 static const char *entry_color_(const t_entry *entry) {
