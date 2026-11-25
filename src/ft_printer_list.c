@@ -40,7 +40,7 @@ static void max_(size_t *dst, size_t value);
 bool printer_list(const t_print_request *req) {
     t_file_info *infos = NULL;
     const bool ok =
-        prepare_list_infos(req->arena, req->entries, &infos, req->access_time);
+        prepare_list_infos(req, &infos);
 
     if (ok) {
         print_list_(req, infos);
@@ -75,11 +75,11 @@ static void print_list_(const t_print_request *req, const t_file_info *infos) {
 }
 
 static void update_stats_(t_list_stats *stats, const t_file_info *info) {
-    if (info->username->len > stats->max_len_user) {
+    if (info->username && info->username->len > stats->max_len_user) {
         stats->max_len_user = info->username->len;
     }
 
-    if (info->groupname->len > stats->max_len_group) {
+    if (info->groupname && info->groupname->len > stats->max_len_group) {
         stats->max_len_group = info->groupname->len;
     }
 

@@ -13,9 +13,11 @@
 #include "./ft_arena.h"
 #include "./ft_file_info.h"
 #include "./ft_ls.h"
+#include "./ft_printer.h"
 #include "./ft_str_arena.h"
 #include "./ft_symlink.h"
 #include "./ft_utils.h"
+#include "./ft_array.h"
 
 struct timespec;
 
@@ -50,8 +52,8 @@ typedef const char *(*t_id_lookup)(size_t id);
 static t_id_cache user_cache = {0};
 static t_id_cache group_cache = {0};
 
-static bool fill_file_info_(t_arena *arena, t_file_info *info,
-                            const t_entry *entry, time_t now, bool access_time);
+static bool fill_file_info_(const t_print_request *req, t_file_info *info,
+                            const t_entry *entry, time_t now);
 static void get_perm_(t_arena *arena, t_file_info *info, const t_entry *entry);
 static char file_type_char_(mode_t mode);
 static t_str *get_id_name_(t_arena *arena, t_id_cache *cache, size_t id,
@@ -70,8 +72,8 @@ static bool is_posix_acl_(const char *name);
 static bool is_security_context_(const char *name);
 static char xattr_error_marker_(int e);
 
-bool prepare_list_infos(t_arena *arena, const t_array *entries,
-                        t_file_info **infos, const bool access_time) {
+bool prepare_list_infos(const t_print_request *req, t_file_info **infos) {
+    const t_array *entries = req->entries;
     if (!entries || !entries->len) {
         *infos = NULL;
         return true;
@@ -82,7 +84,7 @@ bool prepare_list_infos(t_arena *arena, const t_array *entries,
         return false;
     }
 
-    *infos = arena_push(arena, sizeof(**infos) * entries->len);
+    *infos = arena_push(req->arena, sizeof(**infos) * entries->len);
     if (!*infos) {
         return false;
     }
@@ -90,8 +92,7 @@ bool prepare_list_infos(t_arena *arena, const t_array *entries,
     for (size_t index = 0; index < entries->len; ++index) {
         const t_entry *entry = entries->data[index];
 
-        if (!fill_file_info_(arena, &(*infos)[index], entry, now,
-                             access_time)) {
+        if (!fill_file_info_(req, &(*infos)[index], entry, now)) {
             return false;
         }
     }
@@ -99,28 +100,32 @@ bool prepare_list_infos(t_arena *arena, const t_array *entries,
     return true;
 }
 
-static bool fill_file_info_(t_arena *arena, t_file_info *info,
-                            const t_entry *entry, const time_t now,
-                            const bool access_time) {
+static bool fill_file_info_(const t_print_request *req, t_file_info *info,
+                            const t_entry *entry, const time_t now) {
     *info = (t_file_info){0};
+    t_arena *arena = req->arena;
+    const bool unknown = entry->stat_unavailable;
 
     get_perm_(arena, info, entry);
 
-    if (entry->stat_unavailable) {
-        info->username = str_arena_from_cstr(arena, "?");
-        info->groupname = info->username;
-    } else {
-        info->username =
-            get_id_name_(arena, &user_cache, entry->st.st_uid, user_name_);
-        info->groupname =
-            get_id_name_(arena, &group_cache, entry->st.st_gid, group_name_);
+    if (!req->no_owner) {
+        info->username = unknown ? str_arena_from_cstr(arena, "?")
+                                 : get_id_name_(arena, &user_cache,
+                                                entry->st.st_uid, user_name_);
+        if (!info->username) {
+            return false;
+        }
+    }
+    if (!req->no_group) {
+        info->groupname = unknown ? str_arena_from_cstr(arena, "?")
+                                 : get_id_name_(arena, &group_cache,
+                                                entry->st.st_gid, group_name_);
+        if (!info->groupname) {
+            return false;
+        }
     }
 
-    if (!info->username || !info->groupname) {
-        return false;
-    }
-
-    if (!get_dt_(info->dt, now, entry, access_time)) {
+    if (!get_dt_(info->dt, now, entry, req->access_time)) {
         return false;
     }
 
