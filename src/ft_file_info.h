@@ -5,8 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "./ft_str.h"
 #include "./ft_printer.h"
+#include "./ft_str.h"
 
 #ifndef PERMISSION_SIZE
 #define PERMISSION_SIZE 12

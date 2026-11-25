@@ -39,8 +39,7 @@ static void max_(size_t *dst, size_t value);
 
 bool printer_list(const t_print_request *req) {
     t_file_info *infos = NULL;
-    const bool ok =
-        prepare_list_infos(req, &infos);
+    const bool ok = prepare_list_infos(req, &infos);
 
     if (ok) {
         print_list_(req, infos);

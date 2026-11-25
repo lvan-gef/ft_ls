@@ -11,13 +11,13 @@
 #include <time.h>
 
 #include "./ft_arena.h"
+#include "./ft_array.h"
 #include "./ft_file_info.h"
 #include "./ft_ls.h"
 #include "./ft_printer.h"
 #include "./ft_str_arena.h"
 #include "./ft_symlink.h"
 #include "./ft_utils.h"
-#include "./ft_array.h"
 
 struct timespec;
 
@@ -118,8 +118,8 @@ static bool fill_file_info_(const t_print_request *req, t_file_info *info,
     }
     if (!req->no_group) {
         info->groupname = unknown ? str_arena_from_cstr(arena, "?")
-                                 : get_id_name_(arena, &group_cache,
-                                                entry->st.st_gid, group_name_);
+                                  : get_id_name_(arena, &group_cache,
+                                                 entry->st.st_gid, group_name_);
         if (!info->groupname) {
             return false;
         }
