@@ -170,8 +170,7 @@ static void print_list_rows_(const t_print_request *req,
         out_put(out, " ", 1);
         out_put(out, info->dt, DT_LEN - 1);
         out_put(out, " ", 1);
-        put_entry_name(out, entry, req->quoted, ctx->args->color,
-                       ctx->is_tty);
+        put_entry_name(out, entry, req->quoted, ctx->args->color, ctx->is_tty);
 
         if (info->symlink && info->symlink->len > 0) {
             out_put(out, " -> ", 4);

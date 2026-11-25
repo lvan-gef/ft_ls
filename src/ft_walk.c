@@ -187,7 +187,9 @@ error:
 
 static bool collect_operands_(t_params *params, const t_array *array) {
     for (size_t index = 0; index < array->len; ++index) {
-        if (!collect_operand_(params, array->data[index])) {
+        char *arg = array->data[index];
+        const t_str str = {.str = arg, .len = ft_strlen(arg)};
+        if (!collect_operand_(params, &str)) {
             return false;
         }
     }

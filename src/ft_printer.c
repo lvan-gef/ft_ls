@@ -82,8 +82,7 @@ static void init_print_lines_(const t_print_request *req) {
     for (size_t index = 0; index < req->entries->len; ++index) {
         const t_entry *entry = req->entries->data[index];
 
-        put_entry_name(ctx->out, entry, false, ctx->args->color,
-                       ctx->is_tty);
+        put_entry_name(ctx->out, entry, false, ctx->args->color, ctx->is_tty);
         out_put(ctx->out, "\n", 1);
     }
 }

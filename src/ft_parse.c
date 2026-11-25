@@ -6,14 +6,11 @@
 #include "./ft_array.h"
 #include "./ft_out.h"
 #include "./ft_parse.h"
-#include "./ft_str.h"
 #include "./ft_utils.h"
 
-static bool append_input_(char *arg, t_str *views, t_array *inputs);
-static void print_error_(const char *reason, const char *flag, size_t len, int *exit_code);
+static void print_error_(const char *reason, const char *flag, size_t len);
 
-bool parse_args(size_t argc, char **argv, t_args *args, t_array *inputs,
-                t_str *views, int *exit_code) {
+bool parse_args(size_t argc, char **argv, t_args *args, t_array *inputs) {
     bool is_flag = true;
 
     for (size_t index = 1; index < argc; ++index) {
@@ -24,12 +21,12 @@ bool parse_args(size_t argc, char **argv, t_args *args, t_array *inputs,
         }
 
         if (is_flag && !ft_strncmp(argv[index], "--", 2)) {
-            print_error_("unrecognized option ", argv[index], len, exit_code);
+            print_error_("unrecognized option ", argv[index], len);
             return false;
         }
 
         if (!is_flag || *argv[index] != '-' || len == 1) {
-            if (!append_input_(argv[index], views + index, inputs)) {
+            if (!array_append(inputs, argv[index])) {
                 return false;
             }
 
@@ -62,7 +59,8 @@ bool parse_args(size_t argc, char **argv, t_args *args, t_array *inputs,
                     break;
                 case 'G': args->color = true; break;
                 default:
-                    print_error_("invalid option -- ", &argv[index][sub_index], 1, exit_code);
+                    print_error_("invalid option -- ", &argv[index][sub_index],
+                                 1);
                     return false;
             }
         }
@@ -70,7 +68,7 @@ bool parse_args(size_t argc, char **argv, t_args *args, t_array *inputs,
 
     if (!inputs->len) {
         static char dot[] = ".";
-        if (!append_input_(dot, views, inputs)) {
+        if (!array_append(inputs, dot)) {
             return false;
         }
     }
@@ -80,14 +78,7 @@ bool parse_args(size_t argc, char **argv, t_args *args, t_array *inputs,
     return true;
 }
 
-static bool append_input_(char *arg, t_str *views, t_array *inputs) {
-    const size_t len = ft_strlen(arg);
-
-    *views = (t_str){.str = arg, .len = len};
-    return array_append(inputs, views);
-}
-
-static void print_error_(const char *reason, const char *flag, size_t len, int *exit_code) {
+static void print_error_(const char *reason, const char *flag, size_t len) {
     char buf[256];
     t_out out;
 
@@ -99,5 +90,4 @@ static void print_error_(const char *reason, const char *flag, size_t len, int *
     out_put(&out, "'", 1);
     out_str(&out, "\nTry 'ft_ls --help' for more information.\n");
     out_flush(&out);
-    *exit_code = 2;
 }
