@@ -121,7 +121,7 @@ static bool calc_width_(const t_array *array, const bool quoted,
         if (col_widths[index] < real_length) {
             line_len += real_length - col_widths[index];
             col_widths[index] = real_length;
-            if (line_len >= term_size) {
+            if (line_len > term_size) {
                 return false;
             }
         }
