@@ -28,7 +28,9 @@ static size_t dev_width_(const t_list_stats *sizes);
 static size_t size_width_(const t_list_stats *sizes);
 static void put_uint_(t_out *out, size_t value);
 static void put_padded_(t_out *out, const t_str *str, size_t width);
-static void put_right_(t_out *out, const t_str *str, size_t width);
+static void put_num_(t_out *out, const t_entry *entry, size_t value,
+                     size_t width);
+static void put_uint_right_(t_out *out, size_t value, size_t width);
 static void print_list_rows_(const t_print_request *req,
                              const t_file_info *infos,
                              const t_list_stats *sizes);
@@ -53,6 +55,7 @@ static void print_list_(const t_print_request *req, const t_file_info *infos) {
         const t_entry *entry = req->entries->data[index];
         update_num_widths_(&sizes, entry);
         update_stats_(&sizes, &infos[index]);
+        sizes.total += (size_t)entry->st.st_blocks;
     }
 
     const t_array *context = req->list_width_context;
@@ -83,8 +86,6 @@ static void update_stats_(t_list_stats *stats, const t_file_info *info) {
     if (info->perm_len > stats->max_len_perm) {
         stats->max_len_perm = info->perm_len;
     }
-
-    stats->total += info->blocks;
 }
 
 static size_t dev_width_(const t_list_stats *sizes) {
@@ -114,9 +115,20 @@ static void put_padded_(t_out *out, const t_str *str, const size_t width) {
     out_pad(out, ' ', width - str->len);
 }
 
-static void put_right_(t_out *out, const t_str *str, const size_t width) {
-    out_pad(out, ' ', width - str->len);
-    out_put(out, str->str, str->len);
+static void put_num_(t_out *out, const t_entry *entry, size_t value,
+                     size_t width) {
+    if (entry->stat_unavailable) {
+        out_pad(out, ' ', width - 1);
+        out_put(out, "?", 1);
+    } else {
+        put_uint_right_(out, value, width);
+    }
+}
+
+static void put_uint_right_(t_out *out, const size_t value,
+                            const size_t width) {
+    out_pad(out, ' ', width - str_uint_len(value));
+    put_uint_(out, value);
 }
 
 static void print_list_rows_(const t_print_request *req,
@@ -127,11 +139,12 @@ static void print_list_rows_(const t_print_request *req,
     for (size_t index = 0; index < req->entries->len; ++index) {
         const t_entry *entry = req->entries->data[index];
         const t_file_info *info = &infos[index];
+        const struct stat *st = &entry->st;
 
         out_put(out, info->perm, info->perm_len);
         out_pad(out, ' ', sizes->max_len_perm - info->perm_len);
         out_put(out, " ", 1);
-        put_right_(out, info->links, sizes->max_len_links);
+        put_num_(out, entry, st->st_nlink, sizes->max_len_links);
         out_put(out, " ", 1);
 
         if (!req->no_owner) {
@@ -144,13 +157,13 @@ static void print_list_rows_(const t_print_request *req,
             out_put(out, " ", 1);
         }
 
-        if (info->major) {
+        if (S_ISBLK(st->st_mode) || S_ISCHR(st->st_mode)) {
             out_pad(out, ' ', size_width_(sizes) - dev_width_(sizes));
-            put_right_(out, info->major, sizes->max_len_major);
+            put_uint_right_(out, major(st->st_rdev), sizes->max_len_major);
             out_put(out, ", ", 2);
-            put_right_(out, info->minor, sizes->max_len_minor);
+            put_uint_right_(out, minor(st->st_rdev), sizes->max_len_minor);
         } else {
-            put_right_(out, info->size, size_width_(sizes));
+            put_num_(out, entry, (size_t)st->st_size, size_width_(sizes));
         }
 
         out_put(out, " ", 1);

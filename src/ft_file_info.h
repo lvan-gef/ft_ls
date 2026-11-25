@@ -21,14 +21,9 @@ typedef struct s_file_info {
     char perm[PERMISSION_SIZE];
     size_t perm_len;
     char dt[DT_LEN];
-    t_str *links;
     t_str *username;
     t_str *groupname;
-    t_str *size;
     t_str *symlink;
-    t_str *major;
-    t_str *minor;
-    size_t blocks;
 } t_file_info;
 
 bool prepare_list_infos(t_arena *arena, const t_array *entries,

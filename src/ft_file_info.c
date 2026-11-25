@@ -54,15 +54,12 @@ static bool fill_file_info_(t_arena *arena, t_file_info *info,
                             const t_entry *entry, time_t now, bool access_time);
 static void get_perm_(t_arena *arena, t_file_info *info, const t_entry *entry);
 static char file_type_char_(mode_t mode);
-static t_str *get_links_(t_arena *arena, const t_entry *entry);
 static t_str *get_id_name_(t_arena *arena, t_id_cache *cache, size_t id,
                            t_id_lookup lookup);
 static const char *user_name_(size_t id);
 static const char *group_name_(size_t id);
-static t_str *get_size_(t_arena *arena, const t_entry *entry);
 static bool get_dt_(char *dt, const time_t now, const t_entry *entry,
-                    const bool acces_time);
-static bool get_blk_(t_arena *arena, const t_entry *entry, t_file_info *info);
+                    bool acces_time);
 static const char *cache_lookup_(const t_id_cache *cache, size_t id);
 static void cache_store_(t_id_cache *cache, size_t id, const char *name);
 static char exec_char_(mode_t mode, mode_t exec_bit, mode_t special_bit,
@@ -108,10 +105,6 @@ static bool fill_file_info_(t_arena *arena, t_file_info *info,
     *info = (t_file_info){0};
 
     get_perm_(arena, info, entry);
-    info->links = get_links_(arena, entry);
-    if (!info->links) {
-        return false;
-    }
 
     if (entry->stat_unavailable) {
         info->username = str_arena_from_cstr(arena, "?");
@@ -125,17 +118,6 @@ static bool fill_file_info_(t_arena *arena, t_file_info *info,
 
     if (!info->username || !info->groupname) {
         return false;
-    }
-
-    if (S_ISBLK(entry->st.st_mode) || S_ISCHR(entry->st.st_mode)) {
-        if (!get_blk_(arena, entry, info)) {
-            return false;
-        }
-    } else {
-        info->size = get_size_(arena, entry);
-        if (!info->size) {
-            return false;
-        }
     }
 
     if (!get_dt_(info->dt, now, entry, access_time)) {
@@ -152,7 +134,6 @@ static bool fill_file_info_(t_arena *arena, t_file_info *info,
         info->symlink = NULL;
     }
 
-    info->blocks = (size_t)entry->st.st_blocks;
     return true;
 }
 
@@ -221,14 +202,6 @@ static char file_type_char_(const mode_t mode) {
     return '?';
 }
 
-static t_str *get_links_(t_arena *arena, const t_entry *entry) {
-    if (entry->stat_unavailable) {
-        return str_arena_from_cstr(arena, "?");
-    }
-
-    return str_arena_from_uint(arena, (size_t)entry->st.st_nlink);
-}
-
 static t_str *get_id_name_(t_arena *arena, t_id_cache *cache, const size_t id,
                            const t_id_lookup lookup) {
     const char *name = cache_lookup_(cache, id);
@@ -259,14 +232,6 @@ static const char *group_name_(const size_t id) {
     return grp ? grp->gr_name : NULL;
 }
 
-static t_str *get_size_(t_arena *arena, const t_entry *entry) {
-    if (entry->stat_unavailable) {
-        return str_arena_from_cstr(arena, "?");
-    }
-
-    return str_arena_from_uint(arena, (size_t)entry->st.st_size);
-}
-
 static bool get_dt_(char *dt, const time_t now, const t_entry *entry,
                     const bool acces_time) {
     if (entry->stat_unavailable) {
@@ -291,20 +256,6 @@ static bool get_dt_(char *dt, const time_t now, const t_entry *entry,
     }
 
     dt[DT_LEN - 1] = '\0';
-    return true;
-}
-
-static bool get_blk_(t_arena *arena, const t_entry *entry, t_file_info *info) {
-    unsigned int major = major(entry->st.st_rdev);
-    unsigned int minor = minor(entry->st.st_rdev);
-
-    info->major = str_arena_from_uint(arena, major);
-    info->minor = str_arena_from_uint(arena, minor);
-
-    if (!info->major || !info->minor) {
-        return false;
-    }
-
     return true;
 }
 
