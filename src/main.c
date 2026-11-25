@@ -19,17 +19,20 @@ int main(int argc, char **argv) {
     }
 
     if (!array_init(&inputs, (size_t)argc)) {
+        free(views);
         return 1;
     }
 
     if (!parse_args((size_t)argc, argv, &args, &inputs, views)) {
         free(views);
+        array_destroy(&inputs);
         return 1;
     }
 
     init_timezone_();
     const int exit_code = process(&args, &inputs);
     free(views);
+    array_destroy(&inputs);
     return exit_code;
 }
 
