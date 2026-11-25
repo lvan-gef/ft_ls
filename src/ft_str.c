@@ -39,18 +39,6 @@ t_str *str_new(const size_t cap) {
     return str;
 }
 
-t_str *str_from_cstr(const char *src) {
-    const size_t len = ft_strlen(src);
-
-    t_str *new_str = str_new(len);
-    if (!new_str) {
-        return NULL;
-    }
-
-    str_copy_cstr(new_str, src, (size_t)len);
-    return new_str;
-}
-
 t_str *str_dup(const t_str *src) {
     t_str *new_str = str_new(src->len);
     if (!new_str) {

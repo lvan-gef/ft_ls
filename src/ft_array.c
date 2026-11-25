@@ -46,14 +46,6 @@ void array_destroy(t_array *array) {
     array->cap = 0;
 }
 
-void array_destroy_with(t_array *array, const t_array_del del) {
-    for (size_t index = 0; index < array->len; ++index) {
-        del(array->data[index]);
-    }
-
-    array_destroy(array);
-}
-
 bool array_append(t_array *array, void *item) {
     if (array->len == array->cap) {
         if (!realloc_arr_(array)) {
