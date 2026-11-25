@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "./ft_array.h"
+#include "./ft_str.h"
 
 typedef struct s_args {
     bool list;
@@ -21,6 +22,7 @@ typedef struct s_args {
     bool sort_time;
 } t_args;
 
-bool parse_args(size_t argc, const char **argv, t_args *args, t_array *inputs);
+bool parse_args(size_t argc, char **argv, t_args *args, t_array *inputs,
+                t_str *views);
 
 #endif /* ifndef FT_PARSE_H */

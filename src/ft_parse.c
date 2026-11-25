@@ -9,11 +9,11 @@
 #include "./ft_str.h"
 #include "./ft_utils.h"
 
-static bool append_input_(const char *arg, t_array *inputs);
+static bool append_input_(char *arg, t_str *views, t_array *inputs);
 static void print_error_(const char *flag);
 
-bool parse_args(const size_t argc, const char **argv, t_args *args,
-                t_array *inputs) {
+bool parse_args(size_t argc, char **argv, t_args *args, t_array *inputs,
+                t_str *views) {
     bool is_flag = true;
 
     for (size_t index = 1; index < argc; ++index) {
@@ -24,7 +24,7 @@ bool parse_args(const size_t argc, const char **argv, t_args *args,
         }
 
         if (!is_flag || *argv[index] != '-' || len == 1) {
-            if (!append_input_(argv[index], inputs)) {
+            if (!append_input_(argv[index], views + index, inputs)) {
                 return false;
             }
 
@@ -62,7 +62,8 @@ bool parse_args(const size_t argc, const char **argv, t_args *args,
     }
 
     if (!inputs->len) {
-        if (!append_input_(".", inputs)) {
+        static char dot[] = ".";
+        if (!append_input_(dot, views, inputs)) {
             return false;
         }
     }
@@ -72,18 +73,11 @@ bool parse_args(const size_t argc, const char **argv, t_args *args,
     return true;
 }
 
-static bool append_input_(const char *arg, t_array *inputs) {
-    t_str *str = str_from_cstr(arg);
-    if (!str) {
-        return false;
-    }
+static bool append_input_(char *arg, t_str *views, t_array *inputs) {
+    const size_t len = ft_strlen(arg);
 
-    if (!array_append(inputs, (void *)str)) {
-        str_free(str);
-        return false;
-    }
-
-    return true;
+    *views = (t_str){.str = arg, .len = len, .cap = len + 1};
+    return array_append(inputs, views);
 }
 
 static void print_error_(const char *flag) {

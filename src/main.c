@@ -8,29 +8,29 @@
 #include "./ft_str.h"
 #include "./ft_walk.h"
 
-static void del_str_(void *ptr);
 static void init_timezone_(void);
 
-int main(const int argc, const char *argv[]) {
+int main(int argc, char **argv) {
     t_args args = {0};
     t_array inputs = {0};
+    t_str *views = malloc((size_t)argc * sizeof(*views));
+    if (!views) {
+        return 1;
+    }
+
     if (!array_init(&inputs, (size_t)argc)) {
         return 1;
     }
 
-    if (!parse_args((size_t)argc, argv, &args, &inputs)) {
-        array_destroy_with(&inputs, del_str_);
+    if (!parse_args((size_t)argc, argv, &args, &inputs, views)) {
+        free(views);
         return 1;
     }
 
     init_timezone_();
     const int exit_code = process(&args, &inputs);
-    array_destroy_with(&inputs, del_str_);
+    free(views);
     return exit_code;
-}
-
-static void del_str_(void *ptr) {
-    str_free((t_str *)ptr);
 }
 
 static void init_timezone_(void) {
