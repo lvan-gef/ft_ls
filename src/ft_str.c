@@ -5,9 +5,8 @@
 #include "./ft_str.h"
 #include "./ft_utils.h"
 
-void str_init(t_str *str, char *buf, const size_t cap) {
+void str_init(t_str *str, char *buf) {
     str->str = buf;
-    str->cap = cap + 1;
     str->len = 0;
     str->str[0] = '\0';
 }
@@ -36,7 +35,7 @@ t_str *str_new(const size_t cap) {
         return NULL;
     }
 
-    str_init(str, (char *)(str + 1), cap);
+    str_init(str, (char *)(str + 1));
     return str;
 }
 

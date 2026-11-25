@@ -76,7 +76,7 @@ bool parse_args(size_t argc, char **argv, t_args *args, t_array *inputs,
 static bool append_input_(char *arg, t_str *views, t_array *inputs) {
     const size_t len = ft_strlen(arg);
 
-    *views = (t_str){.str = arg, .len = len, .cap = len + 1};
+    *views = (t_str){.str = arg, .len = len};
     return array_append(inputs, views);
 }
 

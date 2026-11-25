@@ -105,7 +105,7 @@ static void put_uint_(t_out *out, const size_t value) {
     char digits[32];
     t_str str;
 
-    str_init(&str, digits, sizeof(digits) - 1);
+    str_init(&str, digits);
     str_copy_uint(&str, value);
     out_put(out, str.str, str.len);
 }

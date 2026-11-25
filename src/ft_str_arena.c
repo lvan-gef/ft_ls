@@ -12,7 +12,7 @@ t_str *str_arena_new(t_arena *arena, const size_t cap) {
         return NULL;
     }
 
-    str_init(str, (char *)(str + 1), cap);
+    str_init(str, (char *)(str + 1));
     return str;
 }
 

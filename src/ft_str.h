@@ -6,11 +6,10 @@
 
 typedef struct s_str {
     char *str;
-    size_t cap;
     size_t len;
 } t_str;
 
-void str_init(t_str *str, char *buf, size_t cap);
+void str_init(t_str *str, char *buf);
 void str_copy_cstr(t_str *str, const char *src, size_t len);
 void str_copy_uint(t_str *str, size_t value);
 size_t str_uint_len(size_t value);

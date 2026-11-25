@@ -69,7 +69,7 @@ t_entry *entry_new_dirent(t_arena *scratch, const struct dirent *dp) {
         return NULL;
     }
 
-    str_init(&ent->name, ent->name_buf, name_len);
+    str_init(&ent->name, ent->name_buf);
     str_copy_cstr(&ent->name, dp->d_name, name_len);
     ent->entry = (t_entry){.name = &ent->name,
                            .path = NULL,
@@ -124,7 +124,7 @@ static t_str *join_dir_path_(t_arena *scratch, const t_str *lhs,
         return NULL;
     }
 
-    str_init(path, (char *)(path + 1), total_len);
+    str_init(path, (char *)(path + 1));
 
     ft_memcpy(path->str, lhs->str, lhs->len);
     path->len = lhs->len;
