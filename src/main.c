@@ -21,6 +21,8 @@ int main(int argc, char **argv) {
     if (parse_args((size_t)argc, argv, &args, &inputs)) {
         init_timezone_();
         exit_code = process(&args, &inputs);
+    } else {
+        exit_code = 2;
     }
 
     array_destroy(&inputs);
