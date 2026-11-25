@@ -6,7 +6,7 @@
 #include "./ft_ls.h"
 #include "./ft_printer.h"
 #include "./ft_printer_helper.h"
-#include "ft_parse.h"
+#include "./ft_parse.h"
 
 #ifndef DEFAULT_TERM_SIZE
 #define DEFAULT_TERM_SIZE 80
@@ -26,6 +26,7 @@ static bool calc_width_(const t_array *array, bool quoted, size_t num_cols,
 static void create_row_(const t_print_request *req, const t_map *map,
                         const size_t *col_widths, bool quoted);
 static void indent_(t_out *out, size_t from, size_t to);
+static size_t name_width_(const t_entry *entry, bool quoted);
 
 bool printer(const t_print_request *req) {
     if (req->ctx->args->list) {
@@ -115,8 +116,7 @@ static bool calc_width_(const t_array *array, const bool quoted,
     for (size_t filesno = 0; filesno < file_count; ++filesno) {
         const size_t index = filesno / num_rows;
         const t_entry *entry = array->data[filesno];
-        size_t real_length = quoted ? entry->name_scan.padded_display_len
-                                    : entry->name_scan.display_len;
+        size_t real_length = name_width_(entry, quoted);
 
         if (index != num_cols - 1) {
             real_length += SPACE_GAP;
@@ -147,20 +147,16 @@ static void create_row_(const t_print_request *req, const t_map *map,
 
         while (true) {
             const t_entry *entry = req->entries->data[filesno];
-            const size_t name_length = quoted
-                                           ? entry->name_scan.padded_display_len
-                                           : entry->name_scan.display_len;
+            const size_t name_length = name_width_(entry, quoted);
             const size_t max_name_length = col_widths[col++];
 
             put_entry_name(out, entry, quoted, args->color, true);
-
             if (files_len - map->rows <= filesno) {
                 break;
             }
 
             filesno += map->rows;
             indent_(out, pos + name_length, pos + max_name_length);
-
             pos += max_name_length;
         }
 
@@ -178,4 +174,10 @@ static void indent_(t_out *out, size_t from, const size_t to) {
             ++from;
         }
     }
+}
+
+static size_t name_width_(const t_entry *entry, const bool quoted) {
+    const t_shell_scan *scan = &entry->name_scan;
+
+    return scan->display_len + (quoted && !scan->quote ? 1 : 0);
 }

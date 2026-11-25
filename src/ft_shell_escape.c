@@ -8,61 +8,61 @@
 #include "./ft_str.h"
 #include "./ft_utils.h"
 
-#define OCTAL_DIGIT_MASK 0x7
-#define BYTE_OCTAL_HIGH_SHIFT 6
-#define BYTE_OCTAL_MID_SHIFT 3
+#define OCTAL_DIGIT_MASK 0x7U
+#define BYTE_OCTAL_HIGH_SHIFT 6U
+#define BYTE_OCTAL_MID_SHIFT 3U
 
 typedef struct s_shell_out {
     t_out *dst;
     size_t len;
 } t_shell_out;
 
-typedef struct s_escape_state {
-    bool in_single;
-    bool in_ansi;
-} t_escape_state;
-
-typedef struct s_shell_analysis {
-    size_t len;
-    char quote;
-    bool needs_quote;
-    bool has_single;
-    bool can_use_double;
-    bool has_non_print;
-} t_shell_analysis;
+typedef enum e_quote_mode {
+    MODE_NONE,
+    MODE_SINGLE,
+    MODE_ANSI,
+} t_quote_mode;
 
 static void emit_bytes_(t_shell_out *out, const char *src, size_t len);
 static void emit_ansi_byte_(t_shell_out *out, unsigned char byte);
-static void enter_single_(t_shell_out *out, t_escape_state *state);
-static void leave_single_(t_shell_out *out, t_escape_state *state);
-static void enter_ansi_(t_shell_out *out, t_escape_state *state);
-static void leave_ansi_(t_shell_out *out, t_escape_state *state);
 static void shell_escape_bytes_(t_shell_out *out, const char *src, size_t len);
-static void escape_byte_(t_shell_out *out, t_escape_state *state,
-                         unsigned char c);
-static size_t escaped_len_(const char *src, size_t len, char quote,
-                           bool pad_unquoted);
-static void fill_scan_(t_shell_scan *scan, const char *src,
-                       const t_shell_analysis *analysis);
+static void escape_byte_(t_shell_out *out, t_quote_mode *mode, unsigned char c);
+static size_t escaped_len_(const char *src, size_t len, char quote);
 static bool needs_raw_quote_(unsigned char c, size_t index);
 static bool is_safe_punct_(unsigned char c, size_t index);
-static void analyze_shell_byte_(t_shell_analysis *analysis, unsigned char c,
-                                size_t index);
-static char quote_from_analysis_(const t_shell_analysis *analysis);
 static void put_literal_(t_out *out, const char *src, size_t len);
+static void switch_mode_(t_shell_out *out, t_quote_mode *mode,
+                         const t_quote_mode next);
 
 void shell_scan_str(const t_str *str, t_shell_scan *scan) {
-    t_shell_analysis analysis = {0};
+    bool needs_quote = false;
+    bool has_single = false;
+    bool can_use_double = true;
 
-    analysis.quote = '\0';
-    analysis.can_use_double = true;
-    analysis.len = str->len;
-    for (size_t i = 0; i < str->len; ++i) {
-        analyze_shell_byte_(&analysis, (unsigned char)str->str[i], i);
+    for (size_t index = 0; index < str->len; ++index) {
+        const unsigned char c = (unsigned char)str->str[index];
+
+        if (c == '\'') {
+            has_single = true;
+        }
+
+        if (needs_raw_quote_(c, index)) {
+            needs_quote = true;
+            if (c != ' ' && c != '\'') {
+                can_use_double = false;
+            }
+        }
     }
 
-    analysis.quote = quote_from_analysis_(&analysis);
-    fill_scan_(scan, str->str, &analysis);
+    if (!needs_quote) {
+        scan->quote = '\0';
+    } else if (has_single && can_use_double) {
+        scan->quote = '"';
+    } else {
+        scan->quote = '\'';
+    }
+
+    scan->display_len = escaped_len_(str->str, str->len, scan->quote);
 }
 
 void shell_escape_put(t_out *out, const t_str *str, const char quote,
@@ -110,93 +110,56 @@ static void emit_ansi_byte_(t_shell_out *out, const unsigned char byte) {
         case '\r': repr[1] = 'r'; break;
         default:
             len = 4;
-            repr[1] = (char)('0' + ((byte >> BYTE_OCTAL_HIGH_SHIFT) &
+            repr[1] = (char)('0' + (((unsigned)byte >> BYTE_OCTAL_HIGH_SHIFT) &
                                     OCTAL_DIGIT_MASK));
-            repr[2] = (char)('0' + ((byte >> BYTE_OCTAL_MID_SHIFT) &
+            repr[2] = (char)('0' + (((unsigned)byte >> BYTE_OCTAL_MID_SHIFT) &
                                     OCTAL_DIGIT_MASK));
-            repr[3] = (char)('0' + (byte & OCTAL_DIGIT_MASK));
+            repr[3] = (char)('0' + ((unsigned)byte & OCTAL_DIGIT_MASK));
             break;
     }
 
     emit_bytes_(out, repr, len);
 }
 
-static void enter_single_(t_shell_out *out, t_escape_state *state) {
-    if (state->in_single) {
-        return;
-    }
-
-    emit_bytes_(out, "'", 1);
-    state->in_single = true;
-}
-
-static void leave_single_(t_shell_out *out, t_escape_state *state) {
-    if (!state->in_single) {
-        return;
-    }
-
-    emit_bytes_(out, "'", 1);
-    state->in_single = false;
-}
-
-static void enter_ansi_(t_shell_out *out, t_escape_state *state) {
-    if (state->in_ansi) {
-        return;
-    }
-
-    emit_bytes_(out, "$'", 2);
-    state->in_ansi = true;
-}
-
-static void leave_ansi_(t_shell_out *out, t_escape_state *state) {
-    if (!state->in_ansi) {
-        return;
-    }
-
-    emit_bytes_(out, "'", 1);
-    state->in_ansi = false;
-}
-
 static void shell_escape_bytes_(t_shell_out *out, const char *src,
                                 const size_t len) {
-    t_escape_state state = {.in_single = true, .in_ansi = false};
+    t_quote_mode mode = MODE_NONE;
 
-    emit_bytes_(out, "'", 1);
+    switch_mode_(out, &mode, MODE_SINGLE);
     for (size_t i = 0; i < len; ++i) {
-        escape_byte_(out, &state, (unsigned char)src[i]);
+        escape_byte_(out, &mode, (unsigned char)src[i]);
     }
 
-    if (state.in_single || state.in_ansi) {
-        emit_bytes_(out, "'", 1);
-    }
+    switch_mode_(out, &mode, MODE_NONE);
 }
 
-static void escape_byte_(t_shell_out *out, t_escape_state *state,
+static void escape_byte_(t_shell_out *out, t_quote_mode *mode,
                          const unsigned char c) {
     if (ft_isprint(c) && c != '\'') {
-        leave_ansi_(out, state);
-        enter_single_(out, state);
+        switch_mode_(out, mode, MODE_SINGLE);
         const char ch = (char)c;
         emit_bytes_(out, &ch, 1);
         return;
     }
 
     if (c == '\'') {
-        leave_ansi_(out, state);
-        emit_bytes_(out, state->in_single ? "'\\''" : "\\'",
-                    state->in_single ? 4U : 2U);
+        if (*mode == MODE_ANSI) {
+            switch_mode_(out, mode, MODE_NONE);
+        }
+
+        emit_bytes_(out, *mode == MODE_SINGLE ? "'\\''" : "\\'",
+                    *mode == MODE_SINGLE ? 4U : 2U);
         return;
     }
 
-    leave_single_(out, state);
-    enter_ansi_(out, state);
+    switch_mode_(out, mode, MODE_ANSI);
     emit_ansi_byte_(out, c);
 }
 
-static size_t escaped_len_(const char *src, const size_t len, const char quote,
-                           const bool pad_unquoted) {
+static size_t escaped_len_(const char *src, const size_t len,
+                           const char quote) {
     if (!quote) {
-        return len + (pad_unquoted ? 1 : 0);
+        return len;
     }
 
     if (quote == '"') {
@@ -209,48 +172,8 @@ static size_t escaped_len_(const char *src, const size_t len, const char quote,
     return out.len;
 }
 
-static void fill_scan_(t_shell_scan *scan, const char *src,
-                       const t_shell_analysis *analysis) {
-    const size_t display_len =
-        escaped_len_(src, analysis->len, analysis->quote, false);
-
-    scan->len = analysis->len;
-    scan->quote = analysis->quote;
-    scan->display_len = display_len;
-    scan->padded_display_len = !analysis->quote ? display_len + 1 : display_len;
-}
-
 static bool needs_raw_quote_(const unsigned char c, const size_t index) {
-    bool needs_quote = false;
-
-    switch (c) {
-        case ' ':
-        case '\'':
-        case '"':
-        case '!':
-        case '&':
-        case '(':
-        case ')':
-        case '[':
-        case ']':
-        case '*':
-        case '?':
-        case '<':
-        case '>':
-        case '|':
-        case ';':
-        case '$':
-        case '`':
-        case '\\':
-        case '^':
-        case '=': needs_quote = true; break;
-        default:
-            needs_quote =
-                !ft_isalpha(c) && !ft_isdigit(c) && !is_safe_punct_(c, index);
-            break;
-    }
-
-    return needs_quote;
+    return !ft_isalpha(c) && !ft_isdigit(c) && !is_safe_punct_(c, index);
 }
 
 static bool is_safe_punct_(const unsigned char c, const size_t index) {
@@ -272,40 +195,6 @@ static bool is_safe_punct_(const unsigned char c, const size_t index) {
     }
 }
 
-static void analyze_shell_byte_(t_shell_analysis *analysis,
-                                const unsigned char c, const size_t index) {
-    if (!ft_isprint(c)) {
-        analysis->has_non_print = true;
-    }
-
-    if (needs_raw_quote_(c, index)) {
-        analysis->needs_quote = true;
-        if (c != ' ' && c != '\'') {
-            analysis->can_use_double = false;
-        }
-    }
-
-    if (c == '\'') {
-        analysis->has_single = true;
-    }
-}
-
-static char quote_from_analysis_(const t_shell_analysis *analysis) {
-    if (analysis->has_non_print) {
-        return '\'';
-    }
-
-    if (!analysis->needs_quote) {
-        return '\0';
-    }
-
-    if (analysis->has_single && analysis->can_use_double) {
-        return '"';
-    }
-
-    return '\'';
-}
-
 static void put_literal_(t_out *out, const char *src, const size_t len) {
     size_t start = 0;
 
@@ -318,4 +207,23 @@ static void put_literal_(t_out *out, const char *src, const size_t len) {
     }
 
     out_put(out, src + start, len - start);
+}
+
+static void switch_mode_(t_shell_out *out, t_quote_mode *mode,
+                         const t_quote_mode next) {
+    if (*mode == next) {
+        return;
+    }
+
+    if (*mode != MODE_NONE) {
+        emit_bytes_(out, "'", 1);
+    }
+
+    if (next == MODE_SINGLE) {
+        emit_bytes_(out, "'", 1);
+    } else if (next == MODE_ANSI) {
+        emit_bytes_(out, "$'", 2);
+    }
+
+    *mode = next;
 }

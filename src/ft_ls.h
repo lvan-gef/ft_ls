@@ -9,9 +9,7 @@
 #include "./ft_str.h"
 
 typedef struct s_shell_scan {
-    size_t len;
     size_t display_len;
-    size_t padded_display_len;
     char quote;
 } t_shell_scan;
 
