@@ -4,9 +4,9 @@
 #include <unistd.h>
 
 #include "./ft_ls.h"
+#include "./ft_parse.h"
 #include "./ft_printer.h"
 #include "./ft_printer_helper.h"
-#include "./ft_parse.h"
 
 #ifndef DEFAULT_TERM_SIZE
 #define DEFAULT_TERM_SIZE 80
