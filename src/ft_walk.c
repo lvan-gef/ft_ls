@@ -44,13 +44,11 @@ static bool load_directory_entries_(t_params *params, DIR *d,
 static bool queue_recursive_dirs_(t_params *params, const t_str *parent_path);
 static bool collect_operands_(t_params *params, const t_array *array);
 static bool collect_operand_(t_params *params, const t_str *str);
-static bool add_operand_file_(t_params *params, const t_str *str,
-                              const struct stat *st);
+static bool add_operand_(t_params *params, t_array *dst, const t_str *str,
+                         const struct stat *st);
 static void quote_str_(t_params *params, const t_str *str);
 static void clear_directory_entries_(t_params *params);
 static void cleanup_process_(t_params *params);
-static bool queue_operand_dir_(t_params *params, const t_str *str,
-                               const struct stat *st);
 static void print_error_(t_out *out, const t_str *path, int e,
                          const char *prefix);
 static mode_t dtype_to_mode_(unsigned char dtype);
@@ -240,21 +238,21 @@ static bool collect_operand_(t_params *params, const t_str *str) {
     }
 
     if (is_dir && !args->directory) {
-        return queue_operand_dir_(params, str, dir_st);
+        return add_operand_(params, &params->dir_queue, str, dir_st);
     }
 
-    return add_operand_file_(params, str, &st);
+    return add_operand_(params, &params->operand_files, str, &st);
 }
 
-static bool add_operand_file_(t_params *params, const t_str *str,
-                              const struct stat *st) {
+static bool add_operand_(t_params *params, t_array *dst, const t_str *str,
+                         const struct stat *st) {
     t_entry *entry = entry_new_path(str, st, true);
     if (!entry) {
         return false;
     }
 
     params->quote_padding = params->quote_padding || entry->name_scan.quote;
-    if (!array_append(&params->operand_files, entry)) {
+    if (!array_append(dst, entry)) {
         entry_free(entry);
         return false;
     }
@@ -364,22 +362,6 @@ static void cleanup_process_(t_params *params) {
     if (params->temp_arena) {
         arena_release(params->temp_arena);
     }
-}
-
-static bool queue_operand_dir_(t_params *params, const t_str *str,
-                               const struct stat *st) {
-    t_entry *dir_entry = entry_new_path(str, st, true);
-    if (!dir_entry) {
-        return false;
-    }
-
-    params->quote_padding = params->quote_padding || dir_entry->name_scan.quote;
-    if (!array_append(&params->dir_queue, dir_entry)) {
-        entry_free(dir_entry);
-        return false;
-    }
-
-    return true;
 }
 
 static void print_error_(t_out *out, const t_str *path, const int e,
