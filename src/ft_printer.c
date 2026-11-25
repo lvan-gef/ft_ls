@@ -32,7 +32,7 @@ bool printer(const t_print_request *req) {
         return printer_list(req);
     }
 
-    if (!req->ctx->is_stdout) {
+    if (!req->ctx->is_tty) {
         init_print_lines_(req);
         return true;
     }
@@ -69,7 +69,7 @@ static bool init_print_row_(const t_print_request *req) {
 
     calc_cols_(req->entries, &map, req->quoted, col_widths, width_count,
                ctx->term_size);
-    put_dir_header(ctx->out, req->dir_header, ctx->is_stdout);
+    put_dir_header(ctx->out, req->dir_header, ctx->is_tty);
     create_row_(req, &map, col_widths, req->quoted);
     return true;
 }
@@ -77,13 +77,13 @@ static bool init_print_row_(const t_print_request *req) {
 static void init_print_lines_(const t_print_request *req) {
     const t_print_ctx *ctx = req->ctx;
 
-    put_dir_header(ctx->out, req->dir_header, ctx->is_stdout);
+    put_dir_header(ctx->out, req->dir_header, ctx->is_tty);
 
     for (size_t index = 0; index < req->entries->len; ++index) {
         const t_entry *entry = req->entries->data[index];
 
         put_entry_name(ctx->out, entry, false, ctx->args->color,
-                       ctx->is_stdout);
+                       ctx->is_tty);
         out_put(ctx->out, "\n", 1);
     }
 }

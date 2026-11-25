@@ -63,7 +63,7 @@ static void print_list_(const t_print_request *req, const t_file_info *infos) {
         update_num_widths_(&sizes, context->data[index]);
     }
 
-    put_dir_header(ctx->out, req->dir_header, ctx->is_stdout);
+    put_dir_header(ctx->out, req->dir_header, ctx->is_tty);
 
     if (req->print_total) {
         out_put(ctx->out, "total ", 6);
@@ -171,11 +171,11 @@ static void print_list_rows_(const t_print_request *req,
         out_put(out, info->dt, DT_LEN - 1);
         out_put(out, " ", 1);
         put_entry_name(out, entry, req->quoted, ctx->args->color,
-                       ctx->is_stdout);
+                       ctx->is_tty);
 
         if (info->symlink && info->symlink->len > 0) {
             out_put(out, " -> ", 4);
-            put_link_target(out, info->symlink, ctx->is_stdout);
+            put_link_target(out, info->symlink, ctx->is_tty);
         }
 
         out_put(out, "\n", 1);

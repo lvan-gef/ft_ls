@@ -22,7 +22,7 @@ typedef struct s_print_ctx {
     const t_args *args;
     t_out *out;
     t_arena *arena;
-    bool is_stdout;
+    bool is_tty;
     size_t term_size;
 } t_print_ctx;
 
