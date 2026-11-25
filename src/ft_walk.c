@@ -91,29 +91,14 @@ cleanup:
 }
 
 static bool run_listing_(t_params *params, const t_array *array) {
-    bool ok = false;
-
     params->ctx = (t_print_ctx){.args = params->args,
                                 .out = &params->out,
                                 .arena = params->temp_arena,
-                                .is_stdout = isatty(STDOUT_FILENO),
+                                .is_tty = isatty(STDOUT_FILENO),
                                 .term_size = get_terminal_width()};
 
-    if (!print_operand_files_(params)) {
-        goto cleanup;
-    }
-
-    if (params->args->directory) {
-        ok = true;
-        goto cleanup;
-    }
-
-    if (!process_queue_(params, array)) {
-        goto cleanup;
-    }
-
-    ok = true;
-cleanup:
+    const bool ok =
+        print_operand_files_(params) && process_queue_(params, array);
     out_flush(&params->out);
     return ok && !params->out.failed;
 }
