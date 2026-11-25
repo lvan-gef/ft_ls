@@ -37,9 +37,8 @@ typedef struct {
 } t_params;
 
 static bool run_listing_(t_params *params, const t_array *array);
-static bool print_operand_files_(t_params *params, bool *printed_files);
-static bool process_queue_(t_params *params, const t_array *array,
-                           bool printed_files);
+static bool print_operand_files_(t_params *params);
+static bool process_queue_(t_params *params, const t_array *array);
 static bool load_directory_entries_(t_params *params, DIR *d,
                                     const t_str *dir_path);
 static bool queue_recursive_dirs_(t_params *params, const t_str *parent_path);
@@ -92,7 +91,6 @@ cleanup:
 }
 
 static bool run_listing_(t_params *params, const t_array *array) {
-    bool printed_files = false;
     bool ok = false;
 
     params->ctx = (t_print_ctx){.args = params->args,
@@ -101,7 +99,7 @@ static bool run_listing_(t_params *params, const t_array *array) {
                                 .is_stdout = isatty(STDOUT_FILENO),
                                 .term_size = get_terminal_width()};
 
-    if (!print_operand_files_(params, &printed_files)) {
+    if (!print_operand_files_(params)) {
         goto cleanup;
     }
 
@@ -110,7 +108,7 @@ static bool run_listing_(t_params *params, const t_array *array) {
         goto cleanup;
     }
 
-    if (!process_queue_(params, array, printed_files)) {
+    if (!process_queue_(params, array)) {
         goto cleanup;
     }
 
@@ -120,7 +118,7 @@ cleanup:
     return ok && !params->out.failed;
 }
 
-static bool print_operand_files_(t_params *params, bool *printed_files) {
+static bool print_operand_files_(t_params *params) {
     if (!params->operand_files.len) {
         return true;
     }
@@ -132,17 +130,17 @@ static bool print_operand_files_(t_params *params, bool *printed_files) {
                                      .list_width_context = &params->dir_queue,
                                      .quoted = params->quote_padding};
         ok = printer(&req);
-        *printed_files = ok;
+        if (ok && params->dir_queue.len) {
+            out_put(&params->out, "\n", 1);
+        }
     }
 
     array_clear_with(&params->operand_files, entry_del);
     return ok;
 }
 
-static bool process_queue_(t_params *params, const t_array *array,
-                           const bool printed_files) {
+static bool process_queue_(t_params *params, const t_array *array) {
     bool printed_dir = false;
-    bool inserted_files_dirs_gap = false;
     const bool print_dir_path = params->args->recursive || array->len > 1;
     t_entry *dir_path = NULL;
 
@@ -152,11 +150,6 @@ static bool process_queue_(t_params *params, const t_array *array,
 
     while (params->dir_queue.len && !params->out.failed) {
         dir_path = array_pop(&params->dir_queue);
-
-        if (!inserted_files_dirs_gap && printed_files && dir_path->is_operand) {
-            out_put(&params->out, "\n", 1);
-            inserted_files_dirs_gap = true;
-        }
 
         DIR *d = opendir(dir_path->path->str);
         if (!d) {
