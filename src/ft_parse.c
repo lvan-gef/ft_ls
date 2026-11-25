@@ -10,17 +10,22 @@
 #include "./ft_utils.h"
 
 static bool append_input_(char *arg, t_str *views, t_array *inputs);
-static void print_error_(const char *flag);
+static void print_error_(const char *reason, const char *flag, size_t len, int *exit_code);
 
 bool parse_args(size_t argc, char **argv, t_args *args, t_array *inputs,
-                t_str *views) {
+                t_str *views, int *exit_code) {
     bool is_flag = true;
 
     for (size_t index = 1; index < argc; ++index) {
         const size_t len = ft_strlen(argv[index]);
-        if (is_flag && !ft_strncmp(argv[index], "--", 2)) {
+        if (is_flag && !ft_strncmp(argv[index], "--", 3)) {
             is_flag = false;
             continue;
+        }
+
+        if (is_flag && !ft_strncmp(argv[index], "--", 2)) {
+            print_error_("unrecognized option ", argv[index], len, exit_code);
+            return false;
         }
 
         if (!is_flag || *argv[index] != '-' || len == 1) {
@@ -56,7 +61,9 @@ bool parse_args(size_t argc, char **argv, t_args *args, t_array *inputs,
                     args->list = true;
                     break;
                 case 'G': args->color = true; break;
-                default: print_error_(argv[index]); return false;
+                default:
+                    print_error_("invalid option -- ", &argv[index][sub_index], 1, exit_code);
+                    return false;
             }
         }
     }
@@ -80,13 +87,17 @@ static bool append_input_(char *arg, t_str *views, t_array *inputs) {
     return array_append(inputs, views);
 }
 
-static void print_error_(const char *flag) {
+static void print_error_(const char *reason, const char *flag, size_t len, int *exit_code) {
     char buf[256];
     t_out out;
 
     out_init(&out, buf, sizeof(buf), STDERR_FILENO);
-    out_str(&out, "ft_ls: invalid option -- ");
-    out_str(&out, flag);
-    out_str(&out, "\nusage: ft_ls [-RalrtgufdoG] [file ...]\n");
+    out_str(&out, "ft_ls: ");
+    out_str(&out, reason);
+    out_put(&out, "'", 1);
+    out_put(&out, flag, len);
+    out_put(&out, "'", 1);
+    out_str(&out, "\nTry 'ft_ls --help' for more information.\n");
     out_flush(&out);
+    *exit_code = 2;
 }

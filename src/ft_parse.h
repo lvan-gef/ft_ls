@@ -23,6 +23,6 @@ typedef struct s_args {
 } t_args;
 
 bool parse_args(size_t argc, char **argv, t_args *args, t_array *inputs,
-                t_str *views);
+                t_str *views, int *exit_code);
 
 #endif /* ifndef FT_PARSE_H */

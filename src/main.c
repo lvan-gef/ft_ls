@@ -23,14 +23,14 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if (!parse_args((size_t)argc, argv, &args, &inputs, views)) {
-        free(views);
-        array_destroy(&inputs);
-        return 1;
+    int exit_code = 0;
+    if (!parse_args((size_t)argc, argv, &args, &inputs, views, &exit_code)) {
+        goto done;
     }
 
     init_timezone_();
-    const int exit_code = process(&args, &inputs);
+    exit_code = process(&args, &inputs);
+done:
     free(views);
     array_destroy(&inputs);
     return exit_code;
