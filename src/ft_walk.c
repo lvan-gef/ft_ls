@@ -35,12 +35,6 @@ typedef struct {
     bool dir_quoted;
 } t_params;
 
-typedef enum {
-    OPERAND_SKIP,
-    OPERAND_FILE,
-    OPERAND_FATAL,
-} t_operand_state;
-
 static bool run_listing_(t_params *params, const t_array *array,
                          int *exit_code);
 static bool print_operand_files_(t_params *params, const t_print_request *req,
@@ -53,9 +47,13 @@ static bool load_directory_entries_(t_params *params, const t_entry *path,
 static bool queue_recursive_dirs_(t_params *params, const t_str *parent_path);
 static bool collect_operands_(t_params *params, const t_array *array,
                               int *exit_code);
+static bool collect_operand_(t_params *params, const t_str *str,
+                             int *exit_code);
+static bool add_operand_file_(t_params *params, const t_str *str,
+                              const struct stat *st);
+static void quote_str_(t_params *params, const t_str *str);
+
 static void clear_directory_entries_(t_params *params);
-static t_operand_state classify_operand_(t_params *params, const t_str *str,
-                                         struct stat *st, int *exit_code);
 static void cleanup_process_(t_params *params);
 static bool queue_operand_dir_(t_params *params, const t_str *str,
                                const struct stat *st);
@@ -223,104 +221,87 @@ error:
 static bool collect_operands_(t_params *params, const t_array *array,
                               int *exit_code) {
     for (size_t index = 0; index < array->len; ++index) {
-        struct stat st = {0};
-        const t_str *str = array->data[index];
-
-        const t_operand_state state =
-            classify_operand_(params, str, &st, exit_code);
-
-        switch (state) {
-            case OPERAND_SKIP: {
-                t_shell_scan scan;
-
-                shell_scan_str(str, &scan);
-                params->quote_padding = params->quote_padding || scan.quote;
-                continue;
-            }
-            case OPERAND_FATAL: goto failed;
-            case OPERAND_FILE: break;
-        }
-
-        if (S_ISDIR(st.st_mode) && !params->args->directory) {
-            if (!queue_operand_dir_(params, str, &st)) {
-                goto failed;
-            }
-            continue;
-        }
-
-        t_entry *entry = entry_new_path(str, &st, true);
-        if (!entry) {
-            goto failed;
-        }
-
-        params->quote_padding = params->quote_padding || entry->name_scan.quote;
-        if (!array_append(&params->operand_files, entry)) {
-            entry_free(entry);
-            goto failed;
+        if (!collect_operand_(params, array->data[index], exit_code)) {
+            *exit_code = 2;
+            return false;
         }
     }
 
     if (!sort(&params->dir_queue, params->args, !params->args->reverse)) {
-        goto failed;
+        *exit_code = 2;
+        return false;
     }
 
     return true;
-failed:
-    *exit_code = 2;
-    return false;
 }
 
-static t_operand_state classify_operand_(t_params *params, const t_str *str,
-                                         struct stat *st, int *exit_code) {
-    int e = 0;
-    t_operand_state state = OPERAND_FILE;
+static bool collect_operand_(t_params *params, const t_str *str,
+                             int *exit_code) {
+    const t_args *args = params->args;
+    struct stat st;
+    struct stat target;
+    const struct stat *dir_st = &st;
 
-    if (lstat(str->str, st) < 0) {
+    if (lstat(str->str, &st) < 0) {
         print_error_(&params->out, str, errno, "cannot access");
         *exit_code = 2;
-        return OPERAND_SKIP;
+        quote_str_(params, str);
+        return true;
     }
 
-    bool is_dir_operand = S_ISDIR(st->st_mode);
-    const struct stat *st_dir = st;
-    struct stat st_target;
-    if (params->args->directory && !params->args->list) {
-        goto cleanup;
-    }
-
-    if (S_ISLNK(st->st_mode)) {
-        if (!stat(str->str, &st_target) && S_ISDIR(st_target.st_mode)) {
-            is_dir_operand = true;
-            st_dir = &st_target;
+    bool is_dir = S_ISDIR(st.st_mode);
+    if (S_ISLNK(st.st_mode) && (args->list || !args->directory)) {
+        if (!args->list && !stat(str->str, &target) &&
+            S_ISDIR(target.st_mode)) {
+            is_dir = true;
+            dir_st = &target;
         }
 
-        if (!read_symlink(params->temp_arena, str, (size_t)st->st_size, &e)) {
-            state = OPERAND_FATAL;
-            goto cleanup;
+        int e = 0;
+        if (!read_symlink(params->temp_arena, str, (size_t)st.st_size, &e)) {
+            return false;
         }
 
         if (e) {
             *exit_code = 2;
-            if (params->args->list) {
-                print_error_(&params->out, str, e, "cannot read symbolic link");
-            } else {
-                print_error_(&params->out, str, e, "cannot access");
-                state = OPERAND_SKIP;
-                goto cleanup;
+            print_error_(&params->out, str, e,
+                         args->list ? "cannot read symbolic link"
+                                    : "cannot access");
+            if (!args->list) {
+                quote_str_(params, str);
+                return true;
             }
         }
     }
 
-    if (is_dir_operand && !params->args->list && !params->args->directory) {
-        if (!queue_operand_dir_(params, str, st_dir)) {
-            state = OPERAND_FATAL;
-            goto cleanup;
-        }
-
-        state = OPERAND_SKIP;
+    if (is_dir && !args->directory) {
+        return queue_operand_dir_(params, str, dir_st);
     }
-cleanup:
-    return state;
+
+    return add_operand_file_(params, str, &st);
+}
+
+static bool add_operand_file_(t_params *params, const t_str *str,
+                              const struct stat *st) {
+    t_entry *entry = entry_new_path(str, st, true);
+    if (!entry) {
+        return false;
+    }
+
+    params->quote_padding = params->quote_padding || entry->name_scan.quote;
+    if (!array_append(&params->operand_files, entry)) {
+        entry_free(entry);
+        return false;
+    }
+
+    return true;
+}
+
+static void quote_str_(t_params *params, const t_str *str) {
+    t_shell_scan scan;
+
+    shell_scan_str(str, &scan);
+    params->quote_padding = params->quote_padding || scan.quote;
 }
 
 static bool load_directory_entries_(t_params *params, const t_entry *path,
