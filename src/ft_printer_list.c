@@ -8,7 +8,6 @@
 #include "./ft_ls.h"
 #include "./ft_out.h"
 #include "./ft_printer.h"
-#include "./ft_printer_helper.h"
 #include "./ft_str.h"
 
 typedef struct {

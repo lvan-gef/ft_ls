@@ -15,7 +15,6 @@
 #include "./ft_file_info.h"
 #include "./ft_ls.h"
 #include "./ft_printer.h"
-#include "./ft_str_arena.h"
 #include "./ft_symlink.h"
 #include "./ft_utils.h"
 

@@ -6,7 +6,6 @@
 #include <unistd.h>
 
 #include "./ft_arena.h"
-#include "./ft_str_arena.h"
 #include "./ft_symlink.h"
 
 #ifndef PATH_MAX

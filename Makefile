@@ -22,9 +22,8 @@ LDLIBS   :=
 
 SRCDIR   := src
 SRCFILES := ft_arena.c ft_array.c ft_file_info.c ft_out.c ft_parse.c           \
-            ft_printer.c ft_printer_helper.c ft_printer_list.c                 \
-			ft_shell_escape.c ft_sort.c ft_str.c ft_str_arena.c                \
-            ft_symlink.c ft_utils.c ft_walk.c ft_walk_entry.c main.c
+            ft_printer.c ft_printer_list.c ft_shell_escape.c ft_sort.c         \
+			ft_str.c ft_symlink.c ft_utils.c ft_walk.c main.c
 
 SRCS     := $(addprefix $(SRCDIR)/, $(SRCFILES))
 OBJDIR   := obj
