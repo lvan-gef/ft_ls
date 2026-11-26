@@ -176,35 +176,16 @@ static void get_perm_(t_file_info *info, const t_entry *entry) {
 }
 
 static char file_type_char_(const mode_t mode) {
-    if ((mode & S_IFMT) == S_IFREG) {
-        return '-';
+    switch (mode & S_IFMT) {
+        case S_IFREG: return '-';
+        case S_IFDIR: return 'd';
+        case S_IFLNK: return 'l';
+        case S_IFIFO: return 'p';
+        case S_IFSOCK: return 's';
+        case S_IFCHR: return 'c';
+        case S_IFBLK: return 'b';
+        default: return '?';
     }
-
-    if ((mode & S_IFMT) == S_IFDIR) {
-        return 'd';
-    }
-
-    if ((mode & S_IFMT) == S_IFLNK) {
-        return 'l';
-    }
-
-    if ((mode & S_IFMT) == S_IFIFO) {
-        return 'p';
-    }
-
-    if ((mode & S_IFMT) == S_IFSOCK) {
-        return 's';
-    }
-
-    if ((mode & S_IFMT) == S_IFCHR) {
-        return 'c';
-    }
-
-    if ((mode & S_IFMT) == S_IFBLK) {
-        return 'b';
-    }
-
-    return '?';
 }
 
 static t_str *get_id_name_(t_arena *arena, t_id_cache *cache, const size_t id,
