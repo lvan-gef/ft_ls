@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -6,24 +7,11 @@
 
 static t_arena_block *new_block_(size_t cap);
 
-t_arena *arena_alloc(const size_t cap) {
-    t_arena_block *block = new_block_(cap);
-    if (!block) {
-        return NULL;
-    }
-
-    t_arena *arena = malloc(sizeof(*arena));
-    if (!arena) {
-        free(block);
-        return NULL;
-    }
-
-    arena->first = block;
-    arena->current = block;
-    arena->align = ARENA_ALIGN;
+bool arena_init(t_arena *arena, const size_t cap) {
+    arena->first = new_block_(cap);
+    arena->current = arena->first;
     arena->block_size = cap;
-
-    return arena;
+    return arena->first != NULL;
 }
 
 void arena_release(t_arena *arena) {
@@ -34,16 +22,14 @@ void arena_release(t_arena *arena) {
         free(block);
         block = next;
     }
-
-    free(arena);
 }
 
 void *arena_push(t_arena *arena, const size_t size) {
     size_t align_pos = arena->current->pos;
 
-    const size_t remainder = align_pos % arena->align;
+    const size_t remainder = align_pos % ARENA_ALIGN;
     if (remainder) {
-        align_pos += arena->align - remainder;
+        align_pos += ARENA_ALIGN - remainder;
     }
 
     if (align_pos > arena->current->cap ||
@@ -58,7 +44,6 @@ void *arena_push(t_arena *arena, const size_t size) {
             return NULL;
         }
 
-        block->prev = arena->current;
         arena->current->next = block;
         arena->current = block;
         align_pos = 0;
@@ -72,8 +57,11 @@ void *arena_push(t_arena *arena, const size_t size) {
 }
 
 void arena_clear(t_arena *arena) {
-    t_arena_block *block = arena->first->next;
+    if (!arena->first) {
+        return;
+    }
 
+    t_arena_block *block = arena->first->next;
     while (block) {
         t_arena_block *next = block->next;
         free(block);
@@ -81,7 +69,6 @@ void arena_clear(t_arena *arena) {
     }
 
     arena->first->next = NULL;
-    arena->first->prev = NULL;
     arena->first->pos = 0;
     arena->current = arena->first;
 }
@@ -93,7 +80,6 @@ static t_arena_block *new_block_(const size_t cap) {
     }
 
     block->next = NULL;
-    block->prev = NULL;
     block->pos = 0;
     block->cap = cap;
 

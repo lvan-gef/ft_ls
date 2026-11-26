@@ -25,7 +25,7 @@
 
 typedef struct {
     const t_args *args;
-    t_arena *temp_arena;
+    t_arena temp_arena;
     t_array dir_queue;
     t_array operand_files;
     t_array current_entries;
@@ -61,8 +61,7 @@ int process(const t_args *args, const t_array *array) {
 
     params.args = args;
     out_init(&params.out, out_buf, sizeof(out_buf), STDOUT_FILENO);
-    params.temp_arena = arena_alloc(ARENA_SIZE);
-    if (!params.temp_arena) {
+    if (!arena_init(&params.temp_arena, ARENA_SIZE)) {
         set_exit_(&params, 2);
         goto cleanup;
     }
@@ -91,7 +90,7 @@ cleanup:
 static bool run_listing_(t_params *params, const t_array *array) {
     params->ctx = (t_print_ctx){.args = params->args,
                                 .out = &params->out,
-                                .arena = params->temp_arena,
+                                .arena = &params->temp_arena,
                                 .is_tty = isatty(STDOUT_FILENO),
                                 .term_size = get_terminal_width()};
 
@@ -223,7 +222,7 @@ static bool collect_operand_(t_params *params, const t_str *str) {
         }
 
         int e = 0;
-        if (!read_symlink(params->temp_arena, str, (size_t)st.st_size, &e)) {
+        if (!read_symlink(&params->temp_arena, str, (size_t)st.st_size, &e)) {
             return false;
         }
 
@@ -284,7 +283,7 @@ static bool load_directory_entries_(t_params *params, DIR *d,
             continue;
         }
 
-        t_entry *entry = entry_new_dirent(params->temp_arena, dp);
+        t_entry *entry = entry_new_dirent(&params->temp_arena, dp);
         if (!entry) {
             return false;
         }
@@ -292,7 +291,7 @@ static bool load_directory_entries_(t_params *params, DIR *d,
         params->dir_quoted = params->dir_quoted || entry->name_scan.quote;
         entry->st.st_mode = mode;
         if (need_lstat) {
-            if (!entry_build_path(params->temp_arena, entry, dir_path)) {
+            if (!entry_build_path(&params->temp_arena, entry, dir_path)) {
                 return false;
             }
 
@@ -314,9 +313,7 @@ static bool load_directory_entries_(t_params *params, DIR *d,
 static void clear_directory_entries_(t_params *params) {
     array_clear(&params->current_entries);
     params->dir_quoted = false;
-    if (params->temp_arena) {
-        arena_clear(params->temp_arena);
-    }
+    arena_clear(&params->temp_arena);
 }
 
 static bool queue_recursive_dirs_(t_params *params, const t_str *parent_path) {
@@ -334,7 +331,7 @@ static bool queue_recursive_dirs_(t_params *params, const t_str *parent_path) {
                 continue;
             }
 
-            if (!entry_build_path(params->temp_arena, entry, parent_path)) {
+            if (!entry_build_path(&params->temp_arena, entry, parent_path)) {
                 return false;
             }
 
@@ -360,10 +357,7 @@ static void cleanup_process_(t_params *params) {
     array_destroy(&params->current_entries);
     array_destroy(&params->operand_files);
     array_destroy(&params->dir_queue);
-
-    if (params->temp_arena) {
-        arena_release(params->temp_arena);
-    }
+    arena_release(&params->temp_arena);
 }
 
 static void print_error_(t_out *out, const t_str *path, const int e,

@@ -1,6 +1,7 @@
 #ifndef ARENA_H
 #define ARENA_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -9,11 +10,9 @@ struct s_arena_block {
     size_t pos;
     size_t cap;
     t_arena_block *next;
-    t_arena_block *prev;
 };
 
 typedef struct s_arena {
-    size_t align;
     size_t block_size;
     t_arena_block *first;
     t_arena_block *current;
@@ -27,7 +26,7 @@ typedef struct s_arena {
 #define ARENA_ALIGN 8
 #endif /* ifndef ARENA_ALIGN */
 
-t_arena *arena_alloc(size_t cap);
+bool arena_init(t_arena *arena, size_t cap);
 void arena_release(t_arena *arena);
 void *arena_push(t_arena *arena, size_t size);
 void arena_clear(t_arena *arena);
