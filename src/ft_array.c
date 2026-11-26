@@ -68,14 +68,6 @@ void array_clear(t_array *array) {
     array->len = 0;
 }
 
-void array_clear_with(t_array *array, const t_array_del del) {
-    for (size_t index = 0; index < array->len; ++index) {
-        del(array->data[index]);
-    }
-
-    array->len = 0;
-}
-
 static bool realloc_arr_(t_array *array) {
     size_t new_cap = array->cap ? array->cap * 2 : 1;
     void **old_data = array->data;

@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 #include "./ft_arena.h"
+#include "./ft_array.h"
 #include "./ft_ls.h"
 #include "./ft_str.h"
 
@@ -14,6 +15,6 @@ t_entry *entry_new_dirent(t_arena *scratch, const struct dirent *dp);
 bool entry_build_path(t_arena *scratch, t_entry *entry,
                       const t_str *parent_path);
 void entry_free(t_entry *entry);
-void entry_del(void *ptr);
+void entries_free(t_array *entries);
 
 #endif /* ifndef FT_WALK_ENTRY_H */

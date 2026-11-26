@@ -117,7 +117,7 @@ static bool print_operand_files_(t_params *params) {
         }
     }
 
-    array_clear_with(&params->operand_files, entry_del);
+    entries_free(&params->operand_files);
     return ok;
 }
 
@@ -352,8 +352,8 @@ static bool queue_recursive_dirs_(t_params *params, const t_str *parent_path) {
 
 static void cleanup_process_(t_params *params) {
     clear_directory_entries_(params);
-    array_clear_with(&params->operand_files, entry_del);
-    array_clear_with(&params->dir_queue, entry_del);
+    entries_free(&params->operand_files);
+    entries_free(&params->dir_queue);
     array_destroy(&params->current_entries);
     array_destroy(&params->operand_files);
     array_destroy(&params->dir_queue);

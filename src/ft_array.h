@@ -9,8 +9,6 @@
 #define ARRAY_SIZE 64
 #endif /* ifndef ARRAY_SIZE */
 
-typedef void (*t_array_del)(void *ptr);
-
 typedef struct s_array {
     size_t len;
     size_t cap;
@@ -23,6 +21,5 @@ void array_destroy(t_array *array);
 bool array_append(t_array *array, void *item);
 void *array_pop(t_array *array);
 void array_clear(t_array *array);
-void array_clear_with(t_array *array, t_array_del del);
 
 #endif /* ifndef FT_ARRAY_H */

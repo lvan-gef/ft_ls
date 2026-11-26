@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 
 #include "./ft_arena.h"
+#include "./ft_array.h"
 #include "./ft_shell_escape.h"
 #include "./ft_str.h"
 #include "./ft_utils.h"
@@ -89,8 +90,12 @@ void entry_free(t_entry *entry) {
     free(entry);
 }
 
-void entry_del(void *ptr) {
-    entry_free((t_entry *)ptr);
+void entries_free(t_array *entries) {
+    for (size_t index = 0; index < entries->len; ++index) {
+        entry_free(entries->data[index]);
+    }
+
+    array_clear(entries);
 }
 
 static t_str *join_dir_path_(t_arena *scratch, const t_str *lhs,
