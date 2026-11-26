@@ -19,8 +19,6 @@
 #include "./ft_symlink.h"
 #include "./ft_utils.h"
 
-struct timespec;
-
 #ifndef CACHE_SIZE
 #define CACHE_SIZE 64
 #endif /* ifndef CACHE_SIZE */
