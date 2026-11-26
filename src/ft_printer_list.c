@@ -104,13 +104,13 @@ static void put_uint_(t_out *out, const size_t value) {
 
 static void put_padded_(t_out *out, const t_str *str, const size_t width) {
     out_put(out, str->str, str->len);
-    out_pad(out, ' ', width - str->len);
+    out_pad(out, width - str->len);
 }
 
 static void put_num_(t_out *out, const t_entry *entry, size_t value,
                      size_t width) {
     if (entry->stat_unavailable) {
-        out_pad(out, ' ', width - 1);
+        out_pad(out, width - 1);
         out_put(out, "?", 1);
     } else {
         put_uint_right_(out, value, width);
@@ -119,7 +119,7 @@ static void put_num_(t_out *out, const t_entry *entry, size_t value,
 
 static void put_uint_right_(t_out *out, const size_t value,
                             const size_t width) {
-    out_pad(out, ' ', width - str_uint_len(value));
+    out_pad(out, width - str_uint_len(value));
     put_uint_(out, value);
 }
 
@@ -138,7 +138,7 @@ static void print_list_rows_(const t_print_request *req,
         const struct stat *st = &entry->st;
 
         out_put(out, info->perm, info->perm_len);
-        out_pad(out, ' ', widths->max_len_perm - info->perm_len);
+        out_pad(out, widths->max_len_perm - info->perm_len);
         out_put(out, " ", 1);
         put_num_(out, entry, st->st_nlink, widths->max_len_links);
         out_put(out, " ", 1);
@@ -154,7 +154,7 @@ static void print_list_rows_(const t_print_request *req,
         }
 
         if (S_ISBLK(st->st_mode) || S_ISCHR(st->st_mode)) {
-            out_pad(out, ' ', size_width - dev_width);
+            out_pad(out, size_width - dev_width);
             put_uint_right_(out, major(st->st_rdev), widths->max_len_major);
             out_put(out, ", ", 2);
             put_uint_right_(out, minor(st->st_rdev), widths->max_len_minor);

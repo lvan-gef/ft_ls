@@ -35,17 +35,14 @@ void out_str(t_out *out, const char *str) {
     out_put(out, str, ft_strlen(str));
 }
 
-void out_pad(t_out *out, const char c, size_t count) {
-    while (count && !out->failed) {
-        if (out->len == out->cap) {
-            out_flush(out);
-            continue;
-        }
+void out_pad(t_out *out, size_t count) {
+    static const char spaces[] = "                                ";
+    const size_t chunk = sizeof(spaces) - 1;
 
-        const size_t avail = out->cap - out->len;
-        const size_t n = count < avail ? count : avail;
-        ft_memset(out->buf + out->len, c, n);
-        out->len += n;
+    while (count > 0) {
+        const size_t n = count < chunk ? count : chunk;
+
+        out_put(out, spaces, n);
         count -= n;
     }
 }
