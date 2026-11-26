@@ -30,18 +30,6 @@ const void *ft_memchr(const void *s, const int c, size_t n) {
     return NULL;
 }
 
-void *ft_memset(void *dest, const int val, size_t len) {
-    unsigned char *ptr = (unsigned char *)dest;
-    const unsigned char byte = (unsigned char)val;
-
-    while (len > 0) {
-        *ptr++ = byte;
-        --len;
-    }
-
-    return dest;
-}
-
 int ft_strncmp(const char *s1, const char *s2, const size_t n) {
     const unsigned char *s1_ = (const unsigned char *)s1;
     const unsigned char *s2_ = (const unsigned char *)s2;
