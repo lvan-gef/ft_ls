@@ -11,9 +11,8 @@
 
 t_entry *entry_new_path(const t_str *path, const struct stat *st,
                         bool is_operand);
-t_entry *entry_new_dirent(t_arena *scratch, const struct dirent *dp);
-bool entry_build_path(t_arena *scratch, t_entry *entry,
-                      const t_str *parent_path);
+t_entry *entry_new_dirent(t_arena *scratch, const struct dirent *dp,
+                          const t_str *dir_path);
 void entry_free(t_entry *entry);
 void entries_free(t_array *entries);
 

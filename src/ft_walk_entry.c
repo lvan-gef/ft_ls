@@ -15,11 +15,9 @@
 typedef struct {
     t_entry entry;
     t_str name;
-    char name_buf[];
+    t_str path;
+    char buf[];
 } t_scratch_dir_entry;
-
-static t_str *join_dir_path_(t_arena *scratch, const t_str *lhs,
-                             const t_str *rhs);
 
 t_entry *entry_new_path(const t_str *path, const struct stat *st,
                         const bool is_operand) {
@@ -42,36 +40,31 @@ t_entry *entry_new_path(const t_str *path, const struct stat *st,
     return entry;
 }
 
-t_entry *entry_new_dirent(t_arena *scratch, const struct dirent *dp) {
+t_entry *entry_new_dirent(t_arena *scratch, const struct dirent *dp,
+                          const t_str *dir_path) {
     const size_t name_len = (size_t)ft_strlen(dp->d_name);
-    t_scratch_dir_entry *ent = arena_push(scratch, sizeof(*ent) + name_len + 1);
+    const bool need_slash =
+        dir_path->len != 0 && dir_path->str[dir_path->len - 1] != '/';
+    const size_t prefix_len = dir_path->len + (need_slash ? 1 : 0);
+
+    t_scratch_dir_entry *ent =
+        arena_push(scratch, sizeof(*ent) + prefix_len + name_len + 1);
     if (!ent) {
         return NULL;
     }
 
-    str_init(&ent->name, ent->name_buf);
-    str_copy_cstr(&ent->name, dp->d_name, name_len);
-    ent->entry = (t_entry){.name = &ent->name,
-                           .path = NULL,
-                           .st = (struct stat){0},
-                           .stat_unavailable = false,
-                           .is_operand = false};
-    shell_scan_str(ent->entry.name, &ent->entry.name_scan);
+    ft_memcpy(ent->buf, dir_path->str, dir_path->len);
+    if (need_slash) {
+        ent->buf[dir_path->len] = '/';
+    }
+    ft_memcpy(ent->buf + prefix_len, dp->d_name, name_len + 1);
+
+    ent->path = (t_str){.str = ent->buf, .len = prefix_len + name_len};
+    ent->name = (t_str){.str = ent->buf + prefix_len, .len = name_len};
+    ent->entry = (t_entry){.name = &ent->name, .path = &ent->path};
+    shell_scan_str(&ent->name, &ent->entry.name_scan);
+
     return &ent->entry;
-}
-
-bool entry_build_path(t_arena *scratch, t_entry *entry,
-                      const t_str *parent_path) {
-    if (entry->path) {
-        return true;
-    }
-
-    if (!parent_path || !entry->name) {
-        return false;
-    }
-
-    entry->path = join_dir_path_(scratch, parent_path, entry->name);
-    return entry->path != NULL;
 }
 
 void entry_free(t_entry *entry) {
@@ -96,29 +89,4 @@ void entries_free(t_array *entries) {
     }
 
     array_clear(entries);
-}
-
-static t_str *join_dir_path_(t_arena *scratch, const t_str *lhs,
-                             const t_str *rhs) {
-    const bool need_slash = lhs->len != 0 && lhs->str[lhs->len - 1] != '/';
-    const size_t slash_len = need_slash ? 1U : 0U;
-    const size_t total_len = lhs->len + rhs->len + slash_len;
-    t_str *path = arena_push(scratch, sizeof(*path) + total_len + 1);
-    if (!path) {
-        return NULL;
-    }
-
-    str_init(path, (char *)(path + 1));
-
-    ft_memcpy(path->str, lhs->str, lhs->len);
-    path->len = lhs->len;
-    if (need_slash) {
-        path->str[path->len++] = '/';
-    }
-
-    ft_memcpy(path->str + path->len, rhs->str, rhs->len);
-    path->len += rhs->len;
-    path->str[path->len] = '\0';
-
-    return path;
 }

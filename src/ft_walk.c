@@ -41,7 +41,7 @@ static bool print_operand_files_(t_params *params);
 static bool process_queue_(t_params *params, const t_array *array);
 static bool load_directory_entries_(t_params *params, DIR *d,
                                     const t_str *dir_path);
-static bool queue_recursive_dirs_(t_params *params, const t_str *parent_path);
+static bool queue_recursive_dirs_(t_params *params);
 static bool collect_operands_(t_params *params, const t_array *array);
 static bool collect_operand_(t_params *params, const t_str *str);
 static bool add_operand_(t_params *params, t_array *dst, const t_str *str,
@@ -154,7 +154,7 @@ static bool process_queue_(t_params *params, const t_array *array) {
             goto error;
         }
 
-        if (!queue_recursive_dirs_(params, dir_path->path)) {
+        if (!queue_recursive_dirs_(params)) {
             goto error;
         }
 
@@ -283,23 +283,17 @@ static bool load_directory_entries_(t_params *params, DIR *d,
             continue;
         }
 
-        t_entry *entry = entry_new_dirent(&params->temp_arena, dp);
+        t_entry *entry = entry_new_dirent(&params->temp_arena, dp, dir_path);
         if (!entry) {
             return false;
         }
 
         params->dir_quoted = params->dir_quoted || entry->name_scan.quote;
         entry->st.st_mode = mode;
-        if (need_lstat) {
-            if (!entry_build_path(&params->temp_arena, entry, dir_path)) {
-                return false;
-            }
-
-            if (lstat(entry->path->str, &entry->st) < 0) {
-                print_error_(&params->out, entry->path, errno, "cannot access");
-                entry->stat_unavailable = true;
-                set_exit_(params, 1);
-            }
+        if (need_lstat && lstat(entry->path->str, &entry->st) < 0) {
+            print_error_(&params->out, entry->path, errno, "cannot access");
+            entry->stat_unavailable = true;
+            set_exit_(params, 1);
         }
 
         if (!array_append(&params->current_entries, entry)) {
@@ -316,7 +310,7 @@ static void clear_directory_entries_(t_params *params) {
     arena_clear(&params->temp_arena);
 }
 
-static bool queue_recursive_dirs_(t_params *params, const t_str *parent_path) {
+static bool queue_recursive_dirs_(t_params *params) {
     if (params->args->recursive && params->current_entries.len) {
         size_t index = params->current_entries.len;
         while (index > 0) {
@@ -329,10 +323,6 @@ static bool queue_recursive_dirs_(t_params *params, const t_str *parent_path) {
             if (!ft_strncmp(entry->name->str, ".", entry->name->len) ||
                 !ft_strncmp(entry->name->str, "..", entry->name->len)) {
                 continue;
-            }
-
-            if (!entry_build_path(&params->temp_arena, entry, parent_path)) {
-                return false;
             }
 
             t_entry *dir_entry = entry_new_path(entry->path, &entry->st, false);
