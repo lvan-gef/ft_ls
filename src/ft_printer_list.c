@@ -12,7 +12,6 @@
 #include "./ft_str.h"
 
 typedef struct {
-    size_t total;
     size_t max_len_links;
     size_t max_len_sizes;
     size_t max_len_user;
@@ -20,12 +19,11 @@ typedef struct {
     size_t max_len_major;
     size_t max_len_minor;
     size_t max_len_perm;
-} t_list_stats;
+} t_list_widths;
 
 static void print_list_(const t_print_request *req, const t_file_info *infos);
-static void update_stats_(t_list_stats *stats, const t_file_info *info);
-static size_t dev_width_(const t_list_stats *sizes);
-static size_t size_width_(const t_list_stats *sizes);
+static void update_stats_(t_list_widths *widths, const t_file_info *info);
+static size_t dev_width_(const t_list_widths *widths);
 static void put_uint_(t_out *out, size_t value);
 static void put_padded_(t_out *out, const t_str *str, size_t width);
 static void put_num_(t_out *out, const t_entry *entry, size_t value,
@@ -33,72 +31,66 @@ static void put_num_(t_out *out, const t_entry *entry, size_t value,
 static void put_uint_right_(t_out *out, size_t value, size_t width);
 static void print_list_rows_(const t_print_request *req,
                              const t_file_info *infos,
-                             const t_list_stats *sizes);
-static void update_num_widths_(t_list_stats *s, const t_entry *e);
+                             const t_list_widths *widths);
+static void update_num_widths_(t_list_widths *widths, const t_entry *e);
 static void max_(size_t *dst, size_t value);
 
 bool printer_list(const t_print_request *req) {
     t_file_info *infos = NULL;
-    const bool ok = prepare_list_infos(req, &infos);
 
-    if (ok) {
-        print_list_(req, infos);
+    if (!prepare_list_infos(req, &infos)) {
+        return false;
     }
 
-    return ok;
+    print_list_(req, infos);
+    return true;
 }
 
 static void print_list_(const t_print_request *req, const t_file_info *infos) {
     const t_print_ctx *ctx = req->ctx;
-    t_list_stats sizes = {0};
+    t_list_widths widths = {0};
+    size_t total = 0;
     for (size_t index = 0; index < req->entries->len; ++index) {
         const t_entry *entry = req->entries->data[index];
-        update_num_widths_(&sizes, entry);
-        update_stats_(&sizes, &infos[index]);
-        sizes.total += (size_t)entry->st.st_blocks;
+        update_num_widths_(&widths, entry);
+        update_stats_(&widths, &infos[index]);
+        total += (size_t)entry->st.st_blocks;
     }
 
     const t_array *context = req->list_width_context;
     for (size_t index = 0; context && index < context->len; ++index) {
-        update_num_widths_(&sizes, context->data[index]);
+        update_num_widths_(&widths, context->data[index]);
     }
 
     put_dir_header(ctx->out, req->dir_header, ctx->is_tty);
 
     if (req->print_total) {
         out_put(ctx->out, "total ", 6);
-        put_uint_(ctx->out, (sizes.total + 1) / 2);
+        put_uint_(ctx->out, (total + 1) / 2);
         out_put(ctx->out, "\n", 1);
     }
 
-    print_list_rows_(req, infos, &sizes);
+    print_list_rows_(req, infos, &widths);
 }
 
-static void update_stats_(t_list_stats *stats, const t_file_info *info) {
-    if (info->username && info->username->len > stats->max_len_user) {
-        stats->max_len_user = info->username->len;
+static void update_stats_(t_list_widths *widths, const t_file_info *info) {
+    if (info->username) {
+        max_(&widths->max_len_user, info->username->len);
     }
 
-    if (info->groupname && info->groupname->len > stats->max_len_group) {
-        stats->max_len_group = info->groupname->len;
+    if (info->groupname) {
+        max_(&widths->max_len_group, info->groupname->len);
     }
 
-    if (info->perm_len > stats->max_len_perm) {
-        stats->max_len_perm = info->perm_len;
-    }
+    max_(&widths->max_len_perm, info->perm_len);
 }
 
-static size_t dev_width_(const t_list_stats *sizes) {
-    if (!sizes->max_len_major && !sizes->max_len_minor) {
+static size_t dev_width_(const t_list_widths *widths) {
+    if (!widths->max_len_major && !widths->max_len_minor) {
         return 0;
     }
 
-    return sizes->max_len_major + 2 + sizes->max_len_minor;
-}
-
-static size_t size_width_(const t_list_stats *sizes) {
-    const size_t dev_width = dev_width_(sizes);
-    return sizes->max_len_sizes > dev_width ? sizes->max_len_sizes : dev_width;
+    return widths->max_len_major + 2 + widths->max_len_minor;
 }
 
 static void put_uint_(t_out *out, const size_t value) {
@@ -133,9 +125,12 @@ static void put_uint_right_(t_out *out, const size_t value,
 
 static void print_list_rows_(const t_print_request *req,
                              const t_file_info *infos,
-                             const t_list_stats *sizes) {
+                             const t_list_widths *widths) {
     const t_print_ctx *ctx = req->ctx;
     t_out *out = ctx->out;
+    const size_t dev_width = dev_width_(widths);
+    const size_t size_width =
+        widths->max_len_sizes > dev_width ? widths->max_len_sizes : dev_width;
 
     for (size_t index = 0; index < req->entries->len; ++index) {
         const t_entry *entry = req->entries->data[index];
@@ -143,28 +138,28 @@ static void print_list_rows_(const t_print_request *req,
         const struct stat *st = &entry->st;
 
         out_put(out, info->perm, info->perm_len);
-        out_pad(out, ' ', sizes->max_len_perm - info->perm_len);
+        out_pad(out, ' ', widths->max_len_perm - info->perm_len);
         out_put(out, " ", 1);
-        put_num_(out, entry, st->st_nlink, sizes->max_len_links);
+        put_num_(out, entry, st->st_nlink, widths->max_len_links);
         out_put(out, " ", 1);
 
         if (!ctx->args->no_owner) {
-            put_padded_(out, info->username, sizes->max_len_user);
+            put_padded_(out, info->username, widths->max_len_user);
             out_put(out, " ", 1);
         }
 
         if (!ctx->args->no_group) {
-            put_padded_(out, info->groupname, sizes->max_len_group);
+            put_padded_(out, info->groupname, widths->max_len_group);
             out_put(out, " ", 1);
         }
 
         if (S_ISBLK(st->st_mode) || S_ISCHR(st->st_mode)) {
-            out_pad(out, ' ', size_width_(sizes) - dev_width_(sizes));
-            put_uint_right_(out, major(st->st_rdev), sizes->max_len_major);
+            out_pad(out, ' ', size_width - dev_width);
+            put_uint_right_(out, major(st->st_rdev), widths->max_len_major);
             out_put(out, ", ", 2);
-            put_uint_right_(out, minor(st->st_rdev), sizes->max_len_minor);
+            put_uint_right_(out, minor(st->st_rdev), widths->max_len_minor);
         } else {
-            put_num_(out, entry, (size_t)st->st_size, size_width_(sizes));
+            put_num_(out, entry, (size_t)st->st_size, size_width);
         }
 
         out_put(out, " ", 1);
@@ -181,15 +176,15 @@ static void print_list_rows_(const t_print_request *req,
     }
 }
 
-static void update_num_widths_(t_list_stats *s, const t_entry *e) {
-    max_(&s->max_len_links,
+static void update_num_widths_(t_list_widths *widths, const t_entry *e) {
+    max_(&widths->max_len_links,
          e->stat_unavailable ? 1 : str_uint_len(e->st.st_nlink));
 
     if (S_ISBLK(e->st.st_mode) || S_ISCHR(e->st.st_mode)) {
-        max_(&s->max_len_major, str_uint_len(major(e->st.st_rdev)));
-        max_(&s->max_len_minor, str_uint_len(minor(e->st.st_rdev)));
+        max_(&widths->max_len_major, str_uint_len(major(e->st.st_rdev)));
+        max_(&widths->max_len_minor, str_uint_len(minor(e->st.st_rdev)));
     } else {
-        max_(&s->max_len_sizes,
+        max_(&widths->max_len_sizes,
              e->stat_unavailable ? 1 : str_uint_len((size_t)e->st.st_size));
     }
 }
