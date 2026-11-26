@@ -26,16 +26,16 @@ struct timespec;
 #endif /* ifndef CACHE_SIZE */
 
 #ifndef LOGIN_NAME_MAX
-#define LOGIN_NAME_MAX INT64_C(256)
+#define LOGIN_NAME_MAX 256
 #endif /* ifndef LOGIN_NAME_MAX */
 
 #ifndef LS_RECENT_SECS
 #define LS_RECENT_SECS ((time_t)(31556952 / 2))
 #endif /* ifndef LS_RECENT_SECS */
 
-#ifndef XATTR_STACK_SIZE
-#define XATTR_STACK_SIZE 1024
-#endif /* ifndef XATTR_STACK_SIZE */
+#ifndef XATTR_LIST_MAX
+#define XATTR_LIST_MAX 65536
+#endif /* ifndef XATTR_LIST_MAX */
 
 typedef struct {
     char name[LOGIN_NAME_MAX];
@@ -54,7 +54,7 @@ static t_id_cache group_cache = {0};
 
 static bool fill_file_info_(const t_print_request *req, t_file_info *info,
                             const t_entry *entry, time_t now);
-static void get_perm_(t_arena *arena, t_file_info *info, const t_entry *entry);
+static void get_perm_(t_file_info *info, const t_entry *entry);
 static char file_type_char_(mode_t mode);
 static t_str *get_id_name_(t_arena *arena, t_id_cache *cache, size_t id,
                            t_id_lookup lookup);
@@ -66,7 +66,7 @@ static const char *cache_lookup_(const t_id_cache *cache, size_t id);
 static void cache_store_(t_id_cache *cache, size_t id, const char *name);
 static char exec_char_(mode_t mode, mode_t exec_bit, mode_t special_bit,
                        char lower, char upper);
-static char get_acl_attr_(t_arena *arena, const char *path);
+static char get_acl_attr_(const char *path);
 static char classify_xattrs_(const char *names, ssize_t size);
 static bool is_posix_acl_(const char *name);
 static bool is_security_context_(const char *name);
@@ -107,8 +107,7 @@ static bool fill_file_info_(const t_print_request *req, t_file_info *info,
     t_arena *arena = req->ctx->arena;
     const bool unknown = entry->stat_unavailable;
 
-    get_perm_(arena, info, entry);
-
+    get_perm_(info, entry);
     if (!args->no_owner) {
         info->username = unknown ? str_arena_from_cstr(arena, "?")
                                  : get_id_name_(arena, &user_cache,
@@ -143,7 +142,7 @@ static bool fill_file_info_(const t_print_request *req, t_file_info *info,
     return true;
 }
 
-static void get_perm_(t_arena *arena, t_file_info *info, const t_entry *entry) {
+static void get_perm_(t_file_info *info, const t_entry *entry) {
     size_t index = 0;
     char *p = info->perm;
     p[index++] = file_type_char_(entry->st.st_mode);
@@ -167,7 +166,7 @@ static void get_perm_(t_arena *arena, t_file_info *info, const t_entry *entry) {
     p[index++] = entry->st.st_mode & S_IWOTH ? 'w' : '-';
     p[index++] = exec_char_(entry->st.st_mode, S_IXOTH, S_ISVTX, 't', 'T');
 
-    const char chr = get_acl_attr_(arena, entry->path->str);
+    const char chr = get_acl_attr_(entry->path->str);
     if (chr != ' ') {
         p[index++] = chr;
     }
@@ -297,11 +296,10 @@ static char exec_char_(const mode_t mode, const mode_t exec_bit,
     return has_exec ? lower : upper;
 }
 
-static char get_acl_attr_(t_arena *arena, const char *path) {
-    errno = 0;
-    char names[XATTR_STACK_SIZE];
+static char get_acl_attr_(const char *path) {
+    static char names[XATTR_LIST_MAX];
 
-    ssize_t size = llistxattr(path, names, sizeof(names));
+    const ssize_t size = llistxattr(path, names, sizeof(names));
     if (size == 0) {
         return ' ';
     }
@@ -310,29 +308,7 @@ static char get_acl_attr_(t_arena *arena, const char *path) {
         return classify_xattrs_(names, size);
     }
 
-    if (errno != ERANGE) {
-        return xattr_error_marker_(errno);
-    }
-
-    size = llistxattr(path, NULL, 0);
-    if (size < 0) {
-        return xattr_error_marker_(errno);
-    }
-
-    if (size == 0) {
-        return ' ';
-    }
-
-    char *large_names = arena_push(arena, (size_t)size);
-    if (!large_names) {
-        return '?';
-    }
-
-    size = llistxattr(path, large_names, (size_t)size);
-    const char chr = size >= 0 ? classify_xattrs_(large_names, size)
-                               : xattr_error_marker_(errno);
-
-    return chr;
+    return xattr_error_marker_(errno);
 }
 
 static bool is_posix_acl_(const char *name) {
